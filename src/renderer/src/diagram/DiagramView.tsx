@@ -1,3 +1,6 @@
+import { editPlacedDevice } from '../product/openEditor'
+import { deviceMenu } from '../product/productActions'
+import { showContextMenu } from '../components/ContextMenu'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyNodeChanges, Background, BackgroundVariant, ConnectionMode, Controls, MiniMap, Panel, ReactFlow, useConnection, useReactFlow,
@@ -248,7 +251,12 @@ export function DiagramView() {
         onEdgesChange={onEdgesChange}
         onNodeDragStop={onNodeDragStop}
         onDelete={onDelete}
-        onNodeDoubleClick={(_, n) => { if (n.type === 'groupFrame') select(project.equipment.filter((e) => e.groupId === (n as GroupFrameType).data.id).map((e) => e.id)) }}
+        onNodeDoubleClick={(ev, n) => {
+          if (n.type === 'groupFrame') { select(project.equipment.filter((e) => e.groupId === (n as GroupFrameType).data.id).map((e) => e.id)); return }
+          if ((ev.target as HTMLElement).closest('.react-flow__handle')) return
+          select([n.id as EquipmentId]); editPlacedDevice(n.id)
+        }}
+        onNodeContextMenu={(ev, n) => { if (n.type !== 'device') return; select([n.id as EquipmentId]); showContextMenu(ev, deviceMenu(n.id)) }}
         onConnectStart={onConnectStart}
         onConnectEnd={endWiring}
         onConnect={onConnect}

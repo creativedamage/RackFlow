@@ -9,6 +9,7 @@ import { api } from '../platform'
 import { useStore } from '../store'
 import { Dot, Field, Modal, NumberInput, Select, TextInput, Toggle } from '../components/ui'
 import { ManufacturerPicker } from '../components/ManufacturerPicker'
+import { removeUserProduct } from './productActions'
 
 const DIRS: { value: PortDirection; label: string }[] = [{ value: 'input', label: 'Input' }, { value: 'output', label: 'Output' }, { value: 'bidirectional', label: 'Bidirectional' }]
 const newPortId = () => `p.${Math.random().toString(36).slice(2, 10)}`
@@ -39,6 +40,8 @@ export function ProductEditor({ initial }: { initial: ProductDefinition }) {
   const instanceId = useStore((s) => s.editingInstance)
   const instance = useStore((s) => (instanceId ? s.project.equipment.find((e) => e.id === instanceId) : undefined))
   const isBuiltIn = BUILT_IN_KEYS.has(initial.key.split('@')[0])
+  /** The saved user copy of this product, if any (enables Delete / Revert). */
+  const stored = useStore((s) => s.userProducts.find((x) => x.key === initial.key))
 
   /** Applies the edited product to just the selected placed device. */
   const saveInstance = () => {
@@ -91,6 +94,8 @@ export function ProductEditor({ initial }: { initial: ProductDefinition }) {
     <Modal title={instance ? `Edit ${instance.tag} · ${initial.manufacturer} ${initial.model}` : (initial.source === 'user' || isBuiltIn) && initial.model !== 'New Product' ? `Edit ${initial.manufacturer} ${initial.model}` : 'Custom Product Builder'} onClose={close} wide
       footer={<>
         <span className="muted">{p.ports.length} ports · {heatBTU(p.power).toFixed(0)} BTU/hr</span>
+        {stored && !instance && <button className="danger" onClick={async () => { if (await removeUserProduct(stored)) close() }}
+          title={isBuiltIn ? 'Throw away your edits and go back to the built-in version' : 'Delete this custom product from your library'}>{isBuiltIn ? 'Revert to Built-in' : 'Delete Product…'}</button>}
         <span className="spacer" />
         <button onClick={close}>Cancel</button>
         {instance && <button disabled={problems.length > 0 || saving} onClick={saveInstance} title="Change only this placed device; the library and other copies stay as they are">Save to This Device Only</button>}

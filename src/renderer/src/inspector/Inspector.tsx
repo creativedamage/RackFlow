@@ -1,3 +1,4 @@
+import { editPlacedDevice } from '../product/openEditor'
 import { useState } from 'react'
 import {
   CABLE_CATALOG, cableSpec, CATEGORIES, CONNECTOR_TYPES, connectorIsPower, exactFitCable, fittingCables, cablesAt, connectorName, DOMAINS, heatBTU, orientation, portDomain, resolve, SIGNALS,
@@ -41,7 +42,7 @@ function EquipmentInspector({ eq }: { eq: EquipmentInstance }) {
       {p.category === 'patchBay'
         ? <p className="muted small">Edit this bay’s labels on the Patch Labels page.</p>
         : <div className="edit-device-row">
-            <button onClick={() => useStore.getState().set(p.plate ? { editingPlate: { product: structuredClone(p), instanceId: eq.id } } : { editingProduct: structuredClone(p), editingInstance: eq.id })}>Edit Device…</button>
+            <button className="primary" onClick={() => editPlacedDevice(eq.id)} title="Edit this device’s ports, specs and power (⌘E). Also: double-click it on the diagram.">✎ Edit Device…</button>
             {p.key.includes('@') && <span className="badge" title="This device has its own edited specs">Edited</span>}
           </div>}
       <Field label="Tag"><TextInput value={eq.tag} onCommit={(v) => upd('Rename Device', (e) => { e.tag = v })} /></Field>

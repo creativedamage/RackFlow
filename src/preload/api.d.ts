@@ -9,7 +9,7 @@ export type MenuCommand =
   | 'new' | 'open' | 'save' | 'saveAs' | 'save-and-close'
   | 'undo' | 'redo' | 'delete' | 'selectAll' | 'zoomFit'
   | 'mode:diagram' | 'mode:rack' | 'mode:patch' | 'mode:sheet'
-  | 'newProduct' | 'newTemplate' | 'toggleInspector'
+  | 'newProduct' | 'newTemplate' | 'toggleInspector' | 'editDevice'
 
 export interface OpenedFile { path: string; data: string }
 

@@ -9,6 +9,9 @@ import { Dot, Segmented, Select } from './ui'
 import { MakersBrowser } from './MakersBrowser'
 import { addBayToProject } from '../patch/addBay'
 import { addProductToDiagram } from '../diagram/placement'
+import { showContextMenu } from './ContextMenu'
+import { openProductEditor } from '../product/openEditor'
+import { duplicateProduct, productMenu, removeUserProduct } from '../product/productActions'
 
 export const DRAG_MIME = 'application/x-rackflow'
 export type DragPayload = { kind: 'product'; key: string } | { kind: 'patch'; key: string } | { kind: 'rack-eq'; id: string }
@@ -16,7 +19,7 @@ export type DragPayload = { kind: 'product'; key: string } | { kind: 'patch'; ke
 export function Sidebar() {
   const [tab, setTab] = useState<'gear' | 'makers' | 'patch'>('gear')
   const [query, setQuery] = useState('')
-  const [category, setCategory] = useState<EquipmentCategory | ''>('')
+  const [category, setCategory] = useState<EquipmentCategory | '' | 'mine'>('')
   const [domain, setDomain] = useState<SignalDomain | ''>('')
   const library = useStore((s) => s.library)
   const templates = useStore((s) => s.templates)
@@ -26,7 +29,10 @@ export function Sidebar() {
   const cap = query || category ? 40 : 8
   const toggle = (set_: Set<string>, k: string) => { const n = new Set(set_); if (n.has(k)) n.delete(k); else n.add(k); return n }
 
-  const results = useMemo(() => library.search({ text: query, category: category || null, domain: domain || null }), [library, query, category, domain])
+  const results = useMemo(() => {
+    const hits = library.search({ text: query, category: category === 'mine' ? null : category || null, domain: domain || null })
+    return category === 'mine' ? hits.filter((p) => p.source === 'user') : hits
+  }, [library, query, category, domain])
   const grouped = useMemo(() => {
     const m = new Map<EquipmentCategory, ProductDefinition[]>()
     for (const p of results) { const a = m.get(p.category); if (a) a.push(p); else m.set(p.category, [p]) }
@@ -48,11 +54,7 @@ export function Sidebar() {
     e.dataTransfer.effectAllowed = 'copy'
   }
 
-  const fork = (p: ProductDefinition) => set({
-    editingProduct: p.source === 'builtIn'
-      ? { ...structuredClone(p), key: `user.${p.key}.${Date.now().toString(36)}`, model: `${p.model} (Custom)`, source: 'user' }
-      : structuredClone(p),
-  })
+
 
   return (
     <aside className="sidebar">
@@ -61,7 +63,7 @@ export function Sidebar() {
         <input className="search" type="search" placeholder={tab === 'gear' ? 'Search gear or manufacturer…' : tab === 'makers' ? 'Search manufacturers or product lines…' : 'Search patch bays…'} value={query} onChange={(e) => setQuery(e.target.value)} />
         {tab === 'gear' && (
           <div className="filters">
-            <Select value={category} onChange={setCategory} options={[{ value: '', label: 'All categories' }, ...CATEGORY_KEYS.map((c) => ({ value: c, label: CATEGORIES[c].name }))]} />
+            <Select value={category} onChange={setCategory} options={[{ value: '', label: 'All categories' }, { value: 'mine', label: '★ My custom & edited' }, ...CATEGORY_KEYS.map((c) => ({ value: c, label: CATEGORIES[c].name }))]} />
             <Select value={domain} onChange={setDomain} options={[{ value: '', label: 'All signals' }, ...(Object.keys(DOMAINS) as SignalDomain[]).map((d) => ({ value: d, label: DOMAINS[d].name }))]} />
           </div>
         )}
@@ -82,22 +84,16 @@ export function Sidebar() {
                 <span className={`disclosure ${isCollapsed ? '' : 'open'}`}>▸</span>{CATEGORIES[cat].name} <span className="muted">{items.length}</span>
               </h4>
               {!isCollapsed && shown.map((p) => (
-                <div key={p.key} className="lib-item" draggable onDragStart={(e) => drag(e, { kind: 'product', key: p.key })} onDoubleClick={() => addProductToDiagram(p)} title="Double-click to add to the Wiring Diagram, or drag it where you want it">
+                <div key={p.key} className="lib-item" draggable onDragStart={(e) => drag(e, { kind: 'product', key: p.key })} onDoubleClick={() => addProductToDiagram(p)} onContextMenu={(e) => showContextMenu(e, productMenu(p))} title="Double-click to add to the Wiring Diagram, or drag it where you want it. Right-click to edit.">
                   <div className="lib-main">
                     <div className="lib-title">{p.model}{p.source === 'user' && <span className="badge">{BUILT_IN_KEYS.has(p.key) ? 'Edited' : 'Custom'}</span>}</div>
                     <div className="lib-sub">{p.manufacturer}{p.physical.rackUnits ? ` · ${p.physical.rackUnits}U` : ''} · {p.ports.length} {p.ports.length === 1 ? "port" : "ports"}</div>
                   </div>
                   <div className="lib-dots">{[...productDomains(p)].map((d) => <Dot key={d} color={DOMAINS[d].color} />)}</div>
                   <div className="lib-actions">
-                    <button className="mini" onClick={() => set(p.plate ? { editingPlate: { product: structuredClone(p), instanceId: null } } : { editingProduct: structuredClone(p), editingInstance: null })} title={p.source === 'builtIn' ? 'Edit this product (saved as your version; revert any time)' : 'Edit product'}>Edit</button>
-                    {p.source === 'builtIn' && <button className="mini" onClick={() => fork(p)} title="Duplicate as a new custom product">Duplicate</button>}
-                    {p.source === 'user' && (
-                      <button className="mini danger" title={BUILT_IN_KEYS.has(p.key) ? 'Discard your edits and go back to the built-in version' : 'Delete custom product'} onClick={async () => {
-                        if (!confirm(BUILT_IN_KEYS.has(p.key) ? `Revert “${p.model}” to the built-in version? Devices already placed keep their current specs.` : `Delete “${p.model}” from your library?`)) return
-                        await api.deleteUserProduct(p.key)
-                        await useStore.getState().reloadLibrary()
-                      }}>{BUILT_IN_KEYS.has(p.key) ? 'Revert' : 'Delete'}</button>
-                    )}
+                    <button className="mini" onClick={(e) => { e.stopPropagation(); openProductEditor(p) }} title={p.source === 'builtIn' ? 'Edit this product (saved as your version; revert any time)' : 'Edit product'}>Edit</button>
+                    {p.source === 'builtIn' && <button className="mini" onClick={(e) => { e.stopPropagation(); duplicateProduct(p) }} title="Duplicate as a new custom product">Duplicate</button>}
+                    {p.source === 'user' && <button className="mini danger" onClick={(e) => { e.stopPropagation(); void removeUserProduct(p) }} title={BUILT_IN_KEYS.has(p.key) ? 'Discard your edits and go back to the built-in version' : 'Delete custom product'}>{BUILT_IN_KEYS.has(p.key) ? 'Revert' : 'Delete'}</button>}
                   </div>
                 </div>
               ))}

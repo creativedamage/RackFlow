@@ -1,3 +1,5 @@
+import { deviceMenu } from '../product/productActions'
+import { showContextMenu } from '../components/ContextMenu'
 import { useMemo, useState } from 'react'
 import { addRack, RackLayout, type EquipmentId, type Rack, type RackFace } from '@core/index'
 import { useStore } from '../store'
@@ -131,8 +133,9 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
               draggable={id != null}
               onDragStart={(e) => { if (id) { const s = JSON.stringify({ kind: 'rack-eq', id } satisfies DragPayload); dragCache = s; e.dataTransfer.setData(DRAG_MIME, s) } }}
               onClick={() => id && select([id])}
+              onContextMenu={(e) => { if (!id) return; select([id]); showContextMenu(e, [...deviceMenu(id), 'sep', { label: 'Flip Front/Rear', onClick: () => apply('Flip Mount Face', (d) => { const eq = d.equipment.find((x) => x.id === id); if (eq?.rackPlacement) eq.rackPlacement.face = eq.rackPlacement.face === 'front' ? 'rear' : 'front' }) }]) }}
               onDoubleClick={() => id && apply('Flip Mount Face', (d) => { const eq = d.equipment.find((x) => x.id === id); if (eq?.rackPlacement) eq.rackPlacement.face = eq.rackPlacement.face === 'front' ? 'rear' : 'front' })}
-              title={id ? 'Drag to move · double-click to flip front/rear · Delete removes from rack' : undefined}
+              title={id ? 'Drag to move · double-click to flip front/rear · right-click to edit · Delete removes from rack' : undefined}
               tabIndex={id ? 0 : -1}
               onKeyDown={(e) => {
                 if (id && (e.key === 'Backspace' || e.key === 'Delete')) {

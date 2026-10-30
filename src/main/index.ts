@@ -113,6 +113,8 @@ function buildMenu() {
         { role: 'cut' }, { role: 'copy' }, { role: 'paste' },
         cmd('Delete', 'delete'),
         cmd('Select All Devices', 'selectAll', 'CmdOrCtrl+A'),
+        { type: 'separator' },
+        cmd('Edit Selected Device…', 'editDevice', 'CmdOrCtrl+E'),
       ],
     },
     {

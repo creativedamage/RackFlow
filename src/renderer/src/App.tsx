@@ -1,3 +1,5 @@
+import { ContextMenu } from './components/ContextMenu'
+import { editSelection } from './product/openEditor'
 import { useEffect } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
 import { newCustomProduct, newCustomTemplate } from '@core/index'
@@ -88,6 +90,7 @@ export function App() {
       case 'zoomFit': s.set({ mode: 'diagram', fitRequest: s.fitRequest + 1 }); break
       case 'toggleInspector': s.set({ showInspector: !s.showInspector }); break
       case 'newProduct': s.set({ editingProduct: newCustomProduct() }); break
+      case 'editDevice': editSelection(); break
       case 'newTemplate': s.set({ editingTemplate: newCustomTemplate() }); break
     }
   }), [])
@@ -113,6 +116,7 @@ export function App() {
         {editingPlate && <PlateBuilder key={editingPlate.product.key + (editingPlate.instanceId ?? '')} initial={editingPlate.product} instanceId={editingPlate.instanceId} />}
         {editingTemplate && <TemplateEditor key={editingTemplate.key} initial={editingTemplate} />}
         <Toasts />
+        <ContextMenu />
       </div>
     </ReactFlowProvider>
   )

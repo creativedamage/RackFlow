@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
-  CATEGORIES, DOMAINS, MAKER_CATEGORIES, newCustomProduct, productDomains,
+  BUILT_IN_KEYS, CATEGORIES, DOMAINS, MAKER_CATEGORIES, newCustomProduct, productDomains,
   type EquipmentCategory, type MakerCategory, type ProductDefinition,
 } from '@core/index'
 import { api } from '../platform'
@@ -8,6 +8,9 @@ import { useStore } from '../store'
 import { Dot, Select } from './ui'
 import { DRAG_MIME } from './Sidebar'
 import { addProductToDiagram } from '../diagram/placement'
+import { showContextMenu } from './ContextMenu'
+import { openProductEditor } from '../product/openEditor'
+import { productMenu, removeUserProduct } from '../product/productActions'
 
 /** Sidebar "Makers" tab: browse 350+ manufacturers, see their products, add products or new makers. */
 export function MakersBrowser({ query }: { query: string }) {
@@ -86,11 +89,15 @@ export function MakersBrowser({ query }: { query: string }) {
                     <div key={c} className="maker-group">
                       <div className="maker-group-head">{CATEGORIES[c].name} <span className="muted">{items.length}</span></div>
                       {items.map((p) => (
-                        <div key={p.key} className="lib-item compact clickable" draggable title={`${p.summary}\nClick to add to the Wiring Diagram (or drag it where you want it)`}
-                          onClick={() => addProductToDiagram(p)}
+                        <div key={p.key} className="lib-item compact clickable" draggable title={`${p.summary}\nClick to add to the Wiring Diagram (or drag it where you want it). Right-click for more.`}
+                          onClick={() => addProductToDiagram(p)} onContextMenu={(e) => showContextMenu(e, productMenu(p))}
                           onDragStart={(e) => { e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: 'product', key: p.key })); e.dataTransfer.effectAllowed = 'copy' }}>
-                          <div className="lib-main"><div className="lib-title">{p.model}{p.source === 'user' && <span className="badge">Custom</span>}</div><div className="lib-sub">{p.summary}</div></div>
+                          <div className="lib-main"><div className="lib-title">{p.model}{p.source === 'user' && <span className="badge">{BUILT_IN_KEYS.has(p.key) ? 'Edited' : 'Custom'}</span>}</div><div className="lib-sub">{p.summary}</div></div>
                           <div className="lib-dots">{[...productDomains(p)].map((d) => <Dot key={d} color={DOMAINS[d].color} />)}</div>
+                          <div className="lib-actions">
+                            <button className="mini" onClick={(e) => { e.stopPropagation(); openProductEditor(p) }} title={p.source === 'builtIn' ? 'Edit this product (saved as your version; revert any time)' : 'Edit product'}>Edit</button>
+                            {p.source === 'user' && <button className="mini danger" onClick={(e) => { e.stopPropagation(); void removeUserProduct(p) }} title={BUILT_IN_KEYS.has(p.key) ? 'Discard your edits and go back to the built-in version' : 'Delete custom product'}>{BUILT_IN_KEYS.has(p.key) ? 'Revert' : 'Delete'}</button>}
+                          </div>
                         </div>
                       ))}
                     </div>
