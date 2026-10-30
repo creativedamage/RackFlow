@@ -105,6 +105,7 @@ export const CONNECTORS = {
   bnc: c('BNC', ['sdi12G']),
   hd15: c('HD15 (VGA)', ['analogComposite']),
   xlr3: c('XLR-3', ['analogLine', 'analogMic']),
+  miniXlr: c('Mini XLR (TA3)', ['analogMic', 'analogLine']),
   trs6_35: c('1/4" TRS', ['analogLine', 'analogMic']),
   trs3_5: c('3.5mm TRS', ['analogLine']),
   bantamTT: c('Bantam / TT', ['analogLine', 'analogMic']),
@@ -125,6 +126,8 @@ export const CONNECTORS = {
   db25: c('DB25', ['analogLine']),
   idcPunchdown: c('IDC Punchdown', ['analogLine']),
   xlr5: c('XLR-5', ['dmx512']),
+  lemo: c('LEMO', ['analogLine']),
+  smpteFiber: c('SMPTE Hybrid Fiber', ['sdi12G']),
   sma: c('SMA', ['rfUHF']),
   tnc: c('TNC', ['rfUHF']),
   iecC13C14: c('IEC C13/C14', ['ac120V', 'ac230V'], { power: true }),
@@ -142,6 +145,7 @@ export const CONNECTORS = {
   powerCON: c('powerCON', ['ac120V', 'ac230V'], { power: true }),
   powerCONTrue1: c('powerCON TRUE1', ['ac120V', 'ac230V'], { power: true }),
   dcBarrel: c('DC Barrel', ['dc12V'], { power: true }),
+  xlr4: c('XLR-4 (DC)', ['dc12V'], { power: true }),
 } satisfies Record<string, ConnectorMeta>
 
 export type ConnectorType = keyof typeof CONNECTORS

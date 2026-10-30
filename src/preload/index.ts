@@ -34,6 +34,11 @@ const api: RackflowAPI = {
   openReleasePage: (url) => ipcRenderer.invoke('update:openPage', url),
   onUpdateStatus: (cb) => on<UpdateStatus>('update:status', cb),
 
+  fetchSpecPage: (url) => ipcRenderer.invoke('specs:fetch', url),
+  aiStatus: () => ipcRenderer.invoke('ai:status'),
+  aiSettings: (patch) => ipcRenderer.invoke('ai:settings', patch),
+  aiLookup: (req) => ipcRenderer.invoke('ai:lookup', req),
+
   onMenu: (cb) => on<MenuCommand>('menu', cb),
   onOpenFile: (cb) => on<OpenedFile>('open-file', cb),
 }

@@ -72,7 +72,7 @@ export function Sidebar() {
       {tab === 'makers' ? <MakersBrowser query={query} /> : <>
       <div className="sidebar-list">
         {tab === 'gear' ? (
-          grouped.length === 0 ? <p className="muted pad">No products match.</p> :
+          grouped.length === 0 ? <div className="pad"><p className="muted">No products match.</p>{query.trim() && <button className="primary" onClick={() => set({ finding: { query } })}>Build “{query.trim()}” from its specs…</button>}</div> :
           <>
           <p className="muted lib-count">{results.length.toLocaleString()} products</p>
           {grouped.map(([cat, items]) => {
@@ -130,7 +130,8 @@ export function Sidebar() {
       </div>
 
       <div className="sidebar-foot">
-        <button className="primary" onClick={() => (tab === 'gear' ? set({ editingProduct: newCustomProduct() }) : set({ editingTemplate: newCustomTemplate() }))}>
+        {tab === 'gear' && <button className="primary" onClick={() => set({ finding: { query } })} title="Search by brand, model, part or type – or build a device from its spec sheet (⇧⌘F)">🔍 Find Device…</button>}
+        <button className={tab === 'gear' ? '' : 'primary'} onClick={() => (tab === 'gear' ? set({ editingProduct: newCustomProduct() }) : set({ editingTemplate: newCustomTemplate() }))}>
           + {tab === 'gear' ? 'New Custom Product' : 'New Patch Bay Template'}
         </button>
         {tab === 'gear' && (

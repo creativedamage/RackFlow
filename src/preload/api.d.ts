@@ -9,7 +9,9 @@ export type MenuCommand =
   | 'new' | 'open' | 'save' | 'saveAs' | 'save-and-close'
   | 'undo' | 'redo' | 'delete' | 'selectAll' | 'zoomFit'
   | 'mode:diagram' | 'mode:rack' | 'mode:patch' | 'mode:sheet'
-  | 'newProduct' | 'newTemplate' | 'toggleInspector' | 'editDevice'
+  | 'newProduct' | 'newTemplate' | 'toggleInspector' | 'editDevice' | 'findDevice'
+
+export interface AiStatus { hasKey: boolean; model: string; canEncrypt: boolean }
 
 export interface OpenedFile { path: string; data: string }
 
@@ -50,6 +52,12 @@ export interface RackflowAPI {
   installUpdate(): Promise<void>
   openReleasePage(url?: string): Promise<void>
   onUpdateStatus(cb: (s: UpdateStatus) => void): () => void
+
+  /** Find Device: fetch a product page as text. */
+  fetchSpecPage(url: string): Promise<{ text: string; title: string; url: string }>
+  aiStatus(): Promise<AiStatus>
+  aiSettings(patch: { key?: string | null; model?: string }): Promise<void>
+  aiLookup(req: { query: string; url?: string; text?: string }): Promise<{ json: unknown; via: string }>
 
   onMenu(cb: (cmd: MenuCommand) => void): () => void
   onOpenFile(cb: (file: OpenedFile) => void): () => void

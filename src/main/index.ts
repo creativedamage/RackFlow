@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:f
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join } from 'node:path'
 import type { MenuCommand, OpenedFile } from '../preload/api'
+import { registerSpecIPC } from './specs'
 import { checkForUpdates, installAndRestart, openReleasePage, startUpdater, updateStatus } from './updater'
 
 const isMac = process.platform === 'darwin'
@@ -96,6 +97,7 @@ function buildMenu() {
         cmd('Save', 'save', 'CmdOrCtrl+S'),
         cmd('Save As…', 'saveAs', 'Shift+CmdOrCtrl+S'),
         { type: 'separator' },
+        cmd('Find Device…', 'findDevice', 'Shift+CmdOrCtrl+F'),
         cmd('New Custom Product…', 'newProduct', 'Alt+CmdOrCtrl+N'),
         cmd('New Patch Bay Template…', 'newTemplate'),
         { type: 'separator' },
@@ -185,6 +187,7 @@ async function withPrintWindow<T>(html: string, fn: (w: BrowserWindow) => Promis
 // MARK: IPC
 
 function registerIPC() {
+  registerSpecIPC()
   const projectFilters = [{ name: 'RackFlow Project', extensions: ['rackflow'] }]
 
   ipcMain.handle('project:open', async () => {

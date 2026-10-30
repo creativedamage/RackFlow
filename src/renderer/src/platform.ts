@@ -66,6 +66,10 @@ const browserShim: RackflowAPI = {
   installUpdate: async () => {},
   openReleasePage: async (url) => { window.open(url ?? 'https://github.com/creativedamage/RackFlow/releases/latest', '_blank') },
   onUpdateStatus: () => () => {},
+  fetchSpecPage: async () => { throw new Error('The browser preview can’t fetch pages – paste the specs instead.') },
+  aiStatus: async () => ({ hasKey: false, model: 'claude-sonnet-4-5', canEncrypt: false }),
+  aiSettings: async () => { throw new Error('AI lookup needs the Mac app.') },
+  aiLookup: async () => { throw new Error('AI lookup needs the Mac app.') },
   onMenu: (cb) => { menuListeners.add(cb); return () => menuListeners.delete(cb) },
   onOpenFile: (cb) => { openListeners.add(cb); return () => openListeners.delete(cb) },
 }
@@ -80,7 +84,7 @@ if (!isElectron) {
     const mod = e.metaKey || e.ctrlKey
     if (!mod) return
     const k = e.key.toLowerCase()
-    const map: Record<string, MenuCommand> = { n: 'new', o: 'open', s: e.shiftKey ? 'saveAs' : 'save', z: e.shiftKey ? 'redo' : 'undo', y: 'redo', 1: 'mode:diagram', 2: 'mode:rack', 3: 'mode:patch', 4: 'mode:sheet', 0: 'zoomFit', e: 'editDevice' }
+    const map: Record<string, MenuCommand> = { n: 'new', o: 'open', s: e.shiftKey ? 'saveAs' : 'save', z: e.shiftKey ? 'redo' : 'undo', y: 'redo', 1: 'mode:diagram', 2: 'mode:rack', 3: 'mode:patch', 4: 'mode:sheet', 0: 'zoomFit', e: 'editDevice', ...(e.shiftKey ? { f: 'findDevice' as MenuCommand } : {}) }
     const cmd = map[k]
     if (!cmd) return
     e.preventDefault()

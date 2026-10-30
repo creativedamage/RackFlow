@@ -676,3 +676,34 @@ button.app-mark:hover { background: var(--bg-3) !important; }
 .context-menu .cm-hint { opacity: .55; font-size: 12px; }
 .context-menu .cm-sep { height: 1px; margin: 4px 6px; background: var(--line); }
 .lib-item.compact .lib-actions { right: 4px; }
+
+/* Find Device */
+.finder { display: flex; flex-direction: column; gap: 14px; min-width: 0; flex: 1; overflow: auto; padding: 16px 20px; }
+.finder h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-2); display: flex; gap: 8px; align-items: baseline; }
+.finder h4 .muted { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.finder-search { width: 100%; font-size: 16px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+.finder-search:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.finder-list { display: flex; flex-direction: column; gap: 2px; max-height: 210px; overflow: auto; border: 1px solid var(--line-2); border-radius: 8px; padding: 4px; }
+.finder-hit { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; align-items: center; padding: 5px 8px; border-radius: 6px; }
+.finder-hit:hover { background: var(--bg-3); }
+.finder-hit .lib-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.finder-build, .finder-review { border-top: 1px solid var(--line-2); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.finder-identity { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.finder-identity .field { display: flex; flex-direction: column; align-items: stretch; gap: 3px; }
+.finder-identity input, .finder-identity select { width: 100%; }
+.finder-text { width: 100%; min-height: 140px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text); resize: vertical; }
+.finder .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.finder .row .grow { flex: 1; min-width: 200px; }
+.finder .row .spacer { flex: 1; }
+.finder-busy { display: flex; gap: 8px; align-items: center; color: var(--text-2); margin: 0; }
+.finder-busy .spinner { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: finder-spin .8s linear infinite; }
+@keyframes finder-spin { to { transform: rotate(360deg); } }
+.finder-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.finder-table th { text-align: left; font-weight: 500; color: var(--text-2); padding: 4px; border-bottom: 1px solid var(--line); }
+.finder-table td { padding: 3px 4px; border-bottom: 1px solid var(--line-2); }
+.finder-table td input:not([type=number]) { width: 100%; min-width: 90px; }
+.finder-table select { max-width: 160px; }
+.finder-confirm { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 8px; background: var(--accent-soft); font-weight: 500; }
+.finder-ai-settings summary { cursor: pointer; }
+.finder-ai-settings .row { margin-top: 6px; }
+.finder .data-note ul { margin: 4px 0 0 16px; padding: 0; }

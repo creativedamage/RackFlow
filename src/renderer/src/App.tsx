@@ -1,3 +1,4 @@
+import { DeviceFinder } from './product/DeviceFinder'
 import { ContextMenu } from './components/ContextMenu'
 import { editSelection } from './product/openEditor'
 import { useEffect } from 'react'
@@ -44,6 +45,7 @@ export function App() {
   const showInspector = useStore((s) => s.showInspector)
   const editingPlate = useStore((s) => s.editingPlate)
   const editingProduct = useStore((s) => s.editingProduct)
+  const finding = useStore((s) => s.finding)
   const editingTemplate = useStore((s) => s.editingTemplate)
   const title = useStore((s) => s.project.info.name)
   const dirty = useStore((s) => s.dirty)
@@ -91,6 +93,7 @@ export function App() {
       case 'toggleInspector': s.set({ showInspector: !s.showInspector }); break
       case 'newProduct': s.set({ editingProduct: newCustomProduct() }); break
       case 'editDevice': editSelection(); break
+      case 'findDevice': s.set({ finding: { query: '' } }); break
       case 'newTemplate': s.set({ editingTemplate: newCustomTemplate() }); break
     }
   }), [])
@@ -115,6 +118,7 @@ export function App() {
         {editingProduct && <ProductEditor key={editingProduct.key} initial={editingProduct} />}
         {editingPlate && <PlateBuilder key={editingPlate.product.key + (editingPlate.instanceId ?? '')} initial={editingPlate.product} instanceId={editingPlate.instanceId} />}
         {editingTemplate && <TemplateEditor key={editingTemplate.key} initial={editingTemplate} />}
+        {finding && <DeviceFinder initialQuery={finding.query} />}
         <Toasts />
         <ContextMenu />
       </div>
