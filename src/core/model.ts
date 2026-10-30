@@ -1,0 +1,378 @@
+// Document data model. Plain JSON-serialisable objects: the `.rackflow` file is
+// literally `JSON.stringify(project)`. Mutating helpers in project.ts are written
+// to work on Immer drafts, so every edit is an immutable update + undo snapshot.
+
+import type { ConnectorType, Gender, SignalDomain, SignalType } from './signals'
+
+type Brand<T, B extends string> = T & { readonly __brand: B }
+export type EquipmentId = Brand<string, 'Equipment'>
+export type CableId = Brand<string, 'Cable'>
+export type RackId = Brand<string, 'Rack'>
+export type PatchBayId = Brand<string, 'PatchBay'>
+export type AccessoryId = Brand<string, 'Accessory'>
+
+export const newId = <T extends string>(): T => crypto.randomUUID() as T
+
+export type PortDirection = 'input' | 'output' | 'bidirectional'
+export type PanelFace = 'front' | 'rear'
+
+export interface PortTemplate {
+  /** Stable within its product, e.g. "in.mic.03". */
+  id: string
+  label: string
+  connector: ConnectorType
+  gender: Gender
+  direction: PortDirection
+  /** Ordered by preference; the first is the port's primary signal. */
+  signals: SignalType[]
+  group?: string
+  face: PanelFace
+  maxConnections: number
+  /** For power outlets: watts available from this outlet. */
+  powerCapacityWatts?: number
+}
+
+export type EquipmentCategory =
+  | 'projector' | 'display' | 'ledProcessor'
+  | 'videoSwitcher' | 'matrixSwitcher' | 'scaler' | 'extender' | 'encoder' | 'decoder' | 'camera' | 'mediaPlayer'
+  | 'dsp' | 'mixer' | 'amplifier' | 'loudspeaker' | 'microphone' | 'wirelessReceiver' | 'audioInterface'
+  | 'networkSwitch' | 'controlProcessor' | 'touchPanel'
+  | 'lightingConsole' | 'lightingFixture' | 'dimmer' | 'dmxNode'
+  | 'intercom' | 'conferencing' | 'recorder' | 'converter'
+  | 'patchBay' | 'wallPlate' | 'floorBox' | 'powerSource' | 'pdu' | 'ups' | 'computer' | 'rackAccessory' | 'other'
+
+export const CATEGORIES: Record<EquipmentCategory, { name: string; tag: string }> = {
+  projector: { name: 'Projector', tag: 'PJ' },
+  display: { name: 'Display', tag: 'DISP' },
+  ledProcessor: { name: 'LED Processor', tag: 'LEDP' },
+  videoSwitcher: { name: 'Video Switcher', tag: 'SW' },
+  matrixSwitcher: { name: 'Matrix Switcher', tag: 'SW' },
+  scaler: { name: 'Scaler', tag: 'SCL' },
+  extender: { name: 'Extender', tag: 'EXT' },
+  encoder: { name: 'Encoder', tag: 'ENC' },
+  decoder: { name: 'Decoder', tag: 'DEC' },
+  camera: { name: 'Camera', tag: 'CAM' },
+  mediaPlayer: { name: 'Media Player', tag: 'MP' },
+  dsp: { name: 'DSP', tag: 'DSP' },
+  mixer: { name: 'Mixer', tag: 'MIX' },
+  amplifier: { name: 'Amplifier', tag: 'AMP' },
+  loudspeaker: { name: 'Loudspeaker', tag: 'LS' },
+  microphone: { name: 'Microphone', tag: 'MIC' },
+  wirelessReceiver: { name: 'Wireless Receiver', tag: 'WRX' },
+  audioInterface: { name: 'Audio Interface', tag: 'AIF' },
+  networkSwitch: { name: 'Network Switch', tag: 'NSW' },
+  controlProcessor: { name: 'Control Processor', tag: 'CP' },
+  touchPanel: { name: 'Touch Panel', tag: 'TP' },
+  lightingConsole: { name: 'Lighting Console', tag: 'LC' },
+  lightingFixture: { name: 'Lighting Fixture', tag: 'FX' },
+  dimmer: { name: 'Dimmer', tag: 'DIM' },
+  dmxNode: { name: 'DMX Node', tag: 'DMXN' },
+  intercom: { name: 'Intercom', tag: 'IC' },
+  conferencing: { name: 'Conferencing', tag: 'VC' },
+  recorder: { name: 'Recorder / Player', tag: 'REC' },
+  converter: { name: 'Converter', tag: 'CNV' },
+  patchBay: { name: 'Patch Bay', tag: 'PB' },
+  wallPlate: { name: 'Wall Plate', tag: 'WP' },
+  floorBox: { name: 'Floor Box / Stage Pocket', tag: 'FB' },
+  powerSource: { name: 'Building Power', tag: 'PWR' },
+  pdu: { name: 'PDU', tag: 'PDU' },
+  ups: { name: 'UPS', tag: 'UPS' },
+  computer: { name: 'Computer', tag: 'PC' },
+  rackAccessory: { name: 'Rack Accessory', tag: 'EQ' },
+  other: { name: 'Other', tag: 'EQ' },
+}
+export const CATEGORY_KEYS = Object.keys(CATEGORIES) as EquipmentCategory[]
+
+export type MountType = 'rack' | 'shelf' | 'wall' | 'ceiling' | 'floor' | 'truss' | 'desk' | 'portable'
+export const MOUNT_TYPES: MountType[] = ['rack', 'shelf', 'wall', 'ceiling', 'floor', 'truss', 'desk', 'portable']
+
+export interface PhysicalSpec {
+  /** Height in rack units; null if not rack-mountable. */
+  rackUnits: number | null
+  halfWidth: boolean
+  widthMM: number
+  heightMM: number
+  depthMM: number
+  weightKG: number
+  mounting: MountType
+}
+
+export interface PowerSpec {
+  acceptedVoltages: SignalType[]
+  typicalWatts: number
+  maxWatts: number
+  /** Manufacturer-published heat; when null it's derived from typical draw. */
+  publishedBTU: number | null
+  /** Amplifiers: share of input power delivered to loudspeakers (0–1). */
+  efficiency: number | null
+  poweredByPoE: boolean
+}
+
+export type ProductSource = 'builtIn' | 'user' | 'imported'
+
+export interface ProductDefinition {
+  key: string
+  manufacturer: string
+  model: string
+  summary: string
+  category: EquipmentCategory
+  tags: string[]
+  physical: PhysicalSpec
+  power: PowerSpec
+  ports: PortTemplate[]
+  source: ProductSource
+  /** Bumped on every save; lets projects detect stale embedded snapshots. */
+  revision: number
+  /** Catalog entries: false = I/O from the RackFlow catalog, physical/power approximate. */
+  verified?: boolean
+  /** Provenance / caveat shown in the inspector. */
+  dataNote?: string
+  /** Building power / generator: the supply this source provides (defaults for its circuit). */
+  supply?: PowerSupply
+  /** Wall plates / floor boxes: the layout they were built from (re-opened by the plate builder). */
+  plate?: PlateSpec
+}
+
+export type PlateKind = 'wallPlate' | 'floorBox'
+/** How the back of an insert is terminated. */
+export type PlateRear = 'same' | 'idcPunchdown' | 'euroblock' | 'none'
+export interface PlateInsert {
+  /** Key into PLATE_MODULES. */
+  module: string
+  count: number
+  /** Optional label prefix, e.g. "Podium Mic". */
+  label?: string
+  rear: PlateRear
+}
+export interface PlateSpec {
+  kind: PlateKind
+  /** e.g. "2-Gang", "Decora", "4-Compartment", "Stage Pocket". */
+  style: string
+  inserts: PlateInsert[]
+  /** If the box has receptacles: the circuit feeding them. */
+  power?: { volts: number; amps: number }
+}
+
+/** What a building receptacle, panel feed or generator can deliver. */
+export interface PowerSupply {
+  volts: number
+  /** Breaker / overcurrent protection rating. */
+  amps: number
+  phases: 1 | 3
+}
+
+/** Where a power source comes from in the building, set per placed source. */
+export interface CircuitInfo {
+  panel: string
+  circuit: string
+  /** Overrides the product's supply.amps (e.g. a 20 A receptacle on a 15 A breaker). */
+  breakerAmps?: number
+  /** Overrides the product's supply.volts (e.g. 208 V vs 240 V). */
+  volts?: number
+  /** Continuous-load limit as a fraction of the breaker (NEC 80 % rule by default). */
+  continuousFactor?: number
+}
+
+export interface CanvasPoint { x: number; y: number }
+
+export interface RackPlacement {
+  rack: RackId
+  /** Lowest occupied unit, 1-based from the bottom. */
+  startUnit: number
+  face: RackFace
+  halfSlot?: 'left' | 'right'
+}
+
+/** A placed device. Embeds its product snapshot so files are self-contained. */
+export interface EquipmentInstance {
+  id: EquipmentId
+  tag: string
+  product: ProductDefinition
+  position: CanvasPoint
+  rackPlacement: RackPlacement | null
+  room: string
+  notes: string
+  /** Power sources only: panel / circuit / breaker. */
+  circuit?: CircuitInfo
+  /** Diagram group (system) this device belongs to. */
+  groupId?: string
+}
+
+/** A named system on the wiring diagram (e.g. "FOH Audio", "Stage Video"). */
+export interface DeviceGroup {
+  id: string
+  name: string
+  /** Colour family; 'custom' uses `color`. */
+  system: SignalDomain | 'custom'
+  color?: string
+}
+
+export interface PortAddress { equipment: EquipmentId; port: string }
+export const addrKey = (a: PortAddress) => `${a.equipment}/${a.port}`
+export const sameAddr = (a: PortAddress, b: PortAddress) => a.equipment === b.equipment && a.port === b.port
+
+export interface Cable {
+  id: CableId
+  /** Printed label, e.g. "V-0012". */
+  label: string
+  /** By convention `from` is the source side. */
+  from: PortAddress
+  to: PortAddress
+  specKey: string | null
+  lengthMeters: number | null
+  notes: string
+}
+
+export type RackFace = 'front' | 'rear'
+
+export interface RackSpec {
+  rackUnits: number
+  mountingDepthMM: number
+  maxLoadKG: number
+  coolingCapacityBTU: number | null
+}
+
+export interface RackAccessory {
+  id: AccessoryId
+  kind: 'blank' | 'vent' | 'cableManager' | 'shelf' | 'drawer'
+  startUnit: number
+  height: number
+  face: RackFace
+}
+
+export interface Rack {
+  id: RackId
+  name: string
+  spec: RackSpec
+  accessories: RackAccessory[]
+}
+
+export interface ProjectInfo { name: string; client: string; designer: string; revision: string; location?: string }
+
+export interface Project {
+  schemaVersion: number
+  info: ProjectInfo
+  equipment: EquipmentInstance[]
+  cables: Cable[]
+  racks: Rack[]
+  patchBays: PatchBay[]
+  /** Diagram groups / systems. */
+  groups?: DeviceGroup[]
+}
+
+// --- Patch bays (types here to keep the document schema in one file) ---
+
+export type PatchFormat = 'ttBantam' | 'longFrame' | 'quarterInchTRS' | 'bncVideo' | 'bnc12G' | 'midsizeVideo' | 'rj45' | 'fiberLC' | 'xlr'
+export type Normalling = 'open' | 'half' | 'full' | 'isolated'
+
+/** Exact designation-strip geometry in millimetres.
+ *  Uniform mode: centre(i) = firstChannelCenterMM + i·channelPitchMM + ⌊i / groupSize⌋·groupGapMM.
+ *  Per-cell mode (PatchCAD-style, when cellWidthsMM is set): cells laid left to right from
+ *  padLeftMM with their own widths and optional gaps after any cell; the strip is
+ *  padLeft + Σwidths + Σgaps + padRight wide. */
+export interface LabelStripGeometry {
+  stripWidthMM: number
+  stripHeightMM: number
+  channelCount: number
+  channelPitchMM: number
+  firstChannelCenterMM: number
+  groupSize: number | null
+  groupGapMM: number
+  linesPerCell: number
+  /** Per-cell widths (length = channelCount). */
+  cellWidthsMM?: number[]
+  /** Gap after cell n (1-based key), in mm. */
+  gapsAfterMM?: Record<string, number>
+  padLeftMM?: number
+  padRightMM?: number
+  /** Inset of the text area from the strip's top / bottom edge. */
+  padTopMM?: number
+  padBottomMM?: number
+  /** Socket layout under the strip (drawn as a guide; PatchCAD's "Mono Spaced" / "Paired"). */
+  socketLayout?: 'mono' | 'paired'
+  /** Paired layout: centre-to-centre distance between the two sockets of a pair. */
+  pairSpacingMM?: number
+  socketDiameterMM?: number
+  /** Distance from the strip's bottom edge to the sockets. */
+  socketOffsetMM?: number
+}
+
+export interface PatchRowTemplate { id: number; name: string; strip: LabelStripGeometry; rearDirection: PortDirection }
+
+export interface PatchBayTemplate {
+  key: string
+  manufacturer: string
+  series: string
+  format: PatchFormat
+  rackUnits: number
+  rows: PatchRowTemplate[]
+  normalling: Normalling
+  rearConnector: ConnectorType
+  source: ProductSource
+  /** False until checked against the manufacturer's strip template or a real panel. */
+  dimensionsVerified: boolean
+  notes: string
+  /** Label style applied to new bays made from this template. */
+  defaultStyle?: Partial<LabelStyle>
+}
+
+/** Per-cell / per-title formatting (PatchCAD-style). Undefined = inherit bay style. */
+export interface CellStyle {
+  bold?: boolean
+  italic?: boolean
+  underline?: boolean
+  strike?: boolean
+  /** Fixed size in points; undefined = auto-fit to the cell. */
+  sizePt?: number
+  fontFamily?: string
+  color?: string
+  fill?: string
+  align?: 'left' | 'center' | 'right'
+}
+
+export interface LabelCell {
+  row: number
+  channel: number
+  text: string
+  /** Typed by hand: never overwritten by "Refresh from Wiring". */
+  manual: boolean
+  /** Signal-domain tint set by "colour by signal" (separate from user fill). */
+  fill: string | null
+  style?: CellStyle
+}
+
+/** A group title spanning channels start…end on one strip (e.g. "TIE LINES"). */
+export interface LabelSpan { id: string; row: number; start: number; end: number; text: string; style?: CellStyle }
+
+/** Normalling between a row and the row below it, per channel (PatchCAD's ↕ / ↓ row). */
+export type NormalMode = 'none' | 'half' | 'full' | 'parallel'
+export interface NormalBand { afterRow: number; modes: NormalMode[] }
+
+export interface LabelFormat { template: string; uppercase: boolean; maxCharsPerLine: number }
+
+export interface LabelStyle {
+  fontFamily: string
+  maxFontPt: number
+  minFontPt: number
+  showChannelNumbers: boolean
+  colorByDomain: boolean
+  cellDividers: boolean
+}
+
+export interface PatchBay {
+  id: PatchBayId
+  name: string
+  /** Where the bay is installed, e.g. "Console", "Machine Room". */
+  location: string
+  equipment: EquipmentId
+  template: PatchBayTemplate
+  format: LabelFormat
+  style: LabelStyle
+  cells: LabelCell[]
+  spans: LabelSpan[]
+  normals: NormalBand[]
+  /** Background colour per strip row (row id → hex). */
+  rowFill: Record<string, string>
+}
+
+export const CURRENT_SCHEMA = 1

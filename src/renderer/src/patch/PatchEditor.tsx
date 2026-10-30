@@ -1,0 +1,347 @@
+import { useEffect, useMemo, useState } from 'react'
+import {
+  clearFormatting, clearRange, copyRange, defaultPrintOptions, fillSeries, findCell, FORMAT_PRESETS, layoutLabels, mergeTitle,
+  NORMAL_SYMBOLS, pagesToPrintHTML, pageToSVG, pasteAt, refreshLabels, removeTitles, setNormals, staleCells, STOCKS, styleRange,
+  toggleStyle, type CellStyle, type NormalMode, type PatchBay, type PrintOptions,
+} from '@core/index'
+import { api } from '../platform'
+import { useStore } from '../store'
+import { Empty, Modal, Select, TextInput, Toggle } from '../components/ui'
+import { BayGrid, CellEditorPopover } from './BayGrid'
+import { bandForRow, editBay, editSelection, fontLabel, FONTS, PALETTE, usePatchUI } from './patchState'
+
+/**
+ * PatchCAD-style label editor: every patch bay in the project stacked as a
+ * spreadsheet of strips, with group titles, a normalling row, per-cell
+ * formatting, keyboard editing and Excel-compatible copy/paste. Cells that
+ * weren't typed by hand fill themselves from the wiring diagram.
+ */
+export function PatchEditor() {
+  const project = useStore((s) => s.project)
+  const preview = usePatchUI((s) => s.preview)
+
+  if (project.patchBays.length === 0) {
+    return (
+      <div className="patch-editor">
+        <InfoBar />
+        <Empty title="No patch bays yet">
+          <p>Pick a layout in the <b>Add a patch bay</b> panel on the right and click <b>Add</b>, or double-click one in the library’s Patch Bays tab. Each bay also appears on the Wiring Diagram.</p>
+          <AddBayButton />
+        </Empty>
+      </div>
+    )
+  }
+
+  return (
+    <div className="patch-editor">
+      <InfoBar />
+      <FormatBar />
+      <Grid />
+      <CellEditorPopover />
+      {preview && <PrintPreview onClose={() => usePatchUI.getState().set({ preview: false })} />}
+    </div>
+  )
+}
+
+function InfoBar() {
+  const info = useStore((s) => s.project.info)
+  const count = useStore((s) => s.project.patchBays.length)
+  const apply = useStore((s) => s.apply)
+  const upd = (label: string, fn: (i: typeof info) => void) => apply(label, (d) => fn(d.info))
+  return (
+    <div className="info-bar">
+      <label>Project Name<TextInput value={info.name} onCommit={(v) => upd('Project Name', (i) => { i.name = v })} /></label>
+      <label>Location<TextInput value={info.location ?? ''} onCommit={(v) => upd('Project Location', (i) => { i.location = v })} /></label>
+      <label>Client Name<TextInput value={info.client} onCommit={(v) => upd('Client', (i) => { i.client = v })} /></label>
+      <label>Revision<TextInput value={info.revision} onCommit={(v) => upd('Revision', (i) => { i.revision = v })} /></label>
+      <span className="count">Patchbays: {count}</span>
+      <AddBayButton />
+    </div>
+  )
+}
+
+function useSelBay(): PatchBay | undefined {
+  const sel = usePatchUI((s) => s.sel)
+  const bays = useStore((s) => s.project.patchBays)
+  const selectedBay = useStore((s) => s.selectedBay)
+  return bays.find((b) => b.id === (sel?.bay ?? selectedBay)) ?? bays[0]
+}
+
+function FormatBar() {
+  const sel = usePatchUI((s) => s.sel)
+  const title = usePatchUI((s) => s.title)
+  const setUI = usePatchUI((s) => s.set)
+  usePatchUI((s) => s.colw)
+  const project = useStore((s) => s.project)
+  const bay = useSelBay()
+  const [series, setSeries] = useState<{ pattern: string; start: number } | null>(null)
+  const cell = bay && sel ? findCell(bay, sel.row, Math.min(sel.a, sel.b)) : undefined
+  const st: CellStyle | undefined = title ? bay?.spans.find((s) => s.id === title)?.style : cell?.style
+  const stale = useMemo(() => (bay ? staleCells(bay, project).length : 0), [bay, project])
+  const has = !!sel
+
+  /** Style either the selected title or the selected cells. */
+  const styleSel = (label: string, patch: CellStyle) => editSelection(label, (b, s) => {
+    const t = usePatchUI.getState().title
+    const span = t && b.spans.find((x) => x.id === t)
+    if (span) span.style = { ...span.style, ...patch }
+    else styleRange(b, s, patch)
+  })
+  const toggle = (k: 'bold' | 'italic' | 'underline' | 'strike') => editSelection('Format', (b, s) => {
+    const t = usePatchUI.getState().title
+    const span = t && b.spans.find((x) => x.id === t)
+    if (span) span.style = { ...span.style, [k]: !span.style?.[k] }
+    else toggleStyle(b, s, k)
+  })
+  const normals = (m: NormalMode) => editSelection('Change Normalling', (b, s) => {
+    const band = bandForRow(b, s.row)
+    if (band != null) setNormals(b, band, s.a, s.b, m)
+  })
+
+  return (
+    <div className="format-bar">
+      <div className="fb-group">
+        <button className={`fb ${st?.bold ? 'on' : ''}`} disabled={!has} onClick={() => toggle('bold')} title="Bold (⌘B)"><b>B</b></button>
+        <button className={`fb ${st?.italic ? 'on' : ''}`} disabled={!has} onClick={() => toggle('italic')} title="Italic (⌘I)"><i>I</i></button>
+        <button className={`fb ${st?.underline ? 'on' : ''}`} disabled={!has} onClick={() => toggle('underline')} title="Underline (⌘U)"><u>U</u></button>
+        <button className={`fb ${st?.strike ? 'on' : ''}`} disabled={!has} onClick={() => toggle('strike')} title="Strikethrough"><s>S</s></button>
+      </div>
+      <div className="fb-group">
+        <Select value={st?.fontFamily ?? ''} width={120} onChange={(f) => styleSel('Font', { fontFamily: f || undefined })}
+          options={[{ value: '', label: 'Default font' }, ...FONTS.map((f) => ({ value: f, label: fontLabel(f) }))]} />
+        <Select value={st?.sizePt ?? 0} width={70} onChange={(n) => styleSel('Font Size', { sizePt: n || undefined })}
+          options={[{ value: 0, label: 'Auto' }, ...[4, 5, 6, 7, 8, 9, 10, 12].map((n) => ({ value: n, label: `${n} pt` }))]} />
+      </div>
+      <div className="fb-group">
+        <ColorButton title="Cell fill" glyph="◧" value={st?.fill} disabled={!has} onPick={(c) => styleSel('Fill', { fill: c ?? undefined })} />
+        <ColorButton title="Text colour" glyph="A" value={st?.color} disabled={!has} onPick={(c) => styleSel('Text Colour', { color: c ?? undefined })} />
+        <ColorButton title="Strip colour (whole row)" glyph="▤" value={bay && sel ? bay.rowFill[String(sel.row)] : undefined} disabled={!has}
+          onPick={(c) => editSelection('Strip Colour', (b, s) => { if (c) b.rowFill[String(s.row)] = c; else delete b.rowFill[String(s.row)] })} />
+      </div>
+      <div className="fb-group">
+        {(['left', 'center', 'right'] as const).map((a) => (
+          <button key={a} className={`fb ${(st?.align ?? 'center') === a && has ? 'on' : ''}`} disabled={!has} title={`Align ${a}`} onClick={() => styleSel('Align', { align: a === 'center' ? undefined : a })}>
+            {a === 'left' ? '⇤' : a === 'center' ? '↔' : '⇥'}
+          </button>
+        ))}
+      </div>
+      <div className="fb-group">
+        <button className="fb" disabled={!has} title="Merge selection into a group title (⌘G)" onClick={() => mergeSelection()}>⊞ Title</button>
+        <button className="fb" disabled={!has} title="Remove titles over the selection" onClick={() => editSelection('Remove Title', (b, s) => removeTitles(b, s))}>⊟</button>
+      </div>
+      <div className="fb-group">
+        <button className="fb" disabled={!has} title="Number the selection 1, 2, 3…" onClick={() => editSelection('Number', (b, s) => fillSeries(b, s, '{n}', 1))}>123</button>
+        <button className="fb" disabled={!has} title="Letter the selection A, B, C…" onClick={() => editSelection('Letter', (b, s) => fillSeries(b, s, '{A}', 1))}>ABC</button>
+        <button className="fb" disabled={!has} title="Fill a series, e.g. MIC {n}" onClick={() => setSeries(series ? null : { pattern: 'MIC {n}', start: 1 })}>Σ Fill…</button>
+        {series && (
+          <span className="fb-pop">
+            <input value={series.pattern} onChange={(e) => setSeries({ ...series, pattern: e.target.value })} title="{n} number · {nn} 01 · {A} letter" />
+            <input type="number" value={series.start} style={{ width: 52 }} onChange={(e) => setSeries({ ...series, start: +e.target.value })} />
+            <button className="primary" onClick={() => { editSelection('Fill Series', (b, s) => fillSeries(b, s, series.pattern, series.start)); setSeries(null) }}>Fill</button>
+          </span>
+        )}
+      </div>
+      <div className="fb-group" title="Normalling for the selected channels">
+        {(['full', 'half', 'parallel', 'none'] as NormalMode[]).map((m) => (
+          <button key={m} className="fb" disabled={!has || !bay || bandForRow(bay, sel!.row) == null} title={NORMAL_SYMBOLS[m].name} onClick={() => normals(m)}>
+            {NORMAL_SYMBOLS[m].glyph || '∅'}
+          </button>
+        ))}
+      </div>
+      <div className="fb-group">
+        <button className="fb" disabled={!has} title="Clear formatting" onClick={() => editSelection('Clear Formatting', (b, s) => clearFormatting(b, s))}>⌫ Fmt</button>
+        {bay && (
+          <>
+            <Select value="" width={118} onChange={(name) => { const p = FORMAT_PRESETS.find((x) => x.name === name); if (p) editBay(bay.id, 'Label Format', (b) => { b.format = { ...p.format } }) }}
+              options={[{ value: '', label: 'Wiring format…' }, ...FORMAT_PRESETS.map((x) => ({ value: x.name, label: x.name }))]} />
+            <button className={`fb ${stale ? 'accent' : ''}`} title="Fill every non-typed cell from the cables wired to this bay's rear ports"
+              onClick={() => editBay(bay.id, 'Refresh from Wiring', (b) => refreshLabels(b, useStore.getState().project))}>⟳ From wiring{stale ? ` (${stale})` : ''}</button>
+          </>
+        )}
+      </div>
+      <span className="spacer" />
+      <label className="zoom" title="Column width (0 = fit window)">Zoom
+        <input type="range" min={0} max={90} step={2} value={usePatchUI.getState().colw} onChange={(e) => setUI({ colw: +e.target.value })} />
+      </label>
+      <button className="primary" onClick={() => setUI({ preview: true })}>Print / Export…</button>
+    </div>
+  )
+}
+
+export function mergeSelection() {
+  const { sel } = usePatchUI.getState()
+  if (!sel) return
+  let id = ''
+  editSelection('Add Title', (b, s) => { id = mergeTitle(b, s, '') })
+  if (id) usePatchUI.getState().set({ title: id, editing: { bay: sel.bay, title: id } })
+}
+
+function ColorButton({ title, glyph, value, disabled, onPick }: { title: string; glyph: string; value?: string; disabled?: boolean; onPick: (c: string | null) => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <span className="color-btn">
+      <button className="fb" disabled={disabled} title={title} onClick={() => setOpen((o) => !o)}>
+        <span>{glyph}</span><span className="swatch" style={{ background: value ?? 'transparent' }} />
+      </button>
+      {open && (
+        <div className="palette" onMouseLeave={() => setOpen(false)}>
+          {PALETTE.map((c) => <button key={c} style={{ background: c }} title={c} onClick={() => { onPick(c); setOpen(false) }} />)}
+          <button className="none" title="None" onClick={() => { onPick(null); setOpen(false) }}>∅</button>
+          <input type="color" title="Custom colour" onChange={(e) => onPick(e.target.value)} />
+        </div>
+      )}
+    </span>
+  )
+}
+
+/** The stacked bays + keyboard model (arrows, shift-extend, type-to-edit, ⌘B/I/U/G, copy/paste). */
+function Grid() {
+  const bays = useStore((s) => s.project.patchBays)
+  const colw = usePatchUI((s) => s.colw)
+  const ui = usePatchUI
+
+  useEffect(() => {
+    if (!ui.getState().sel && bays[0]) ui.getState().setSel({ bay: bays[0].id, row: bays[0].template.rows[0].id, a: 1, b: 1 })
+  }, [bays, ui])
+
+  const onKey = (e: React.KeyboardEvent) => {
+    const { sel, title, editing, setSel, set } = ui.getState()
+    if (editing) {
+      // Keys that arrive before the editor has focus belong to the text being typed.
+      if ('seed' in editing && e.key.length === 1 && !e.metaKey && !e.ctrlKey) { e.preventDefault(); set({ editing: { ...editing, seed: (editing.seed ?? '') + e.key } }) }
+      return
+    }
+    if (!sel) return
+    const bay = bays.find((b) => b.id === sel.bay)
+    if (!bay) return
+    const rows = bay.template.rows
+    const ri = rows.findIndex((r) => r.id === sel.row)
+    const n = rows[ri].strip.channelCount
+    const mod = e.metaKey || e.ctrlKey
+    const k = e.key
+
+    if (mod && ['b', 'i', 'u'].includes(k.toLowerCase())) {
+      e.preventDefault()
+      const key = ({ b: 'bold', i: 'italic', u: 'underline' } as const)[k.toLowerCase() as 'b' | 'i' | 'u']
+      editSelection('Format', (b, s) => toggleStyle(b, s, key))
+      return
+    }
+    if (mod && k.toLowerCase() === 'g') { e.preventDefault(); mergeSelection(); return }
+    if (mod) return
+
+    const move = (row: number, ch: number, extend: boolean) => {
+      e.preventDefault()
+      const max = rows.find((r) => r.id === row)!.strip.channelCount
+      const c = Math.max(1, Math.min(max, ch))
+      setSel(extend && row === sel.row ? { ...sel, b: c } : { bay: sel.bay, row, a: c, b: c })
+    }
+    switch (k) {
+      case 'ArrowLeft': return move(sel.row, sel.b - 1, e.shiftKey)
+      case 'ArrowRight': return move(sel.row, sel.b + 1, e.shiftKey)
+      case 'Tab': return move(sel.row, sel.b + (e.shiftKey ? -1 : 1), false)
+      case 'ArrowUp': {
+        if (ri > 0) return move(rows[ri - 1].id, sel.b, false)
+        const bi = bays.findIndex((b) => b.id === bay.id)
+        if (bi > 0) { e.preventDefault(); const pb = bays[bi - 1]; const r = pb.template.rows[pb.template.rows.length - 1]; setSel({ bay: pb.id, row: r.id, a: Math.min(sel.b, r.strip.channelCount), b: Math.min(sel.b, r.strip.channelCount) }) }
+        return
+      }
+      case 'ArrowDown': {
+        if (ri < rows.length - 1) return move(rows[ri + 1].id, sel.b, false)
+        const bi = bays.findIndex((b) => b.id === bay.id)
+        if (bi < bays.length - 1) { e.preventDefault(); const nb = bays[bi + 1]; const r = nb.template.rows[0]; setSel({ bay: nb.id, row: r.id, a: Math.min(sel.b, r.strip.channelCount), b: Math.min(sel.b, r.strip.channelCount) }) }
+        return
+      }
+      case 'Enter': case 'F2':
+        e.preventDefault()
+        set({ editing: title ? { bay: bay.id, title } : { bay: bay.id, row: sel.row, channel: Math.min(sel.a, sel.b) } })
+        return
+      case 'Backspace': case 'Delete':
+        e.preventDefault()
+        if (title) editSelection('Delete Title', (b) => { b.spans = b.spans.filter((s) => s.id !== title) })
+        else editSelection('Clear Cells', (b, s) => clearRange(b, s))
+        ui.getState().set({ title: null })
+        return
+      case 'Escape': setSel({ ...sel, a: sel.b }); return
+    }
+    if (k.length === 1 && !e.altKey && n > 0) {
+      e.preventDefault()
+      set({ editing: { bay: bay.id, row: sel.row, channel: Math.min(sel.a, sel.b), seed: k } })
+    }
+  }
+
+  const onCopy = (e: React.ClipboardEvent, cut = false) => {
+    const { sel } = ui.getState()
+    const bay = sel && bays.find((b) => b.id === sel.bay)
+    if (!sel || !bay) return
+    e.preventDefault()
+    e.clipboardData.setData('text/plain', copyRange(bay, sel))
+    if (cut) editSelection('Cut', (b, s) => clearRange(b, s))
+  }
+  const onPaste = (e: React.ClipboardEvent) => {
+    const text = e.clipboardData.getData('text/plain')
+    if (!text) return
+    e.preventDefault()
+    editSelection('Paste', (b, s) => pasteAt(b, s.row, Math.min(s.a, s.b), text))
+  }
+
+  return (
+    <div className="patch-grid" style={{ ['--colw' as string]: `${colw}px` }} tabIndex={0} onKeyDown={onKey} onCopy={(e) => onCopy(e)} onCut={(e) => onCopy(e, true)} onPaste={onPaste}>
+      {bays.map((b, i) => <BayGrid key={b.id} bay={b} index={i} count={bays.length} />)}
+    </div>
+  )
+}
+
+/** Exact-scale print preview + export. */
+function PrintPreview({ onClose }: { onClose: () => void }) {
+  const project = useStore((s) => s.project)
+  const notify = useStore((s) => s.notify)
+  const bay = useSelBay()
+  const [opts, setOpts] = useState<PrintOptions>(defaultPrintOptions)
+  const [all, setAll] = useState(true)
+  const bays = all ? project.patchBays : bay ? [bay] : []
+  const pages = useMemo(() => layoutLabels(bays, opts), [bays, opts])
+  const name = all ? `${project.info.name} labels` : `${bay?.name} labels`
+  const unverified = bays.filter((b) => !b.template.dimensionsVerified)
+
+  return (
+    <Modal title="Print / Export Labels" onClose={onClose} wide footer={<>
+      <span className="muted">{pages.length} page{pages.length === 1 ? '' : 's'} · 1:1 scale</span>
+      <span className="spacer" />
+      <button onClick={async () => { const out = await api.exportSVG(pages.map(pageToSVG), name); if (out) notify('Exported SVG') }}>Export SVG…</button>
+      <button onClick={async () => { const out = await api.exportPDF(pagesToPrintHTML(pages), name); if (out) notify(`Exported ${out.split(/[\\/]/).pop()}`) }}>Export PDF…</button>
+      <button className="primary" onClick={() => void api.print(pagesToPrintHTML(pages))}>Print…</button>
+    </>}>
+      <div className="preview">
+        <div className="preview-opts form">
+          <Toggle label="All patch bays" checked={all} onChange={setAll} />
+          <label className="field"><span className="field-label">Paper</span>
+            <Select value={opts.stock.key} onChange={(k) => setOpts({ ...opts, stock: STOCKS.find((s) => s.key === k)! })} options={STOCKS.map((s) => ({ value: s.key, label: s.name }))} />
+          </label>
+          <Toggle label="Landscape" checked={opts.landscape} onChange={(v) => setOpts({ ...opts, landscape: v })} />
+          <Toggle label="Cut marks" checked={opts.cutMarks} onChange={(v) => setOpts({ ...opts, cutMarks: v })} />
+          <Toggle label="Strip captions" checked={opts.captions} onChange={(v) => setOpts({ ...opts, captions: v })} />
+          <Toggle label="Normalling symbols" checked={opts.normals !== false} onChange={(v) => setOpts({ ...opts, normals: v })} />
+          <p className="muted small">Printed at 100 %. Strips wider than the paper are split at channel boundaries and marked “cont.”.</p>
+          {unverified.length > 0 && <p className="warn-text small">⚠ {unverified.map((b) => b.name).join(', ')} use nominal template dimensions. Check one strip against the panel before printing a full run.</p>}
+        </div>
+        <div className="preview-pages">
+          {pages.map((p, i) => <div key={i} className="sheet" dangerouslySetInnerHTML={{ __html: pageToSVG(p).replace(/width="[\d.]+mm" height="[\d.]+mm"/, 'width="100%"') }} />)}
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+/** Shows the template panel (it lives in the right-hand pane) and focuses its search. */
+function AddBayButton() {
+  const show = () => {
+    useStore.getState().set({ showInspector: true })
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLInputElement>('.templates-panel input[type=search]')
+      el?.focus()
+      document.querySelector('.templates-panel')?.classList.add('flash')
+      setTimeout(() => document.querySelector('.templates-panel')?.classList.remove('flash'), 900)
+    })
+  }
+  return <button className="primary add-bay" onClick={show}>+ Add Patch Bay</button>
+}

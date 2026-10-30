@@ -1,0 +1,43 @@
+appId: com.rackflow.app
+productName: RackFlow
+copyright: Copyright © 2026 Wayne Goodman
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**
+  - package.json
+asar: true
+electronLanguages: [en]
+mac:
+  category: public.app-category.graphics-design
+  icon: build/icon.png
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  # The in-app updater looks for RackFlow-<version>-mac-<arch>.zip on the latest GitHub release.
+  artifactName: "RackFlow-${version}-mac-${arch}.${ext}"
+  # Ad-hoc signature ("-") so Apple Silicon will launch it; replace with a
+  # Developer ID + notarize for distribution.
+  identity: "-"
+  hardenedRuntime: false
+  fileAssociations:
+    - ext: rackflow
+      name: RackFlow Project
+      role: Editor
+dmg:
+  artifactName: "RackFlow-${version}-${arch}.dmg"
+  title: "RackFlow ${version}"
+win:
+  icon: build/icon.png
+  target: [nsis]
+  fileAssociations:
+    - ext: rackflow
+      name: RackFlow Project
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+# Releases are uploaded by .github/workflows/release.yml, not by electron-builder.
+publish: null

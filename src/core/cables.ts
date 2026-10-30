@@ -1,0 +1,186 @@
+import type { PortTemplate } from './model'
+import { CONNECTORS, connectorIsPower, connectorName, connectorsMate, mateGender, type ConnectorType, type Gender, type SignalType } from './signals'
+
+export interface CableEnd { connector: ConnectorType; gender: Gender }
+
+/** A cable type (catalog item). */
+export interface CableSpec {
+  key: string
+  name: string
+  endA: CableEnd
+  endB: CableEnd
+  /** Empty = passive conductor rated for anything its connectors carry. */
+  ratedSignals: SignalType[]
+  maxLengthMeters: number | null
+  labelPrefix: string
+  /** Not a separate cable: the device's attached plug goes straight into the outlet. */
+  direct?: boolean
+}
+
+/** Plugs that are accepted by a receptacle of another type (NEMA T-slot receptacles). */
+const PLUG_ACCEPTS: Partial<Record<ConnectorType, ConnectorType[]>> = {
+  nema5_20: ['nema5_15'], // a 5-20R receptacle takes 5-15P and 5-20P plugs
+}
+
+export function endMates(end: CableEnd, port: PortTemplate): boolean {
+  if (mateGender(end.gender) !== port.gender) return false
+  if (connectorsMate(end.connector, port.connector)) return true
+  return end.gender === 'male' && port.gender === 'female' && (PLUG_ACCEPTS[port.connector]?.includes(end.connector) ?? false)
+}
+
+/** A plug on one port goes straight into a receptacle on the other (power only). */
+export function plugsInto(a: PortTemplate, b: PortTemplate): boolean {
+  if (!connectorIsPower(a.connector) || !connectorIsPower(b.connector)) return false
+  const [plug, rec] = a.gender === 'male' && b.gender === 'female' ? [a, b] : b.gender === 'male' && a.gender === 'female' ? [b, a] : [null, null]
+  if (!plug || !rec) return false
+  return connectorsMate(plug.connector, rec.connector) || (PLUG_ACCEPTS[rec.connector]?.includes(plug.connector) ?? false)
+}
+
+export function orientation(spec: CableSpec, from: PortTemplate, to: PortTemplate): 'aToB' | 'bToA' | null {
+  if (spec.direct) return plugsInto(from, to) ? 'aToB' : null
+  if (endMates(spec.endA, from) && endMates(spec.endB, to)) return 'aToB'
+  if (endMates(spec.endB, from) && endMates(spec.endA, to)) return 'bToA'
+  return null
+}
+
+export const carries = (spec: CableSpec, signal: SignalType) =>
+  spec.ratedSignals.length === 0 || spec.ratedSignals.includes(signal)
+
+const e = (connector: ConnectorType, gender: Gender): CableEnd => ({ connector, gender })
+const cable = (key: string, name: string, endA: CableEnd, endB: CableEnd, ratedSignals: SignalType[],
+  maxLengthMeters: number | null, labelPrefix: string): CableSpec => ({ key, name, endA, endB, ratedSignals, maxLengthMeters, labelPrefix })
+
+/** Standard cable types. Lengths are conservative passive-copper rules of thumb
+ *  and surface as warnings (except Ethernet's 100 m, which is a standard). */
+export const DIRECT_PLUG: CableSpec = {
+  key: 'direct', name: 'Plugged in directly (attached cord)', endA: e('nema5_15', 'male'), endB: e('nema5_15', 'female'),
+  ratedSignals: [], maxLengthMeters: null, labelPrefix: 'P', direct: true,
+}
+
+export const CABLE_CATALOG: CableSpec[] = [
+  DIRECT_PLUG,
+  cable('hdmi.uhs', 'HDMI Ultra High Speed', e('hdmi', 'male'), e('hdmi', 'male'), ['hdmi14', 'hdmi20', 'hdmi21', 'dviD'], 5, 'V'),
+  cable('hdmi.premium', 'HDMI Premium High Speed', e('hdmi', 'male'), e('hdmi', 'male'), ['hdmi14', 'hdmi20', 'dviD'], 10, 'V'),
+  cable('dp.14', 'DisplayPort 1.4', e('displayPort', 'male'), e('displayPort', 'male'), ['displayPort12', 'displayPort14'], 3, 'V'),
+  cable('sdi.12g', '12G-SDI Coax (RG6)', e('bnc', 'male'), e('bnc', 'male'), ['sdiHD', 'sdi3G', 'sdi6G', 'sdi12G'], 70, 'V'),
+  cable('sdi.3g', '3G-SDI Coax (RG59)', e('bnc', 'male'), e('bnc', 'male'), ['sdiHD', 'sdi3G', 'analogComposite'], 100, 'V'),
+  cable('cat6a', 'Cat6A U/FTP', e('rj45', 'male'), e('rj45', 'male'), [], 100, 'N'),
+  cable('cat6a.ethercon', 'Cat6A etherCON', e('etherCON', 'male'), e('etherCON', 'male'), [], 100, 'N'),
+  cable('fiber.lc.sm', 'Singlemode Fiber LC-LC', e('lcDuplex', 'male'), e('lcDuplex', 'male'), [], 10000, 'F'),
+  cable('xlr3.mic', 'XLR-3 Mic Cable', e('xlr3', 'female'), e('xlr3', 'male'), ['analogMic', 'analogLine', 'aes3'], 100, 'A'),
+  cable('xlr3.trs', 'XLR-3 Male to 1/4" TRS', e('xlr3', 'female'), e('trs6_35', 'male'), ['analogMic', 'analogLine'], 50, 'A'),
+  cable('xlr5.dmx', 'DMX 5-pin (120Ω)', e('xlr5', 'female'), e('xlr5', 'male'), ['dmx512'], 300, 'L'),
+  cable('euro.pair', 'Shielded Pair (Euroblock)', e('euroblock', 'female'), e('euroblock', 'female'),
+    ['analogMic', 'analogLine', 'rs232', 'rs485', 'ir', 'gpio', 'contactClosure'], null, 'A'),
+  cable('spk.nl4', 'Speaker Cable NL4 (12 AWG)', e('speakonNL4', 'male'), e('speakonNL4', 'male'), ['speakerLowZ', 'speaker70V', 'speaker100V'], null, 'S'),
+  cable('spk.euro', 'Speaker Wire (Euroblock)', e('euroblock', 'female'), e('euroblock', 'female'), ['speakerLowZ', 'speaker70V', 'speaker100V'], null, 'S'),
+  cable('pwr.c13.515', 'Power Cord NEMA 5-15P → C13', e('nema5_15', 'male'), e('iecC13C14', 'female'), ['ac120V'], null, 'P'),
+  cable('pwr.c13.c14', 'Jumper Cord C14 → C13', e('iecC13C14', 'male'), e('iecC13C14', 'female'), ['ac120V', 'ac230V'], null, 'P'),
+  cable('pwr.c19.515', 'Power Cord NEMA 5-15P → C19', e('nema5_15', 'male'), e('iecC19C20', 'female'), ['ac120V'], null, 'P'),
+  cable('pwr.true1.515', 'Power Cord NEMA 5-15P → TRUE1', e('nema5_15', 'male'), e('powerCONTrue1', 'female'), ['ac120V'], null, 'P'),
+  cable('pwr.c13.520', 'Power Cord NEMA 5-20P → C13', e('nema5_20', 'male'), e('iecC13C14', 'female'), ['ac120V'], null, 'P'),
+  cable('pwr.c19.520', 'Power Cord NEMA 5-20P → C19', e('nema5_20', 'male'), e('iecC19C20', 'female'), ['ac120V'], null, 'P'),
+  cable('pwr.c13.l520', 'Power Cord NEMA L5-20P → C13', e('nemaL5_20', 'male'), e('iecC13C14', 'female'), ['ac120V'], null, 'P'),
+  cable('pwr.c19.l520', 'Power Cord NEMA L5-20P → C19', e('nemaL5_20', 'male'), e('iecC19C20', 'female'), ['ac120V'], null, 'P'),
+  cable('pwr.c13.l530', 'Power Cord NEMA L5-30P → C13', e('nemaL5_30', 'male'), e('iecC13C14', 'female'), ['ac120V'], null, 'P'),
+  cable('pwr.c19.l530', 'Power Cord NEMA L5-30P → C19', e('nemaL5_30', 'male'), e('iecC19C20', 'female'), ['ac120V'], null, 'P'),
+  cable('pwr.c19.l620', 'Power Cord NEMA L6-20P → C19', e('nemaL6_20', 'male'), e('iecC19C20', 'female'), ['ac230V'], null, 'P'),
+  cable('pwr.c19.l630', 'Power Cord NEMA L6-30P → C19', e('nemaL6_30', 'male'), e('iecC19C20', 'female'), ['ac230V'], null, 'P'),
+  cable('pwr.camlok.feeder', 'Cam-Lok Feeder Set (5-wire)', e('camlok', 'male'), e('camlok', 'female'), ['ac120V', 'ac230V'], null, 'P'),
+  cable('pwr.ext.l2130', 'Extension NEMA L21-30P → L21-30R', e('nemaL21_30', 'male'), e('nemaL21_30', 'female'), ['ac120V', 'ac230V'], null, 'P'),
+  cable('pwr.ext.l530', 'Extension NEMA L5-30P → L5-30R', e('nemaL5_30', 'male'), e('nemaL5_30', 'female'), ['ac120V'], null, 'P'),
+  cable('pwr.ext.l520', 'Extension NEMA L5-20P → L5-20R', e('nemaL5_20', 'male'), e('nemaL5_20', 'female'), ['ac120V'], null, 'P'),
+  cable('pwr.ext.520', 'Extension NEMA 5-20P → 5-20R', e('nema5_20', 'male'), e('nema5_20', 'female'), ['ac120V'], null, 'P'),
+  cable('pwr.ext.515', 'Extension NEMA 5-15P → 5-15R', e('nema5_15', 'male'), e('nema5_15', 'female'), ['ac120V'], null, 'P'),
+  cable('pwr.c19.c20', 'Jumper Cord C20 → C19', e('iecC19C20', 'male'), e('iecC19C20', 'female'), ['ac120V', 'ac230V'], null, 'P'),
+  cable('pwr.c13.c20', 'Jumper Cord C20 → C13', e('iecC19C20', 'male'), e('iecC13C14', 'female'), ['ac120V', 'ac230V'], null, 'P'),
+  cable('pwr.true1.c14', 'Jumper Cord C14 → TRUE1', e('iecC13C14', 'male'), e('powerCONTrue1', 'female'), ['ac120V', 'ac230V'], null, 'P'),
+  cable('pwr.true1.link', 'powerCON TRUE1 Link', e('powerCONTrue1', 'male'), e('powerCONTrue1', 'female'), ['ac120V', 'ac230V'], null, 'P'),
+  cable('pwr.powercon.515', 'Power Cord NEMA 5-15P → powerCON', e('nema5_15', 'male'), e('powerCON', 'female'), ['ac120V'], null, 'P'),
+  cable('usb.c', 'USB-C to USB-C', e('usbC', 'male'), e('usbC', 'male'), ['usb2', 'usb3'], 2, 'U'),
+]
+
+// MARK: Exact-fit custom cables
+//
+// When nothing in the catalog fits a pair of connectors, the user can pick a
+// cable built from the two ports themselves. Its key encodes both ends
+// ("custom:nemaL5_30/male~iecC13C14/female") so it round-trips in project files
+// without a separate cable table.
+
+const ENDS: Partial<Record<ConnectorType, [male: string, female: string]>> = {
+  iecC13C14: ['C14', 'C13'], iecC19C20: ['C20', 'C19'],
+  nema5_15: ['NEMA 5-15P', 'NEMA 5-15R'], nema5_20: ['NEMA 5-20P', 'NEMA 5-20R'],
+  nemaL5_20: ['NEMA L5-20P', 'NEMA L5-20R'], nemaL5_30: ['NEMA L5-30P', 'NEMA L5-30R'],
+  nemaL6_20: ['NEMA L6-20P', 'NEMA L6-20R'], nemaL6_30: ['NEMA L6-30P', 'NEMA L6-30R'],
+  nemaL14_30: ['NEMA L14-30P', 'NEMA L14-30R'], nemaL21_30: ['NEMA L21-30P', 'NEMA L21-30R'],
+  powerCONTrue1: ['TRUE1 (in)', 'TRUE1 (out)'],
+  camlok: ['Cam-Lok (male)', 'Cam-Lok (female)'],
+}
+
+/** Human name for one cable end, e.g. "NEMA L5-30P", "C13", "XLR-3 (F)". */
+export function endName(end: CableEnd): string {
+  const named = ENDS[end.connector]
+  if (named && end.gender !== 'genderless') return named[end.gender === 'male' ? 0 : 1]
+  const g = end.gender === 'male' ? ' (M)' : end.gender === 'female' ? ' (F)' : ''
+  return `${connectorName(end.connector)}${g}`
+}
+
+const CUSTOM = 'custom:'
+const endKey = (e: CableEnd) => `${e.connector}/${e.gender}`
+
+/** A cable whose ends are made to fit `from` and `to` exactly. */
+export function exactFitCable(from: PortTemplate, to: PortTemplate): CableSpec {
+  // Put the plug (male) end first for power cords so names read "plug → connector".
+  let a: CableEnd = { connector: from.connector, gender: mateGender(from.gender) }
+  let b: CableEnd = { connector: to.connector, gender: mateGender(to.gender) }
+  if (connectorIsPower(a.connector) && a.gender !== 'male' && b.gender === 'male') [a, b] = [b, a]
+  return customCable(a, b)
+}
+
+function customCable(a: CableEnd, b: CableEnd): CableSpec {
+  const power = connectorIsPower(a.connector) || connectorIsPower(b.connector)
+  return {
+    key: `${CUSTOM}${endKey(a)}~${endKey(b)}`,
+    name: `${power ? 'Power Cord' : 'Custom Cable'} ${endName(a)} → ${endName(b)}`,
+    endA: a, endB: b, ratedSignals: [], maxLengthMeters: null, labelPrefix: power ? 'P' : 'X',
+  }
+}
+
+function parseCustom(key: string): CableSpec | undefined {
+  const [ka, kb] = key.slice(CUSTOM.length).split('~')
+  const parse = (k?: string): CableEnd | null => {
+    const [c, g] = (k ?? '').split('/')
+    if (!c || !(c in CONNECTORS) || !['male', 'female', 'genderless'].includes(g)) return null
+    return { connector: c as ConnectorType, gender: g as Gender }
+  }
+  const a = parse(ka), b = parse(kb)
+  return a && b ? customCable(a, b) : undefined
+}
+
+export const isCustomCable = (key: string | null | undefined) => !!key?.startsWith(CUSTOM)
+
+export const cableSpec = (key: string | null | undefined): CableSpec | undefined =>
+  !key ? undefined : key.startsWith(CUSTOM) ? parseCustom(key) : CABLE_CATALOG.find((c) => c.key === key)
+
+/** 0 when both ends are the ports' own connector types; higher for looser fits (5-15P in a 5-20R). */
+export function fitLooseness(spec: CableSpec, from: PortTemplate, to: PortTemplate): number {
+  const o = orientation(spec, from, to)
+  if (!o) return Infinity
+  if (spec.direct) return -1
+  const [ea, eb] = o === 'aToB' ? [spec.endA, spec.endB] : [spec.endB, spec.endA]
+  return (ea.connector === from.connector ? 0 : 1) + (eb.connector === to.connector ? 0 : 1)
+}
+
+const sameEnds = (x: CableSpec, y: CableSpec) => {
+  const k = (e: CableEnd) => `${e.connector}/${e.gender}`
+  return (k(x.endA) === k(y.endA) && k(x.endB) === k(y.endB)) || (k(x.endA) === k(y.endB) && k(x.endB) === k(y.endA))
+}
+
+/** Every cable that physically fits, closest fit first. Includes a made-to-fit
+ *  cable unless a catalog cable already has exactly those ends. */
+export function fittingCables(from: PortTemplate, to: PortTemplate): CableSpec[] {
+  const fit = CABLE_CATALOG.filter((s) => orientation(s, from, to) != null)
+    .sort((a, b) => fitLooseness(a, from, to) - fitLooseness(b, from, to))
+  const exact = exactFitCable(from, to)
+  return fit.some((c) => sameEnds(c, exact)) ? fit : [...fit, exact]
+}

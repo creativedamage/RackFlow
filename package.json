@@ -1,0 +1,43 @@
+{
+  "name": "rackflow",
+  "productName": "RackFlow",
+  "version": "1.0.0",
+  "description": "AVL system design: wiring diagrams, rack elevations, validated connections and patch bay labels.",
+  "main": "./out/main/index.js",
+  "author": "Wayne Goodman",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "vitest run",
+    "dist:mac": "npm run build && electron-builder --mac --publish never",
+    "dist:win": "npm run build && electron-builder --win",
+    "version:check": "node scripts/check-version.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "@xyflow/react": "12.12.0",
+    "electron": "44.7.1",
+    "electron-builder": "26.17.0",
+    "electron-vite": "6.0.0",
+    "immer": "11.1.21",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "typescript": "5.9.3",
+    "vite": "8.3.4",
+    "vitest": "5.0.4",
+    "zustand": "5.0.15"
+  },
+  "dependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/creativedamage/RackFlow.git"
+  },
+  "homepage": "https://github.com/creativedamage/RackFlow"
+}

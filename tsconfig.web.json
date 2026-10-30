@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": { "composite": true, "jsx": "react-jsx", "lib": ["ES2022", "DOM", "DOM.Iterable"], "types": [] },
+  "include": ["src/renderer/src/**/*", "src/core/**/*", "src/preload/api.d.ts"],
+  "exclude": ["src/core/**/*.test.ts"]
+}
