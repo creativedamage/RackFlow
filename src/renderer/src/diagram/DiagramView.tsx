@@ -13,10 +13,12 @@ import { setViewCenterProvider } from './placement'
 import { pickIndex } from './wiring'
 import { DeviceNode, headerHeight, NODE_WIDTH, ROW_H, splitPorts, type DeviceNodeType } from './DeviceNode'
 import { GroupFrame, type GroupFrameType } from './GroupFrame'
+import { CableEdge, type CableEdgeType } from './CableEdge'
 import { GroupsPanel, useGroupFocus } from './GroupsPanel'
 import { useWiring } from './wiring'
 
 const nodeTypes = { device: DeviceNode, groupFrame: GroupFrame }
+const edgeTypes = { cable: CableEdge }
 type AnyNode = DeviceNodeType | GroupFrameType
 const FRAME_PAD = 22, FRAME_LABEL = 26
 const nodeH = (n: DeviceNodeType) => n.measured?.height ?? headerHeight(n.data.eq) + Math.max(...Object.values(splitPorts(n.data.eq)).map((x) => x.length), 1) * ROW_H + 8
@@ -90,21 +92,27 @@ export function DiagramView() {
     return m
   }, [issues])
 
-  const edges: Edge[] = useMemo(() => project.cables.map((c) => {
-    const from = resolve(project, c.from)
-    const d = from ? portDomain(from.port) : null
-    const sev = cableSeverity.get(c.id)
-    const color = sev === 'error' ? '#e03131' : d ? DOMAINS[d].color : '#888'
-    const sel = c.id === selectedCable
-    return {
-      id: c.id, source: c.from.equipment, sourceHandle: c.from.port, target: c.to.equipment, targetHandle: c.to.port,
-      type: 'smoothstep', selected: sel, label: c.label,
-      labelStyle: { fontSize: 9, fontFamily: 'ui-monospace, Menlo, monospace', fill: 'var(--text-2)' },
-      labelBgStyle: { fill: 'var(--bg)' }, labelBgPadding: [3, 1] as [number, number],
-      style: { stroke: color, strokeWidth: sel ? 3 : 1.6, strokeDasharray: sev === 'error' ? '6 3' : undefined },
-      pathOptions: { borderRadius: 6, offset: 16 },
-    }
-  }), [project, cableSeverity, selectedCable])
+  const edges: CableEdgeType[] = useMemo(() => {
+    const sel = new Set(selection)
+    const lanes = new Map<string, number>()
+    return project.cables.map((c) => {
+      const from = resolve(project, c.from)
+      const d = from ? portDomain(from.port) : null
+      const sev = cableSeverity.get(c.id)
+      const color = sev === 'error' ? '#e03131' : d ? DOMAINS[d].color : '#888'
+      const isSel = c.id === selectedCable
+      // Wires touching a selected (or dragged) device draw above other devices.
+      const lifted = isSel || sel.has(c.from.equipment) || sel.has(c.to.equipment)
+      const pair = `${c.from.equipment}>${c.to.equipment}`
+      const lane = lanes.get(pair) ?? 0
+      lanes.set(pair, lane + 1)
+      return {
+        id: c.id, source: c.from.equipment, sourceHandle: c.from.port, target: c.to.equipment, targetHandle: c.to.port,
+        type: 'cable' as const, selected: isSel, zIndex: lifted ? 1000 : 0,
+        data: { label: c.label, color, dashed: sev === 'error', lane: lane + project.cables.indexOf(c), onSelect: () => select([], c.id) },
+      }
+    })
+  }, [project, cableSeverity, selectedCable, selection, select])
 
   useEffect(() => { if (fitRequest) void fitView({ padding: 0.15, duration: 250 }) }, [fitRequest, fitView])
 
@@ -231,10 +239,11 @@ export function DiagramView() {
 
   return (
     <div className="diagram" onDragOver={(e) => { if (e.dataTransfer.types.includes(DRAG_MIME)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' } }} onDrop={onDrop}>
-      <ReactFlow<AnyNode, Edge>
+      <ReactFlow<AnyNode, CableEdgeType>
         nodes={allNodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeDragStop={onNodeDragStop}
