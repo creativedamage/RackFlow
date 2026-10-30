@@ -131,6 +131,13 @@ function buildMenu() {
       ],
     },
     { role: 'windowMenu' },
+    {
+      role: 'help',
+      submenu: [
+        { label: 'Check for Updates…', click: () => { void checkForUpdates({ userInitiated: true }) } },
+        { label: 'RackFlow Releases on GitHub', click: () => openReleasePage() },
+      ],
+    },
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }

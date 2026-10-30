@@ -2,7 +2,7 @@ import { openDocument, saveDocument, newDocument, useStore, type Mode } from '..
 import { isElectron } from '../platform'
 import { Segmented, TextInput } from './ui'
 import { IssuesButton } from './IssuesButton'
-import { UpdatePill } from './UpdatePill'
+import { AppMenuButton, UpdatePill } from './UpdatePill'
 
 export function Toolbar() {
   const mode = useStore((s) => s.mode)
@@ -22,7 +22,7 @@ export function Toolbar() {
   return (
     <header className="toolbar">
       <div className="toolbar-left">
-        <span className="app-mark" aria-hidden>▦</span>
+        <AppMenuButton />
         <TextInput className="doc-title" value={name} onCommit={(v) => apply('Rename Project', (d) => { d.info.name = v || 'Untitled Project' })} />
         {dirty && <span className="dirty-dot" title="Unsaved changes" />}
         {!isElectron && (

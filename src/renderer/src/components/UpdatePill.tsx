@@ -47,3 +47,38 @@ export function UpdatePill() {
     </div>
   )
 }
+
+/** The app mark in the toolbar: shows the version and a Check for Updates button. */
+export function AppMenuButton() {
+  const [open, setOpen] = useState(false)
+  const [version, setVersion] = useState('')
+  const [checking, setChecking] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => { void api.appVersion().then(setVersion) }, [])
+  useEffect(() => {
+    if (!open) return
+    const off = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    window.addEventListener('mousedown', off)
+    return () => window.removeEventListener('mousedown', off)
+  }, [open])
+  const check = async () => {
+    setChecking(true)
+    try {
+      const s = await api.checkForUpdates()
+      if (s.state === 'manual' && !s.version) useStore.getState().notify(s.reason, { kind: 'info' })
+    } finally { setChecking(false); setOpen(false) }
+  }
+  return (
+    <div className="app-menu" ref={ref}>
+      <button className="app-mark" onClick={() => setOpen(!open)} title={`RackFlow ${version}`} aria-label="About RackFlow">▦</button>
+      {open && (
+        <div className="app-menu-pop">
+          <b>RackFlow</b>
+          <span className="muted small">Version {version}</span>
+          <button className="primary" disabled={checking} onClick={() => void check()}>{checking ? 'Checking…' : 'Check for Updates'}</button>
+          <button onClick={() => { void api.openReleasePage(); setOpen(false) }}>Release Notes</button>
+        </div>
+      )}
+    </div>
+  )
+}

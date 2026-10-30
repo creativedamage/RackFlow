@@ -661,3 +661,7 @@ button.link.show-all:hover { text-decoration: underline; }
 .react-flow__edgelabel-renderer { z-index: 1500 !important; }
 .cable-label { position: absolute; pointer-events: all; cursor: pointer; font: 600 9px/1 ui-monospace, Menlo, monospace; padding: 2px 5px; border-radius: 6px; border: 1px solid; background: var(--bg); color: var(--text); white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
 .cable-label:hover { filter: brightness(0.96); }
+.app-menu { position: relative; -webkit-app-region: no-drag; }
+button.app-mark { border: none; background: transparent; padding: 2px 6px; cursor: pointer; }
+button.app-mark:hover { background: var(--bg-3) !important; }
+.app-menu-pop { position: absolute; left: 0; top: calc(100% + 8px); width: 220px; display: flex; flex-direction: column; gap: 6px; padding: 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 14px 40px rgba(0,0,0,.22); z-index: 300; }
