@@ -172,6 +172,9 @@ function adapter(c: ConnectorType): { w: number; h: number; svg: string } {
 
 export interface FiberDrawOpts { /** Skip the rack ears / outline (the rack elevation draws its own). */ bare?: boolean; labels?: boolean }
 
+/** FHD cassette / adapter panel front face (mm): 4.29" × 1.38". */
+export const MODULE_W = 109, MODULE_H = 35
+
 /** Face size (mm). */
 export const fiberFaceSize = (spec: FiberSpec) => ({ w: 482.6, h: 44.45 * fiberEnclosure(spec.enclosure).ru })
 
@@ -187,11 +190,16 @@ export function fiberInner(spec: FiberSpec, o: FiberDrawOpts = {}): string {
     out.push(`<line x1="15.9" y1="0" x2="15.9" y2="${n(H)}" ${line(0.2)} stroke-dasharray="1.5 1"/><line x1="${n(W - 15.9)}" y1="0" x2="${n(W - 15.9)}" y2="${n(H)}" ${line(0.2)} stroke-dasharray="1.5 1"/>`)
   }
   // Slot grid inside the ears.
-  const x0 = 24, x1 = W - 24, y0 = 3, y1 = H - 3, gap = 2.5
-  const sw = (x1 - x0 - gap * (e.cols - 1)) / e.cols, sh = (y1 - y0 - gap * (e.rows - 1)) / e.rows
+  // Modules are drawn at their real size (FHD cassette face 4.29" × 1.38"),
+  // centred in the opening – an enclosure with fewer slots doesn't stretch them.
+  const sw = MODULE_W, sh = MODULE_H, gap = 1.5
+  const gridW = e.cols * sw + (e.cols - 1) * gap
+  const gapY = e.rows > 1 ? Math.min(6, (H - 6 - e.rows * sh) / (e.rows - 1)) : 0
+  const gridH = e.rows * sh + (e.rows - 1) * gapY
+  const x0 = (W - gridW) / 2, y0 = (H - gridH) / 2
   spec.slots.slice(0, e.cols * e.rows).forEach((slot, i) => {
     const c = i % e.cols, r = Math.floor(i / e.cols)
-    const sx = x0 + c * (sw + gap), sy = y0 + r * (sh + gap)
+    const sx = x0 + c * (sw + gap), sy = y0 + r * (sh + gapY)
     const m = fiberModule(slot.module)
     out.push(`<rect x="${n(sx)}" y="${n(sy)}" width="${n(sw)}" height="${n(sh)}" rx="1" ${line(m ? 0.45 : 0.3)}${m ? '' : ' stroke-dasharray="2 1.2"'}/>`)
     // Latches.
