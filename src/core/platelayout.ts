@@ -4,7 +4,7 @@
 // in the designer, as the preview on the wiring-diagram card and in print.
 
 import type { PlateInsert, PlateKind, PlateLayout, PlateSpec, PlateText, ProductDefinition } from './model'
-import { fiberFaceSize, fiberInner } from './fiber'
+import { fiberFaceSize, fiberInner, lcPort } from './fiber'
 import { PLATE_MODULES } from './plates'
 
 export type PlateFinish = PlateLayout['finish']
@@ -222,7 +222,7 @@ export function jackSVG(module: string): string {
       }
       case 'nl4': D(0, 0, 10); C(0, 0, 8.5); C(0, 0, 5.2); R(-1.1, -8.5, 2.2, 3.3); R(-1.1, 5.2, 2.2, 3.3); break
       case 'ethercon': D(0, 0, 10); C(0, 0, 8.6); R(-5.85, -3.6, 11.7, 8.1, 0.6); R(-2.5, 4.5, 5, 1.6); R(-3.6, 10.3, 7.2, 3.2, 0.8); break
-      case 'oc': D(0, 0, 10); C(0, 0, 8.6); R(-5.5, -2.4, 4.6, 4.8, 0.5); R(0.9, -2.4, 4.6, 4.8, 0.5); break
+      case 'oc': D(0, 0, 10); C(0, 0, 8.6); P.push(lcPort(-3.2, 0.3), lcPort(3.2, 0.3)); break
       case 'bnc': D(0, 0, 10); C(0, 0, 4.75); C(0, 0, 2.6); C(0, 0, 0.6); R(-5.6, -0.6, 1.2, 1.2); R(4.4, -0.6, 1.2, 1.2); break
       case 'hdmi': D(0, 0, 10); L('M -7 -2.25 L 7 -2.25 L 7 0.6 L 5.4 2.25 L -5.4 2.25 L -7 0.6 Z'); break
       case 'dp': D(0, 0, 10); L('M -8 -2.4 L 8 -2.4 L 8 2.4 L -6.4 2.4 L -8 0.8 Z'); break
@@ -230,7 +230,7 @@ export function jackSVG(module: string): string {
       case 'usbB': D(0, 0, 10); L('M -4 -3.65 L 2.6 -3.65 L 4 -2.25 L 4 3.65 L -4 3.65 Z'); break
       case 'usbC': D(0, 0, 10); R(-4.15, -1.3, 8.3, 2.6, 1.3); break
       case 'trs': D(0, 0, 10); C(0, 0, 6); C(0, 0, 3.2); break
-      case 'lc': D(0, 0, 10); R(-5.4, -2.25, 4.5, 4.5, 0.3); R(0.9, -2.25, 4.5, 4.5, 0.3); break
+      case 'lc': D(0, 0, 10); R(-7.2, -4, 14.4, 8, 0.8); P.push(lcPort(-3.2, 0.4), lcPort(3.2, 0.4)); break
       default: D(0, 0, 10)
     }
   } else if (f.shape === 'keystone') {

@@ -121,16 +121,52 @@ export function makeFiberProduct(spec: FiberSpec, meta: { key?: string; manufact
 const n = (v: number) => Math.round(v * 100) / 100
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-/** One adapter on the face, centred on (0,0). */
+// Fiber port symbols as seen from the front of an adapter (mm, outline only).
+const SW = 0.28
+const rect = (x: number, y: number, w: number, h: number, rx = 0.3, sw = SW) => `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" rx="${rx}" fill="none" stroke="currentColor" stroke-width="${sw}"/>`
+const circ = (x: number, y: number, r: number, sw = SW) => `<circle cx="${n(x)}" cy="${n(y)}" r="${n(r)}" fill="none" stroke="currentColor" stroke-width="${sw}"/>`
+const dot = (x: number, y: number, r: number) => `<circle cx="${n(x)}" cy="${n(y)}" r="${n(r)}" fill="currentColor"/>`
+
+/**
+ * LC port: 4.5 mm square opening with the latch keyway on one side, the
+ * ceramic sleeve and the 1.25 mm ferrule bore in the middle.
+ */
+export function lcPort(cx: number, cy: number, key: 'top' | 'left' | 'right' = 'top'): string {
+  const o = rect(cx - 2.25, cy - 2.25, 4.5, 4.5, 0.5)
+  const k = key === 'top' ? rect(cx - 1, cy - 3.15, 2, 0.9, 0.15) : key === 'left' ? rect(cx - 3.15, cy - 1, 0.9, 2, 0.15) : rect(cx + 2.25, cy - 1, 0.9, 2, 0.15)
+  return o + k + circ(cx, cy, 1.05) + dot(cx, cy, 0.32)
+}
+/** SC port: 7 × 9 mm opening with chamfered corners, keyway, 2.5 mm ferrule in its sleeve. */
+export function scPort(cx: number, cy: number): string {
+  const w = 3.5, h = 4.5, c = 1
+  const d = `M ${n(cx - w + c)} ${n(cy - h)} L ${n(cx + w - c)} ${n(cy - h)} L ${n(cx + w)} ${n(cy - h + c)} L ${n(cx + w)} ${n(cy + h - c)} L ${n(cx + w - c)} ${n(cy + h)} L ${n(cx - w + c)} ${n(cy + h)} L ${n(cx - w)} ${n(cy + h - c)} L ${n(cx - w)} ${n(cy - h + c)} Z`
+  return `<path d="${d}" fill="none" stroke="currentColor" stroke-width="${SW}"/>` + rect(cx - 0.9, cy - h - 1.1, 1.8, 1.1, 0.2) + circ(cx, cy, 1.7) + circ(cx, cy, 1.25) + dot(cx, cy, 0.35)
+}
+/** MTP/MPO port (vertical): rectangular opening with the key on one side, MT ferrule with its fiber row and two guide-pin holes. */
+export function mtpPort(cx: number, cy: number, fibers = 12): string {
+  let s = rect(cx - 2.2, cy - 5, 4.4, 10, 0.6) + rect(cx - 3.1, cy - 1.4, 0.9, 2.8, 0.2) + rect(cx - 1.1, cy - 3.7, 2.2, 7.4, 0.3)
+  s += circ(cx, cy - 3.0, 0.32, 0.2) + circ(cx, cy + 3.0, 0.32, 0.2)
+  const pitch = 4.4 / Math.max(1, fibers - 1)
+  for (let i = 0; i < fibers; i++) s += dot(cx, cy - 2.2 + i * pitch, 0.12)
+  return s
+}
+/** MDC port: very small form factor – 2.3 × 3 mm opening, ferrule bore. */
+export function mdcPort(cx: number, cy: number): string {
+  return rect(cx - 1.15, cy - 1.5, 2.3, 3, 0.35) + rect(cx - 0.5, cy - 2.1, 1, 0.6, 0.1) + circ(cx, cy, 0.7, 0.22) + dot(cx, cy, 0.22)
+}
+
+/** One adapter on the face (front view), centred on (0,0). */
 function adapter(c: ConnectorType): { w: number; h: number; svg: string } {
-  const L = (d: string) => `<path d="${d}" fill="none" stroke="currentColor" stroke-width="0.3"/>`
-  const R = (x: number, y: number, w: number, h: number, rx = 0.4) => `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" rx="${rx}" fill="none" stroke="currentColor" stroke-width="0.3"/>`
+  // Adapter body with the snap-in tabs at each end.
+  const body = (w: number, h: number) => rect(-w / 2, -h / 2, w, h, 0.7, 0.35) + rect(-w / 2 + w * 0.3, -h / 2 - 0.7, w * 0.4, 0.7, 0.2, 0.22) + rect(-w / 2 + w * 0.3, h / 2, w * 0.4, 0.7, 0.2, 0.22)
   switch (c) {
-    case 'lcDuplex': return { w: 9.6, h: 12.6, svg: R(-4.8, -6.3, 9.6, 12.6, 0.6) + R(-3.6, -5, 3, 4.3) + R(0.6, -5, 3, 4.3) + R(-3.6, 0.7, 3, 4.3) + R(0.6, 0.7, 3, 4.3) }
-    case 'scDuplex': return { w: 12.7, h: 25.4, svg: R(-6.35, -12.7, 12.7, 25.4, 0.8) + R(-4.2, -10.6, 8.4, 9.2) + R(-4.2, 1.4, 8.4, 9.2) }
-    case 'mdc': return { w: 4.2, h: 12.6, svg: R(-2.1, -6.3, 4.2, 12.6, 0.4) + R(-1.3, -4.5, 2.6, 3.6) + R(-1.3, 0.9, 2.6, 3.6) }
-    case 'mpo8': case 'mpo12': case 'mpo24': return { w: 8, h: 14, svg: R(-4, -7, 8, 14, 0.6) + R(-1.6, -5.4, 3.2, 10.8) + L('M -2.6 -6.6 L -2.6 -5.2') }
-    default: return { w: 10, h: 12, svg: R(-5, -6, 10, 12) }
+    case 'lcDuplex': return { w: 7, h: 13, svg: body(7, 13) + lcPort(0, -3.1, 'left') + lcPort(0, 3.1, 'left') }
+    case 'scDuplex': return { w: 9.8, h: 25.4, svg: body(9.8, 25.4) + scPort(0, -6.35) + scPort(0, 6.35) }
+    case 'mdc': return { w: 4.2, h: 8.6, svg: body(4.2, 8.6) + mdcPort(0, -1.9) + mdcPort(0, 1.9) }
+    case 'mpo8': return { w: 7, h: 13, svg: body(7, 13) + mtpPort(0, 0, 8) }
+    case 'mpo24': return { w: 7, h: 13, svg: body(7, 13) + mtpPort(0, -0.8, 12) + mtpPort(0, 0.8, 12) }
+    case 'mpo12': return { w: 7, h: 13, svg: body(7, 13) + mtpPort(0, 0, 12) }
+    default: return { w: 10, h: 12, svg: rect(-5, -6, 10, 12) }
   }
 }
 
