@@ -55,7 +55,8 @@ export const PLATE_MODULE_KEYS = Object.keys(PLATE_MODULES)
 
 export const PLATE_STYLES: Record<PlateKind, string[]> = {
   wallPlate: ['1-Gang', '2-Gang', '3-Gang', '4-Gang', 'Decora 1-Gang', 'Decora 2-Gang', 'Custom'],
-  floorBox: ['2-Compartment', '4-Compartment', '6-Compartment', '8-Compartment', 'Poke-Thru', 'Stage Pocket', 'Wall Box', 'Custom'],
+  floorBox: ['2-Compartment', '4-Compartment', '6-Compartment', '8-Compartment', 'Poke-Thru', 'Stage Pocket', 'Custom'],
+  wallBox: ['UCP 3.5" x 3.5"', '6" x 6"', '8" x 8"', '10" x 10"', '12" x 12"', '8.5" x 5.75"', '5.75" x 8.5"', '8.5" x 7.5"', '7.5" x 8.5"', '14.5" x 7.5"', '7.5" x 14.5"', '14.5" x 10.5"', '10.5" x 14.5"', '17" x 7.5"', '7.5" x 17"', '17" x 10.5"', '10.5" x 17"', 'Custom'],
   rackPanel: ['1RU', '2RU', '3RU', '4RU'],
 }
 
@@ -90,11 +91,13 @@ export function platePorts(spec: PlateSpec): PortTemplate[] {
   return ports
 }
 
+const KIND_LABEL: Record<PlateKind, string> = { wallBox: 'wall box', wallPlate: 'wall plate', floorBox: 'floor box', rackPanel: 'rack connector panel' }
+
 const shortName = (m: PlateModule) => m.name.replace(/\s*\(.*\)$/, '')
 
 export function plateSummary(spec: PlateSpec): string {
   const parts = spec.inserts.filter((i) => PLATE_MODULES[i.module]).map((i) => `${i.count}× ${shortName(PLATE_MODULES[i.module])}`)
-  return `${spec.style} ${spec.kind === 'floorBox' ? 'floor box' : spec.kind === 'rackPanel' ? 'rack connector panel' : 'wall plate'}: ${parts.join(', ') || 'empty'}`
+  return `${spec.style} ${KIND_LABEL[spec.kind]}: ${parts.join(', ') || 'empty'}`
 }
 
 /** Builds (or rebuilds) the product for a plate spec. */
@@ -103,13 +106,13 @@ export function makePlateProduct(spec: PlateSpec, meta: { key?: string; manufact
   return {
     key: meta.key ?? `user.plate.${newId()}`,
     manufacturer: meta.manufacturer?.trim() || 'Custom',
-    model: meta.model.trim() || (spec.kind === 'floorBox' ? 'Floor Box' : spec.kind === 'rackPanel' ? 'Connector Panel' : 'Wall Plate'),
+    model: meta.model.trim() || ({ wallBox: 'Wall Box', floorBox: 'Floor Box', rackPanel: 'Connector Panel', wallPlate: 'Wall Plate' } as const)[spec.kind],
     summary: plateSummary(spec),
     category: spec.kind === 'rackPanel' ? 'connectorPanel' : spec.kind,
-    tags: ['plate', spec.kind === 'floorBox' ? 'floor box' : spec.kind === 'rackPanel' ? 'rack panel' : 'wall plate', 'connection point', spec.style.toLowerCase()],
+    tags: ['plate', KIND_LABEL[spec.kind], 'connection point', spec.style.toLowerCase()],
     physical: spec.kind === 'rackPanel'
       ? { rackUnits: Math.max(1, parseInt(spec.style, 10) || 1), halfWidth: false, widthMM: 482.6, heightMM: 44.45 * (parseInt(spec.style, 10) || 1), depthMM: 50, weightKG: 1, mounting: 'rack' }
-      : { rackUnits: null, halfWidth: false, widthMM: spec.layout?.w ?? 120, heightMM: spec.layout?.h ?? 120, depthMM: spec.kind === 'floorBox' ? 100 : 60, weightKG: 0.4, mounting: spec.kind === 'floorBox' ? 'floor' : 'wall' },
+      : { rackUnits: null, halfWidth: false, widthMM: spec.layout?.w ?? 120, heightMM: spec.layout?.h ?? 120, depthMM: spec.kind === 'floorBox' ? 100 : spec.kind === 'wallBox' ? 101.6 : 60, weightKG: spec.kind === 'wallBox' ? 1.4 : 0.4, mounting: spec.kind === 'floorBox' ? 'floor' : 'wall' },
     power: { acceptedVoltages: [], typicalWatts: 0, maxWatts: 0, publishedBTU: null, efficiency: null, poweredByPoE: false },
     ports: platePorts(spec),
     source: 'user',
@@ -121,6 +124,8 @@ export function makePlateProduct(spec: PlateSpec, meta: { key?: string; manufact
 
 export const newPlateSpec = (kind: PlateKind = 'wallPlate'): PlateSpec => kind === 'wallPlate'
   ? { kind, style: '1-Gang', inserts: [{ module: 'hdmi', count: 1, rear: 'same' }, { module: 'rj45', count: 1, rear: 'idcPunchdown' }] }
+  : kind === 'wallBox'
+  ? { kind, style: '6" x 6"', inserts: [{ module: 'xlrF', count: 4, rear: 'idcPunchdown' }, { module: 'ethercon', count: 2, rear: 'same' }] }
   : kind === 'rackPanel'
   ? { kind, style: '1RU', inserts: [{ module: 'xlrF', count: 8, rear: 'idcPunchdown' }, { module: 'rj45', count: 4, rear: 'idcPunchdown' }] }
   : { kind, style: '4-Compartment', inserts: [{ module: 'pwr520', count: 2, rear: 'none' }, { module: 'rj45', count: 2, rear: 'idcPunchdown' }, { module: 'hdmi', count: 1, rear: 'same' }], power: { volts: 120, amps: 20 } }
@@ -137,6 +142,8 @@ export const PLATE_PRODUCTS: ProductDefinition[] = [
     { key: 'generic.plate.nl4', manufacturer: 'Generic', model: 'Speaker Wall Plate: 2× NL4' }), source: 'builtIn' },
   { ...makePlateProduct({ kind: 'wallPlate', style: '1-Gang', inserts: [{ module: 'bnc', count: 4, rear: 'same' }] },
     { key: 'generic.plate.bnc4', manufacturer: 'Generic', model: 'Video Wall Plate: 4× BNC' }), source: 'builtIn' },
+  { ...makePlateProduct(newPlateSpec('wallBox'), { key: 'generic.wallbox.6x6', manufacturer: 'Generic', model: 'Wall Box 6" x 6": 4× XLR-F, 2× etherCON' }), source: 'builtIn' },
+  { ...makePlateProduct({ kind: 'wallBox', style: '17" x 10.5"', inserts: [{ module: 'xlrF', count: 12, rear: 'idcPunchdown' }, { module: 'xlrM', count: 4, rear: 'idcPunchdown' }, { module: 'ethercon', count: 2, rear: 'same' }, { module: 'bnc', count: 2, rear: 'same' }] }, { key: 'generic.wallbox.17x10', manufacturer: 'Generic', model: 'Stage Wall Box 17" x 10.5": 12× XLR-F, 4× XLR-M, 2× etherCON, 2× BNC' }), source: 'builtIn' },
   { ...makePlateProduct(newPlateSpec('floorBox'), { key: 'generic.floorbox.4', manufacturer: 'Generic', model: 'Floor Box: 2× 5-20R, 2× RJ45, HDMI' }), source: 'builtIn' },
   { ...makePlateProduct({ kind: 'floorBox', style: 'Stage Pocket', power: { volts: 120, amps: 20 }, inserts: [
     { module: 'xlrF', count: 8, rear: 'idcPunchdown' }, { module: 'xlrM', count: 4, rear: 'idcPunchdown' }, { module: 'nl4', count: 2, rear: 'euroblock' },

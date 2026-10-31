@@ -16,7 +16,7 @@ const REAR_OPTIONS: { value: PlateInsert['rear']; label: string }[] = [
   { value: 'none', label: 'No tie line' },
 ]
 const GROUP_ORDER = ['Audio', 'Speaker', 'Video', 'Network', 'Data', 'Control', 'Lighting', 'Power']
-const KIND_NAME: Record<PlateKind, string> = { wallPlate: 'Wall Plate', floorBox: 'Floor Box', rackPanel: 'Rack Panel' }
+const KIND_NAME: Record<PlateKind, string> = { wallBox: 'Wall Box', wallPlate: 'Wall Plate', floorBox: 'Floor Box', rackPanel: 'Rack Panel' }
 const short = (k: string) => PLATE_MODULES[k].name.replace(/\s*\(.*\)$/, '')
 
 type Sel = Set<string>
@@ -64,8 +64,10 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
   const freeSpot = (module: string) => {
     const f = footprint(module)
     const taken = spec.inserts.filter((x) => x.pid && L.jacks[x.pid]).map((x) => ({ ...L.jacks[x.pid!], ...footprint(x.module) }))
-    const margin = spec.kind === 'rackPanel' ? 20 : 6
-    for (let y = f.h / 2 + 4; y <= L.h - f.h / 2 - 2; y += 2) for (let x = f.w / 2 + margin; x <= L.w - f.w / 2 - margin; x += 2) {
+    // Stay clear of rack ears and of the back box's walls.
+    const margin = spec.kind === 'rackPanel' ? 20 : spec.kind === 'wallBox' ? 16 : 6
+    const top = spec.kind === 'wallBox' ? 16 : 4
+    for (let y = f.h / 2 + top; y <= L.h - f.h / 2 - top / 2; y += 2) for (let x = f.w / 2 + margin; x <= L.w - f.w / 2 - margin; x += 2) {
       if (taken.every((t) => Math.abs(t.x - x) >= (t.w + f.w) / 2 + 4 || Math.abs(t.y - y) >= (t.h + f.h) / 2 + 8)) return { x: snapV(x), y: snapV(y) }
     }
     return { x: L.w / 2, y: L.h / 2 }
@@ -258,7 +260,7 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
   }
 
   // MARK: Face settings
-  const setKind = (k: PlateKind) => setStyle(k, PLATE_STYLE_LIST[k][k === 'floorBox' ? 1 : 0])
+  const setKind = (k: PlateKind) => setStyle(k, PLATE_STYLE_LIST[k][k === 'floorBox' || k === 'wallBox' ? 1 : 0])
   const setStyle = (kind: PlateKind, style: string) => {
     const sz = PLATE_SIZES[style]
     edit((d) => {
@@ -290,7 +292,7 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
       </>}>
       <div className="pd">
         <div className="pd-top">
-          <Segmented<PlateKind> value={spec.kind} onChange={setKind} options={[{ value: 'wallPlate', label: 'Wall Plate' }, { value: 'floorBox', label: 'Floor Box / Pocket' }, { value: 'rackPanel', label: 'Rack Panel' }]} />
+          <Segmented<PlateKind> value={spec.kind} onChange={setKind} options={[{ value: 'wallBox', label: 'Wall Box' }, { value: 'wallPlate', label: 'Gang Plate' }, { value: 'floorBox', label: 'Floor Box / Pocket' }, { value: 'rackPanel', label: 'Rack Panel' }]} />
           <Select value={spec.style} onChange={(v) => setStyle(spec.kind, v)} options={PLATE_STYLE_LIST[spec.kind].map((s) => ({ value: s, label: s }))} />
           {spec.style === 'Custom' && (<>
             <NumberInput value={L.w} min={20} max={1000} unit="W mm" width={60} onCommit={(v) => editL((l) => { l.w = v ?? l.w })} />

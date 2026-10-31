@@ -984,7 +984,7 @@ input.mono { font-family: var(--mono); }
 .pd-name { width: 200px; font-weight: 600; }
 .pd-maker { width: 130px; }
 .pd-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 190px minmax(0, 1fr) 240px; gap: 12px; }
-.pd-palette { overflow: auto; padding-right: 4px; }
+.pd-palette { overflow: auto; padding: 0 4px 0 6px; }
 .pd-palette h4 { margin-top: 0; }
 .pd-palette h5 { margin: 10px 0 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-2); }
 .pd-chips { display: flex; flex-wrap: wrap; gap: 4px; }

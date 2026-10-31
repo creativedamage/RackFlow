@@ -31,3 +31,12 @@ describe('plate designer', () => {
     expect(small.port(prod.ports[0].id)!.side).toBe('left')
   })
 })
+
+describe('plate drawing', () => {
+  it('draws every jack of a library plate (multi-count inserts)', () => {
+    const spec = { kind: 'wallBox' as const, style: '6" x 6"', inserts: [{ module: 'xlrF', count: 4, rear: 'idcPunchdown' as const }, { module: 'ethercon', count: 2, rear: 'same' as const }] }
+    const svg = plateSVG(spec)
+    expect((svg.match(/<g transform="translate/g) ?? []).length).toBe(6)
+    expect(withLayout(spec).layout!.w).toBeCloseTo(152.4)
+  })
+})

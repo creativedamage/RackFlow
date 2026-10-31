@@ -7,7 +7,7 @@ import { useStore } from '../store'
 import { Modal, TextInput, Toggle } from '../components/ui'
 import { openView } from './GroupsPanel'
 
-const INFRA: EquipmentCategory[] = ['wallPlate', 'floorBox', 'connectorPanel', 'patchBay']
+const INFRA: EquipmentCategory[] = ['wallBox', 'wallPlate', 'floorBox', 'connectorPanel', 'patchBay']
 
 /**
  * Create / edit a signal view: name, which signal types it shows, and which

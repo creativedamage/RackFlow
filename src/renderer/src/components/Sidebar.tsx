@@ -23,7 +23,7 @@ const SHOW: { value: Show; label: string }[] = [
   { value: 'plates', label: 'Wall plates, boxes & panels' },
   { value: 'mine', label: '★ My custom & edited' },
 ]
-const PLATE_CATS = new Set<EquipmentCategory>(['wallPlate', 'floorBox', 'connectorPanel'])
+const PLATE_CATS = new Set<EquipmentCategory>(['wallBox', 'wallPlate', 'floorBox', 'connectorPanel'])
 const PAGE = 120
 
 const primaryColor = (p: ProductDefinition) => { const d = [...productDomains(p)][0]; return d ? DOMAINS[d].color : '#9aa0a6' }
@@ -106,7 +106,8 @@ export function Sidebar() {
     { label: 'Custom Device…', hint: 'blank, add ports', onClick: () => set({ editingProduct: newCustomProduct() }) },
     { label: 'Find Device…', hint: '⇧⌘F', onClick: () => set({ finding: { query } }) },
     'sep',
-    { label: 'Wall Plate…', onClick: () => plate('wallPlate', 'Wall Plate') },
+    { label: 'Wall Box…', hint: 'Redco-style panels', onClick: () => plate('wallBox', 'Wall Box') },
+    { label: 'Wall Plate (gang)…', onClick: () => plate('wallPlate', 'Wall Plate') },
     { label: 'Floor Box / Stage Pocket…', onClick: () => plate('floorBox', 'Floor Box') },
     { label: 'Rack Connector Panel…', onClick: () => plate('rackPanel', 'Connector Panel') },
     'sep',

@@ -8,7 +8,7 @@ import { PLATE_MODULES } from './plates'
 
 export type PlateFinish = PlateLayout['finish']
 
-export interface PlateSize { w: number; h: number; shape?: 'rect' | 'round'; ru?: number; gangs?: number; decora?: boolean }
+export interface PlateSize { w: number; h: number; shape?: 'rect' | 'round'; ru?: number; gangs?: number; decora?: boolean; box?: boolean }
 
 /** Face sizes (mm). Wall plates: US standard size; floor boxes: typical covers; rack panels: 19" × n RU. */
 export const PLATE_SIZES: Record<string, PlateSize> = {
@@ -17,12 +17,31 @@ export const PLATE_SIZES: Record<string, PlateSize> = {
   'Midsize 1-Gang': { w: 79, h: 124, gangs: 1 }, 'Midsize 2-Gang': { w: 125, h: 124, gangs: 2 },
   '2-Compartment': { w: 150, h: 150 }, '4-Compartment': { w: 230, h: 230 }, '6-Compartment': { w: 300, h: 230 }, '8-Compartment': { w: 300, h: 300 },
   'Poke-Thru': { w: 160, h: 160, shape: 'round' }, 'Stage Pocket': { w: 305, h: 152 }, 'Wall Box': { w: 254, h: 203 },
+  // Wall boxes (Redco-style surface-mount back box + panel; size = panel W × H).
+  'UCP 3.5" x 3.5"': { w: 88.9, h: 88.9, box: true },
+  '6" x 6"': { w: 152.4, h: 152.4, box: true },
+  '8" x 8"': { w: 203.2, h: 203.2, box: true },
+  '10" x 10"': { w: 254.0, h: 254.0, box: true },
+  '12" x 12"': { w: 304.8, h: 304.8, box: true },
+  '8.5" x 5.75"': { w: 215.9, h: 146.0, box: true },
+  '5.75" x 8.5"': { w: 146.0, h: 215.9, box: true },
+  '8.5" x 7.5"': { w: 215.9, h: 190.5, box: true },
+  '7.5" x 8.5"': { w: 190.5, h: 215.9, box: true },
+  '14.5" x 7.5"': { w: 368.3, h: 190.5, box: true },
+  '7.5" x 14.5"': { w: 190.5, h: 368.3, box: true },
+  '14.5" x 10.5"': { w: 368.3, h: 266.7, box: true },
+  '10.5" x 14.5"': { w: 266.7, h: 368.3, box: true },
+  '17" x 7.5"': { w: 431.8, h: 190.5, box: true },
+  '7.5" x 17"': { w: 190.5, h: 431.8, box: true },
+  '17" x 10.5"': { w: 431.8, h: 266.7, box: true },
+  '10.5" x 17"': { w: 266.7, h: 431.8, box: true },
   '1RU': { w: 482.6, h: 44.45, ru: 1 }, '2RU': { w: 482.6, h: 88.9, ru: 2 }, '3RU': { w: 482.6, h: 133.35, ru: 3 }, '4RU': { w: 482.6, h: 177.8, ru: 4 },
 }
 
 export const PLATE_STYLE_LIST: Record<PlateKind, string[]> = {
   wallPlate: ['1-Gang', '2-Gang', '3-Gang', '4-Gang', 'Decora 1-Gang', 'Decora 2-Gang', 'Midsize 1-Gang', 'Midsize 2-Gang', 'Custom'],
-  floorBox: ['2-Compartment', '4-Compartment', '6-Compartment', '8-Compartment', 'Poke-Thru', 'Stage Pocket', 'Wall Box', 'Custom'],
+  wallBox: ['UCP 3.5" x 3.5"', '6" x 6"', '8" x 8"', '10" x 10"', '12" x 12"', '8.5" x 5.75"', '5.75" x 8.5"', '8.5" x 7.5"', '7.5" x 8.5"', '14.5" x 7.5"', '7.5" x 14.5"', '14.5" x 10.5"', '10.5" x 14.5"', '17" x 7.5"', '7.5" x 17"', '17" x 10.5"', '10.5" x 17"', 'Custom'],
+  floorBox: ['2-Compartment', '4-Compartment', '6-Compartment', '8-Compartment', 'Poke-Thru', 'Stage Pocket', 'Custom'],
   rackPanel: ['1RU', '2RU', '3RU', '4RU'],
 }
 
@@ -90,7 +109,7 @@ export function autoArrange(spec: PlateSpec, size = plateSize(spec)): Record<str
   const jacks = spec.inserts.filter((x) => x.pid)
   const out: Record<string, { x: number; y: number }> = {}
   if (!jacks.length) return out
-  const pad = size.ru ? 22 : 10, gap = 6, lab = 7
+  const pad = size.ru ? 22 : size.box ? 18 : 10, gap = 6, lab = 7
   // Wall plates: one column per gang, jacks stacked down each gang's centre line.
   if (size.gangs && !size.ru) {
     const gw = size.w / size.gangs
@@ -265,8 +284,10 @@ export interface PlateDrawOpts {
 }
 
 /** Inner SVG (mm units) of the plate face; wrap with plateSVG() for a stand-alone image. */
-export function plateInner(spec: PlateSpec, o: PlateDrawOpts = {}): string {
-  const L = withLayout(spec).layout!
+export function plateInner(spec0: PlateSpec, o: PlateDrawOpts = {}): string {
+  // Older plates store multi-count inserts; draw from the one-jack-per-insert form.
+  const spec = withLayout(spec0)
+  const L = spec.layout!
   const size = plateSize({ ...spec, layout: L })
   const out: string[] = []
   const line = (sw: number) => `fill="none" stroke="currentColor" stroke-width="${sw}"`
@@ -290,6 +311,11 @@ export function plateInner(spec: PlateSpec, o: PlateDrawOpts = {}): string {
     const sy = (L.h - 83.3) / 2 // device screws 3.28" (83.3 mm) apart
     for (let g = 0; g < size.gangs; g++) { screw(gw * (g + 0.5), sy, 1.8); screw(gw * (g + 0.5), L.h - sy, 1.8) }
     if (size.decora) for (let g = 0; g < size.gangs; g++) out.push(`<rect x="${n(gw * (g + 0.5) - 16.65)}" y="${n(L.h / 2 - 33.35)}" width="33.3" height="66.7" rx="1" ${line(0.4)}/>`)
+  } else if (spec.kind === 'wallBox' && L.shape !== 'round') {
+    // Panel on a surface-mount back box: screws ¼" in from each corner, box walls behind shown as hidden (dashed) lines.
+    const e = L.w < 100 || L.h < 100 ? 5 : 6.35
+    for (const [x, y] of [[e, e], [L.w - e, e], [e, L.h - e], [L.w - e, L.h - e]]) screw(x, y, 2)
+    out.push(`<rect x="12.7" y="12.7" width="${n(L.w - 25.4)}" height="${n(L.h - 25.4)}" rx="1" ${line(0.25)} stroke-dasharray="2 1.2"/>`)
   } else if (spec.kind === 'floorBox' && L.shape !== 'round') {
     for (const [x, y] of [[9, 9], [L.w - 9, 9], [9, L.h - 9], [L.w - 9, L.h - 9]]) screw(x, y, 2.4)
   }

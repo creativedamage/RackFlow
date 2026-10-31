@@ -39,7 +39,7 @@ export type EquipmentCategory =
   | 'networkSwitch' | 'controlProcessor' | 'touchPanel'
   | 'lightingConsole' | 'lightingFixture' | 'dimmer' | 'dmxNode'
   | 'intercom' | 'conferencing' | 'recorder' | 'converter'
-  | 'patchBay' | 'wallPlate' | 'floorBox' | 'connectorPanel' | 'powerSource' | 'pdu' | 'ups' | 'computer' | 'rackAccessory' | 'other'
+  | 'patchBay' | 'wallBox' | 'wallPlate' | 'floorBox' | 'connectorPanel' | 'powerSource' | 'pdu' | 'ups' | 'computer' | 'rackAccessory' | 'other'
 
 export const CATEGORIES: Record<EquipmentCategory, { name: string; tag: string }> = {
   projector: { name: 'Projector', tag: 'PJ' },
@@ -73,6 +73,7 @@ export const CATEGORIES: Record<EquipmentCategory, { name: string; tag: string }
   converter: { name: 'Converter', tag: 'CNV' },
   patchBay: { name: 'Patch Bay', tag: 'PB' },
   wallPlate: { name: 'Wall Plate', tag: 'WP' },
+  wallBox: { name: 'Wall Box', tag: 'WB' },
   floorBox: { name: 'Floor Box / Stage Pocket', tag: 'FB' },
   connectorPanel: { name: 'Connector Panel (rack)', tag: 'CNP' },
   powerSource: { name: 'Building Power', tag: 'PWR' },
@@ -134,7 +135,7 @@ export interface ProductDefinition {
   plate?: PlateSpec
 }
 
-export type PlateKind = 'wallPlate' | 'floorBox' | 'rackPanel'
+export type PlateKind = 'wallBox' | 'wallPlate' | 'floorBox' | 'rackPanel'
 /** How the back of an insert is terminated. */
 export type PlateRear = 'same' | 'idcPunchdown' | 'euroblock' | 'none'
 export interface PlateInsert {
