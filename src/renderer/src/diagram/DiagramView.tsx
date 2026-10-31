@@ -7,7 +7,7 @@ import {
   type Connection, type Edge, type EdgeChange, type NodeChange, type OnConnectStart,
 } from '@xyflow/react'
 import {
-  addEquipment, addPatchBay, nodeGeom, placeInFreeSpace, connectMany, groupColor, groupsOf, type BulkResult, candidates as findCandidates, connect, DOMAINS, portDomain, resolve, SIGNALS, validate,
+  addEquipment, addPatchBay, addToGroup, nodeGeom, placeInFreeSpace, connectMany, groupColor, groupsOf, type BulkResult, candidates as findCandidates, connect, DOMAINS, portDomain, resolve, SIGNALS, validate,
   type CableId, type EquipmentId, type PortAddress,
 } from '@core/index'
 import { useStore } from '../store'
@@ -17,17 +17,18 @@ import { pickIndex } from './wiring'
 import { DeviceNode, headerHeight, NODE_WIDTH, ROW_H, splitPorts, type DeviceNodeType } from './DeviceNode'
 import { GroupFrame, type GroupFrameType } from './GroupFrame'
 import { CableEdge, type CableEdgeType } from './CableEdge'
-import { GroupsPanel, useGroupFocus } from './GroupsPanel'
+import { GroupsPanel, PageTabs, useGroupFocus } from './GroupsPanel'
+import { NoteNode, type NoteNodeType } from './NoteNode'
 import { useWiring } from './wiring'
 import { tidyDiagram } from './tidy'
 import { SchematicPrintDialog } from '../print/SchematicPrint'
 import { createPortal } from 'react-dom'
 import { Segmented } from '../components/ui'
-import type { WireMode } from '@core/index'
+import { newId, type Annotation, type AnnotationKind, type WireMode } from '@core/index'
 
-const nodeTypes = { device: DeviceNode, groupFrame: GroupFrame }
+const nodeTypes = { device: DeviceNode, groupFrame: GroupFrame, note: NoteNode }
 const edgeTypes = { cable: CableEdge }
-type AnyNode = DeviceNodeType | GroupFrameType
+type AnyNode = DeviceNodeType | GroupFrameType | NoteNodeType
 const FRAME_PAD = 22, FRAME_LABEL = 26
 const nodeH = (n: DeviceNodeType) => n.measured?.height ?? headerHeight(n.data.eq) + Math.max(...Object.values(splitPorts(n.data.eq)).map((x) => x.length), 1) * ROW_H + 8
 const GRID = 8
@@ -42,6 +43,7 @@ export function DiagramView() {
   const select = useStore((s) => s.select)
   const { screenToFlowPosition, fitView } = useReactFlow()
   const focusGroup = useGroupFocus((s) => s.focus)
+  const page = useStore((s) => s.diagramPage)
   // Let click-to-add (Makers / library) drop new gear in the middle of what's on screen.
   useEffect(() => {
     setViewCenterProvider(() => {
@@ -62,20 +64,32 @@ export function DiagramView() {
     }
     const sel = new Set(selection)
     const groups = new Map(groupsOf(project).map((g) => [g.id, g]))
+    // Page view: devices on other pages are hidden; their wires become flags on the visible port.
+    const onPage = (e: { groupId?: string }) => !page || e.groupId === page
+    const eqById = new Map(project.equipment.map((e) => [e.id as string, e]))
+    const offPage = new Map<string, Record<string, string>>()
+    if (page) for (const c of project.cables) {
+      const a = eqById.get(c.from.equipment), b = eqById.get(c.to.equipment)
+      if (!a || !b || onPage(a) === onPage(b)) continue
+      const [here, hereAddr, there, thereAddr] = onPage(a) ? [a, c.from, b, c.to] : [b, c.to, a, c.from]
+      const tp = there.product.ports.find((x) => x.id === thereAddr.port)
+      const pg = there.groupId ? groups.get(there.groupId)?.name : undefined
+      offPage.set(here.id, { ...(offPage.get(here.id) ?? {}), [hereAddr.port]: `${c.label} ▸ ${there.tag} · ${tp?.label ?? ''}${pg ? ` (${pg})` : ' (no page)'}` })
+    }
     setNodes((prev) => {
       const byId = new Map(prev.map((n) => [n.id, n]))
       return project.equipment.map((eq) => {
         const old = byId.get(eq.id)
         const g = eq.groupId ? groups.get(eq.groupId) : undefined
         const dim = !!focusGroup && eq.groupId !== focusGroup
-        return { ...(old ?? {}), id: eq.id, type: 'device' as const, position: { ...eq.position }, selected: sel.has(eq.id),
-          data: { eq, connected: connected.get(eq.id) ?? new Set(), group: g ? { name: g.name, color: groupColor(g) } : undefined, dim } }
+        return { ...(old ?? {}), id: eq.id, type: 'device' as const, position: { ...eq.position }, selected: sel.has(eq.id), hidden: !onPage(eq),
+          data: { eq, connected: connected.get(eq.id) ?? new Set(), group: g ? { name: g.name, color: groupColor(g) } : undefined, dim, offPage: offPage.get(eq.id) } }
       })
     })
-  }, [project.equipment, project.cables, project.groups, selection, focusGroup])
+  }, [project.equipment, project.cables, project.groups, selection, focusGroup, page])
 
   // Group frames follow their devices live (including mid-drag).
-  const frames = useMemo<GroupFrameType[]>(() => groupsOf(project).flatMap((g) => {
+  const frames = useMemo<GroupFrameType[]>(() => (page ? [] : groupsOf(project)).flatMap((g) => {
     const members = nodes.filter((n) => n.data.eq.groupId === g.id)
     if (!members.length) return []
     const x0 = Math.min(...members.map((n) => n.position.x)) - FRAME_PAD
@@ -87,10 +101,23 @@ export function DiagramView() {
       width: x1 - x0, height: y1 - y0, style: { width: x1 - x0, height: y1 - y0, pointerEvents: 'none' as const },
       data: { id: g.id, name: g.name, color: groupColor(g), count: members.length, system: g.system, active: focusGroup === g.id },
     }]
-  }), [project, nodes, focusGroup])
+  }), [project, nodes, focusGroup, page])
   const framesRef = useRef(frames); framesRef.current = frames
   const nodesRef = useRef(nodes); nodesRef.current = nodes
-  const allNodes = useMemo<AnyNode[]>(() => [...frames, ...nodes], [frames, nodes])
+  // Notes / callouts / revision notes: local state for smooth dragging and resizing.
+  const [notes, setNotes] = useState<NoteNodeType[]>([])
+  useEffect(() => {
+    setNotes((prev) => {
+      const byId = new Map(prev.map((n) => [n.id, n]))
+      return (project.annotations ?? []).map((a) => {
+        const id = `note:${a.id}`, old = byId.get(id)
+        return { ...(old ?? {}), id, type: 'note' as const, position: { x: a.x, y: a.y }, width: a.w, height: a.h, zIndex: 5,
+          hidden: !!page && a.page !== page, data: { a } }
+      })
+    })
+  }, [project.annotations, page])
+  const notesRef = useRef(notes); notesRef.current = notes
+  const allNodes = useMemo<AnyNode[]>(() => [...frames, ...nodes, ...notes], [frames, nodes, notes])
 
   const cableSeverity = useMemo(() => {
     const m = new Map<string, 'error' | 'warning'>()
@@ -102,6 +129,14 @@ export function DiagramView() {
 
   const wireMode = project.diagram?.wires ?? 'all'
   const autoTidy = !!project.diagram?.autoTidy
+  // On a page, newly added devices join that page.
+  const knownIds = useRef(new Set(project.equipment.map((e) => e.id as string)))
+  useEffect(() => {
+    const fresh = project.equipment.filter((e) => !knownIds.current.has(e.id) && !e.groupId).map((e) => e.id)
+    knownIds.current = new Set(project.equipment.map((e) => e.id as string))
+    if (page && fresh.length) useStore.getState().amend((d) => addToGroup(d, fresh, page))
+  }, [project.equipment, page])
+
   // Auto-tidy: when devices or cables are added, re-arrange in the same undo step.
   const counts = useRef({ e: project.equipment.length, c: project.cables.length })
   useEffect(() => {
@@ -135,6 +170,8 @@ export function DiagramView() {
   }, [project, cableSeverity, selectedCable, selection, select, wireMode])
 
   useEffect(() => { if (fitRequest) void fitView({ padding: 0.15, duration: 250 }) }, [fitRequest, fitView])
+  // Switching page frames what's on it.
+  useEffect(() => { const t = setTimeout(() => void fitView({ padding: 0.15, duration: 250 }), 60); return () => clearTimeout(t) }, [page, fitView])
 
   const onNodesChange = useCallback((all: NodeChange<AnyNode>[]) => {
     // Dragging a group frame moves its members by the same amount.
@@ -144,7 +181,9 @@ export function DiagramView() {
       const f = framesRef.current.find((x) => x.id === c.id)
       if (f) moves.set(c.id.slice(6), { dx: c.position.x - f.position.x, dy: c.position.y - f.position.y, dragging: c.dragging })
     }
-    const changes = all.filter((c) => !('id' in c && String(c.id).startsWith('group:'))) as NodeChange<DeviceNodeType>[]
+    const noteChanges = all.filter((c) => 'id' in c && String(c.id).startsWith('note:')) as NodeChange<NoteNodeType>[]
+    if (noteChanges.length) setNotes((ns) => applyNodeChanges(noteChanges.filter((c) => c.type !== 'remove'), ns))
+    const changes = all.filter((c) => !('id' in c && (String(c.id).startsWith('group:') || String(c.id).startsWith('note:')))) as NodeChange<DeviceNodeType>[]
     setNodes((ns) => {
       let next = applyNodeChanges(changes.filter((c) => c.type !== 'remove'), ns)
       if (moves.size) next = next.map((n) => {
@@ -167,6 +206,18 @@ export function DiagramView() {
 
   const onNodeDragStop = useCallback((_: unknown, __: unknown, draggedAll: AnyNode[]) => {
     const groupIds = new Set(draggedAll.filter((n) => n.type === 'groupFrame').map((n) => (n as GroupFrameType).data.id))
+    const movedNotes = draggedAll.filter((n) => n.type === 'note')
+    if (movedNotes.length) {
+      apply(movedNotes.length > 1 ? 'Move Notes' : 'Move Note', (d) => {
+        for (const n of movedNotes) {
+          const a = d.annotations?.find((x) => `note:${x.id}` === n.id)
+          if (!a) continue
+          const dx = Math.round(n.position.x) - a.x, dy = Math.round(n.position.y) - a.y
+          a.x += dx; a.y += dy
+          if (a.leader && draggedAll.length > 1) a.leader = { x: a.leader.x + dx, y: a.leader.y + dy }
+        }
+      })
+    }
     const dragged = [
       ...draggedAll.filter((n): n is DeviceNodeType => n.type === 'device'),
       ...nodesRef.current.filter((n) => n.data.eq.groupId && groupIds.has(n.data.eq.groupId)),
@@ -185,6 +236,7 @@ export function DiagramView() {
     const ids = new Set(ns.map((n) => n.id))
     const cids = new Set(es.map((e) => e.id))
     apply('Delete', (d) => {
+      if (d.annotations) d.annotations = d.annotations.filter((a) => !ids.has(`note:${a.id}`))
       d.equipment = d.equipment.filter((e) => !ids.has(e.id))
       d.patchBays = d.patchBays.filter((b) => !ids.has(b.equipment))
       d.cables = d.cables.filter((c) => !cids.has(c.id) && !ids.has(c.from.equipment) && !ids.has(c.to.equipment))
@@ -258,6 +310,8 @@ export function DiagramView() {
   }, [apply, screenToFlowPosition, select])
 
   return (
+    <div className="diagram-wrap">
+    {(project.groups?.length ?? 0) > 0 && <PageTabs />}
     <div className="diagram" onDragOver={(e) => { if (e.dataTransfer.types.includes(DRAG_MIME)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' } }} onDrop={onDrop}>
       <ReactFlow<AnyNode, CableEdgeType>
         nodes={allNodes}
@@ -310,6 +364,7 @@ export function DiagramView() {
           </Panel>
         )}
       </ReactFlow>
+    </div>
     </div>
   )
 }
@@ -364,6 +419,21 @@ function DiagramTools() {
   const notify = useStore((s) => s.notify)
   const { fitView } = useReactFlow()
   const [printing, setPrinting] = useState(false)
+  const { screenToFlowPosition } = useReactFlow()
+  const addNote = (kind: AnnotationKind) => {
+    const el = document.querySelector('.diagram')?.getBoundingClientRect()
+    const c = el ? screenToFlowPosition({ x: el.left + el.width / 2, y: el.top + el.height / 2 }) : { x: 0, y: 0 }
+    const s = useStore.getState()
+    const revs = s.project.revisions ?? []
+    const a: Annotation = {
+      id: newId(), kind, x: Math.round(c.x - 110), y: Math.round(c.y - 40), w: kind === 'note' ? 240 : 220, h: kind === 'revision' ? 70 : 80,
+      text: kind === 'revision' ? (revs[revs.length - 1]?.description ?? '') : '', page: s.diagramPage ?? undefined,
+      leader: kind === 'callout' ? { x: Math.round(c.x - 200), y: Math.round(c.y + 120) } : undefined,
+      rev: kind === 'revision' ? (revs[revs.length - 1]?.rev ?? s.project.info.revision ?? 'A') : undefined,
+    }
+    s.apply(kind === 'callout' ? 'Add Callout' : kind === 'revision' ? 'Add Revision Note' : 'Add Note', (d) => { d.annotations = [...(d.annotations ?? []), a] })
+    s.notify('Double-click the note to type · drag to move · drag its corners to resize' + (kind === 'callout' ? ' · drag the arrow’s dot to aim it' : ''), { kind: 'info' })
+  }
   const set = (label: string, patch: Partial<NonNullable<typeof settings>>) => apply(label, (d) => { d.diagram = { ...(d.diagram ?? {}), ...patch } })
   const tidy = (sel: boolean) => {
     const n = tidyDiagram({ selectionOnly: sel })
@@ -379,6 +449,11 @@ function DiagramTools() {
         { value: 'smart', label: 'Smart', title: 'Long or tangled wires become labelled stubs at each end (like a CAD drawing). Select one to see it in full.' },
         { value: 'stubs', label: 'Stubs', title: 'Every wire is a labelled stub at each end' },
       ]} />
+      <button onClick={(e) => showContextMenu(e, [
+        { label: 'Callout (box + arrow)', onClick: () => addNote('callout') },
+        { label: 'Note', onClick: () => addNote('note') },
+        { label: 'Revision Note (Δ cloud)', onClick: () => addNote('revision') },
+      ])} title="Place a callout, note or revision note anywhere on the diagram">＋ Note ▾</button>
       <button onClick={() => setPrinting(true)} title="Print or export a CAD-style wiring drawing">Print…</button>
       {printing && createPortal(<SchematicPrintDialog onClose={() => setPrinting(false)} />, document.body)}
       <label className="check" title="Re-arrange automatically whenever you add a device or cable">

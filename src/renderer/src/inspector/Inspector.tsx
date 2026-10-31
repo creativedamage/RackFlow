@@ -51,11 +51,11 @@ function EquipmentInspector({ eq }: { eq: EquipmentInstance }) {
           </div>}
       <Field label="Tag"><TextInput value={eq.tag} onCommit={(v) => { const tag = v.trim(); if (!tag) return; apply('Rename Device', (d) => { const x = d.equipment.find((e) => e.id === eq.id); if (x) x.tag = tag; const b = d.patchBays.find((q) => q.equipment === eq.id); if (b) b.name = tag }) }} /></Field>
       <Field label="Room"><TextInput value={eq.room} placeholder="e.g. Main Hall" onCommit={(v) => upd('Set Room', (e) => { e.room = v })} /></Field>
-      <Field label="Group">
+      <Field label="Page">
         <Select value={eq.groupId ?? ''} onChange={(v: string) => {
           if (v === '__new') { useStore.getState().select([eq.id]); groupSelection(); return }
-          apply(v ? 'Move to Group' : 'Remove from Group', (d) => { if (v) addToGroup(d, [eq.id], v); else removeFromGroup(d, [eq.id]) })
-        }} options={[{ value: '', label: 'None' }, ...groupsOf(project).map((g) => ({ value: g.id, label: g.name })), { value: '__new', label: '+ New group…' }]} />
+          apply(v ? 'Move to Page' : 'Remove from Page', (d) => { if (v) addToGroup(d, [eq.id], v); else removeFromGroup(d, [eq.id]) })
+        }} options={[{ value: '', label: 'No page' }, ...groupsOf(project).map((g) => ({ value: g.id, label: g.name })), { value: '__new', label: '+ New page…' }]} />
       </Field>
 
       {isPowerSource(eq) ? <PowerSourceSection eq={eq} /> : <FedFrom eq={eq} />}
@@ -239,17 +239,17 @@ function MultiInspector({ ids }: { ids: EquipmentId[] }) {
     <div className="form">
       <h3>{devices.length} devices selected</h3>
       <p className="muted small">{devices.map((d) => d.tag).join(', ')}</p>
-      <h4>Group</h4>
-      <Field label="Name"><TextInput value={name} placeholder="e.g. FOH Audio" onCommit={setName} /></Field>
+      <h4>Page</h4>
+      <Field label="Name"><TextInput value={name} placeholder="e.g. Stage Video" onCommit={setName} /></Field>
       <Field label="System"><Select value={system} onChange={setSystem} options={[{ value: 'auto', label: 'Detect from devices' }, ...SYSTEM_OPTIONS]} /></Field>
-      <button className="primary" onClick={() => groupSelection(name || undefined, system === 'auto' ? undefined : system as never)}>Group {devices.length} devices (⌘G)</button>
+      <button className="primary" onClick={() => groupSelection(name || undefined, system === 'auto' ? undefined : system as never)}>Move {devices.length} devices to a new page (⌘G)</button>
       {groups.length > 0 && (
         <Field label="Or add to">
-          <Select value="" onChange={(v: string) => { if (v) apply('Move to Group', (d) => addToGroup(d, ids, v)) }}
-            options={[{ value: '', label: 'Choose a group…' }, ...groups.map((g) => ({ value: g.id, label: g.name }))]} />
+          <Select value="" onChange={(v: string) => { if (v) apply('Move to Page', (d) => addToGroup(d, ids, v)) }}
+            options={[{ value: '', label: 'Choose a page…' }, ...groups.map((g) => ({ value: g.id, label: g.name }))]} />
         </Field>
       )}
-      {devices.some((d) => d.groupId) && <button onClick={() => apply('Remove from Group', (d) => removeFromGroup(d, ids))}>Remove from their groups</button>}
+      {devices.some((d) => d.groupId) && <button onClick={() => apply('Remove from Page', (d) => removeFromGroup(d, ids))}>Take off their pages</button>}
       <h4>Location</h4>
       <Field label="Room"><TextInput value={rooms.length === 1 ? rooms[0] : ''} placeholder={rooms.length > 1 ? 'Mixed – type to set all' : 'e.g. Main Hall'}
         onCommit={(v) => apply('Set Room', (d) => { for (const e of d.equipment) if (ids.includes(e.id)) e.room = v })} /></Field>

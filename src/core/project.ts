@@ -85,7 +85,7 @@ export function removeEquipment(p: Project, ids: Set<EquipmentId> | EquipmentId[
   p.equipment = p.equipment.filter((e) => !set.has(e.id))
   p.cables = p.cables.filter((c) => !set.has(c.from.equipment) && !set.has(c.to.equipment))
   p.patchBays = p.patchBays.filter((b) => !set.has(b.equipment))
-  if (p.groups) { const used = new Set(p.equipment.map((e) => e.groupId)); p.groups = p.groups.filter((g) => used.has(g.id)) }
+  // Pages (groups) stay even when their last device is removed.
 }
 
 export function updateEquipment(p: Project, id: EquipmentId, fn: (e: EquipmentInstance) => void) {

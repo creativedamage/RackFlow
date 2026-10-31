@@ -1,9 +1,10 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { SHEETS, sheetsToHTML, sheetSize, type SheetOptions } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
 import { Field, Modal, Select, TextInput, Toggle } from '../components/ui'
 import { uploadLogo } from '../rack/AccessoryInspector'
+import { RevisionsEditor } from './RevisionsEditor'
 
 /**
  * Shared print / export dialog for drawings: sheet + title block options on
@@ -24,6 +25,7 @@ export function DrawingDialog<O extends SheetOptions>({ title, name, options, se
   const pages = useMemo(() => render(options), [render, options, project]) // eslint-disable-line react-hooks/exhaustive-deps
   const size = sheetSize(options)
   const [zoom, setZoom] = useState(1)
+  const pagesRef = useRef<HTMLDivElement>(null)
   const info = (k: keyof typeof project.info, label: string) => (
     <Field label={label}><TextInput value={String(project.info[k] ?? '')} onCommit={(v) => apply('Title Block', (d) => { (d.info as unknown as Record<string, string>)[k] = v })} /></Field>
   )
@@ -51,16 +53,46 @@ export function DrawingDialog<O extends SheetOptions>({ title, name, options, se
             {info('client', 'Client')}
             {info('location', 'Location')}
             {info('designer', 'Designer')}
-            {info('revision', 'Revision')}
+            {!project.revisions?.length && info('revision', 'Revision')}
             <Field label="Logo">
               <Select value={options.logoId ?? ''} onChange={(v) => set({ logoId: v || undefined })} options={[{ value: '', label: 'None' }, ...(project.logos ?? []).map((l) => ({ value: l.id, label: l.name }))]} />
             </Field>
             <button className="mini" onClick={async () => { const id = await uploadLogo(); if (id) set({ logoId: id }) }}>Upload Logo…</button>
           </>)}
+          <h4>Revisions</h4>
+          <RevisionsEditor />
           <h4>Preview</h4>
-          <label className="zoom">Zoom <input type="range" min={0.5} max={3} step={0.25} value={zoom} onChange={(e) => setZoom(+e.target.value)} /></label>
+          <div className="zoom-row">
+            <button className="mini" onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))} title="Zoom out">−</button>
+            <input type="range" min={0.5} max={6} step={0.05} value={zoom} onChange={(e) => setZoom(+e.target.value)} />
+            <button className="mini" onClick={() => setZoom((z) => Math.min(6, z * 1.25))} title="Zoom in">+</button>
+            <button className="mini" onClick={() => setZoom(1)} title="Fit the sheet to the window">Fit</button>
+            <span className="muted small">{Math.round(zoom * 100)}%</span>
+          </div>
+          <p className="muted small">Drag the sheet to move around when zoomed in.</p>
         </div>
-        <div className="preview-pages">
+        <div className={`preview-pages ${zoom > 1 ? 'pannable' : ''}`} ref={pagesRef}
+          title={zoom > 1 ? 'Drag to move around · ⌘-scroll or pinch to zoom' : '⌘-scroll or pinch to zoom'}
+          onPointerDown={(e) => {
+            const el = pagesRef.current
+            if (!el || e.button !== 0) return
+            const start = { x: e.clientX, y: e.clientY, l: el.scrollLeft, t: el.scrollTop }
+            el.setPointerCapture(e.pointerId); el.classList.add('panning')
+            const move = (ev: PointerEvent) => { el.scrollLeft = start.l - (ev.clientX - start.x); el.scrollTop = start.t - (ev.clientY - start.y) }
+            const up = () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.classList.remove('panning') }
+            el.addEventListener('pointermove', move); el.addEventListener('pointerup', up)
+          }}
+          onWheel={(e) => {
+            if (!(e.metaKey || e.ctrlKey)) return
+            e.preventDefault()
+            const el = pagesRef.current!
+            const r = el.getBoundingClientRect()
+            const fx = (el.scrollLeft + e.clientX - r.left) / el.scrollWidth, fy = (el.scrollTop + e.clientY - r.top) / el.scrollHeight
+            const next = Math.min(6, Math.max(0.5, zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12)))
+            setZoom(next)
+            // Keep the point under the cursor in place.
+            requestAnimationFrame(() => { el.scrollLeft = fx * el.scrollWidth - (e.clientX - r.left); el.scrollTop = fy * el.scrollHeight - (e.clientY - r.top) })
+          }}>
           {pages.length === 0 && <p className="muted pad">Nothing to print yet.</p>}
           {pages.map((svg, i) => (
             <div key={i} className="drawing-page" style={{ width: `${zoom * 100}%`, aspectRatio: `${size.w} / ${size.h}` }} dangerouslySetInnerHTML={{ __html: svg }} />

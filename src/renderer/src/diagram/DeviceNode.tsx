@@ -6,7 +6,7 @@ import { pickIndex, useWiring } from './wiring'
 export { NODE_WIDTH, HEADER_H, ROW_H, headerHeight, splitPorts } from '@core/index'
 import { headerHeight, NODE_WIDTH, ROW_H, splitPorts } from '@core/index'
 
-export type DeviceNodeData = { eq: EquipmentInstance; connected: Set<string>; group?: { name: string; color: string }; dim?: boolean }
+export type DeviceNodeData = { eq: EquipmentInstance; connected: Set<string>; group?: { name: string; color: string }; dim?: boolean; offPage?: Record<string, string> }
 export type DeviceNodeType = Node<DeviceNodeData, 'device'>
 
 /**
@@ -45,6 +45,7 @@ export const DeviceNode = memo(function DeviceNode({ data, selected }: NodeProps
         onMouseDownCapture={(e) => { if (e.shiftKey) e.stopPropagation() }}
         onClickCapture={(e) => { if (e.shiftKey) e.stopPropagation() }}>
         <span className="port-label">{p.label}</span>
+        {data.offPage?.[p.id] && <span className={`offpage ${side}`} title="Connected to a device on another page">{data.offPage[p.id]}</span>}
         {pick >= 0 && <span className="pick-badge">{pick + 1}</span>}
         <Handle
           id={p.id}

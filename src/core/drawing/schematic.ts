@@ -3,7 +3,7 @@
 // cable number and FROM-TO tags at both ends, off-sheet arrows for long or
 // cross-sheet runs, and dashed room zones.
 
-import { CATEGORIES, type Cable, type EquipmentInstance, type PortTemplate, type Project, type WireMode } from '../model'
+import { CATEGORIES, type Annotation, type Cable, type EquipmentInstance, type PortTemplate, type Project, type WireMode } from '../model'
 import { DOMAINS } from '../signals'
 import { portDomain } from '../project'
 import { planChannels, type ChannelWire } from '../autolayout'
@@ -22,7 +22,7 @@ export interface SchematicOptions extends SheetOptions {
 }
 
 export const defaultSchematic = (p?: Project): SchematicOptions => ({
-  sheet: 'archD', titleBlock: true, title: 'SIGNAL FLOW', wires: p?.diagram?.wires === 'all' ? 'all' : 'smart', split: 'none', rooms: true, color: false,
+  sheet: 'archD', titleBlock: true, title: 'SIGNAL FLOW', wires: p?.diagram?.wires === 'all' ? 'all' : 'smart', split: p?.groups?.length ? 'group' : 'none', rooms: true, color: false,
 })
 
 const BADGE = 22      // connector badge width (px, diagram units)
@@ -43,7 +43,7 @@ export function connectorBadge(c: PortTemplate['connector']): string {
 const compactTag = (t: string) => t.replace(/[^A-Za-z0-9]/g, '')
 const portRef = (eq: EquipmentInstance, port: PortTemplate) => `${eq.tag} ${port.label}`.toUpperCase()
 
-interface Page { title: string; ids: Set<string> }
+interface Page { title: string; ids: Set<string>; pageId?: string | null }
 
 export function schematicSheets(p: Project, o: SchematicOptions): string[] {
   if (!p.equipment.length) return []
@@ -51,14 +51,14 @@ export function schematicSheets(p: Project, o: SchematicOptions): string[] {
   let pages: Page[]
   if (o.split === 'group') {
     const gs = groupsOf(p)
-    pages = gs.map((g) => ({ title: g.name.toUpperCase(), ids: new Set(p.equipment.filter((e) => e.groupId === g.id).map((e) => e.id as string)) }))
+    pages = gs.map((g) => ({ title: g.name.toUpperCase(), pageId: g.id, ids: new Set(p.equipment.filter((e) => e.groupId === g.id).map((e) => e.id as string)) }))
     const rest = p.equipment.filter((e) => !e.groupId || !gs.some((g) => g.id === e.groupId))
-    if (rest.length) pages.push({ title: 'GENERAL', ids: new Set(rest.map((e) => e.id as string)) })
+    if (rest.length || (p.annotations ?? []).some((a) => !a.page || !gs.some((g) => g.id === a.page))) pages.push({ title: 'GENERAL', pageId: null, ids: new Set(rest.map((e) => e.id as string)) })
   } else if (o.split === 'room') {
     const rooms = [...new Set(p.equipment.map((e) => e.room?.trim() || ''))].sort((a, b) => (a ? 0 : 1) - (b ? 0 : 1) || a.localeCompare(b))
     pages = rooms.map((r) => ({ title: (r || 'UNASSIGNED').toUpperCase(), ids: new Set(p.equipment.filter((e) => (e.room?.trim() || '') === r).map((e) => e.id as string)) }))
   } else pages = [{ title: '', ids: new Set(p.equipment.map((e) => e.id as string)) }]
-  pages = pages.filter((pg) => pg.ids.size)
+  pages = pages.filter((pg) => pg.ids.size || notesFor(p, o, pg).length)
   const sheetOf = new Map<string, number>()
   pages.forEach((pg, i) => pg.ids.forEach((id) => sheetOf.set(id, i + 1)))
   return pages.map((pg, i) => drawPage(p, o, pg, i + 1, pages.length, sheetOf))
@@ -146,13 +146,20 @@ function drawPage(p0: Project, o: SchematicOptions, page: Page, n: number, total
   const pos = printPositions(p0, p0.equipment.filter((e) => page.ids.has(e.id)), o)
   const p: Project = { ...p0, equipment: p0.equipment.map((e) => (pos.has(e.id) ? { ...e, position: pos.get(e.id)! } : e)) }
   const eqs = p.equipment.filter((e) => page.ids.has(e.id))
+  // Notes on this sheet move with the device they sit next to.
+  const notes = notesFor(p0, o, page).map((a) => {
+    const near = nearestDevice(p0, a, page)
+    const d = near && pos.get(near.id) ? { x: pos.get(near.id)!.x - near.position.x, y: pos.get(near.id)!.y - near.position.y } : { x: 0, y: 0 }
+    return { ...a, x: a.x + d.x, y: a.y + d.y, leader: a.leader ? { x: a.leader.x + d.x, y: a.leader.y + d.y } : undefined }
+  })
   const geo = new Map(eqs.map((e) => [e.id as string, nodeGeom(e)]))
   // Bounds in diagram units (room for tags above, category below, stubs and labels at the sides).
   const reachOf = new Map(eqs.map((e) => [e.id as string, sideReach(p, e, o)]))
-  const x0 = Math.min(...eqs.map((e) => e.position.x - BADGE - reachOf.get(e.id)!.left - ZONE_PAD)) - 20
-  const y0 = Math.min(...eqs.map((e) => e.position.y)) - 100
-  const x1 = Math.max(...eqs.map((e) => e.position.x + NODE_WIDTH + BADGE + reachOf.get(e.id)!.right + ZONE_PAD)) + 20
-  const y1 = Math.max(...eqs.map((e) => e.position.y + geo.get(e.id)!.height)) + 60
+  const noteXs = notes.flatMap((a) => [a.x, a.x + a.w, ...(a.leader ? [a.leader.x] : [])]), noteYs = notes.flatMap((a) => [a.y, a.y + a.h, ...(a.leader ? [a.leader.y] : [])])
+  const x0 = Math.min(...eqs.map((e) => e.position.x - BADGE - reachOf.get(e.id)!.left - ZONE_PAD), ...noteXs.map((v) => v - 20)) - 20
+  const y0 = Math.min(...eqs.map((e) => e.position.y - 100), ...noteYs.map((v) => v - 30))
+  const x1 = Math.max(...eqs.map((e) => e.position.x + NODE_WIDTH + BADGE + reachOf.get(e.id)!.right + ZONE_PAD), ...noteXs.map((v) => v + 20)) + 20
+  const y1 = Math.max(...eqs.map((e) => e.position.y + geo.get(e.id)!.height + 60), ...noteYs.map((v) => v + 30))
   const scale = Math.min(area.w / (x1 - x0), area.h / (y1 - y0), 0.6)
   const ox = area.x + (area.w - (x1 - x0) * scale) / 2, oy = area.y + (area.h - (y1 - y0) * scale) / 2
   const rects: Rect[] = eqs.map((e) => {
@@ -163,6 +170,7 @@ function drawPage(p0: Project, o: SchematicOptions, page: Page, n: number, total
     if (o.rooms && o.split !== 'room') drawRooms(g, eqs, geo, reachOf)
     for (const e of eqs) drawDevice(g, e, o)
     drawWires(g, p, o, eqs, rects, sheetOf, n)
+    for (const a of notes) drawNote(g, a)
   })
   return svg.toString()
 }
@@ -306,3 +314,72 @@ function offSheet(svg: Svg, e: End, label: string, tags: string, ref: string, st
 }
 
 export const schematicSheetSize = (o: SchematicOptions) => sheetSize(o)
+
+// MARK: Notes, callouts, revision notes
+
+/** Notes that belong on a sheet: by page when printing one sheet per page, else by nearest device. */
+function notesFor(p: Project, o: SchematicOptions, page: Page): Annotation[] {
+  const all = p.annotations ?? []
+  if (o.split === 'group') {
+    const known = new Set(groupsOf(p).map((g) => g.id))
+    return all.filter((a) => (page.pageId ? a.page === page.pageId : !a.page || !known.has(a.page)))
+  }
+  if (o.split === 'none') return all
+  return all.filter((a) => { const d = nearestDevice(p, a); return d ? page.ids.has(d.id) : page.title === 'UNASSIGNED' })
+}
+
+function nearestDevice(p: Project, a: Annotation, page?: Page): EquipmentInstance | undefined {
+  const cx = a.x + a.w / 2, cy = a.y + a.h / 2
+  let best: EquipmentInstance | undefined, bd = Infinity
+  for (const e of p.equipment) {
+    if (page && page.ids.size && !page.ids.has(e.id)) continue
+    const d = Math.hypot(e.position.x + NODE_WIDTH / 2 - cx, e.position.y + 40 - cy)
+    if (d < bd) { bd = d; best = e }
+  }
+  return best
+}
+
+/** Word-wraps text to a width (diagram units). */
+function wrap(text: string, width: number, size: number): string[] {
+  const out: string[] = []
+  for (const para of text.split('\n')) {
+    let line = ''
+    for (const word of para.split(/\s+/)) {
+      const next = line ? `${line} ${word}` : word
+      if (line && textWidth(next, size) > width) { out.push(line); line = word } else line = next
+    }
+    out.push(line)
+  }
+  return out
+}
+
+function drawNote(svg: Svg, a: Annotation) {
+  const size = 11, lh = size * 1.3
+  if (a.kind === 'revision') {
+    // Cloud outline
+    const r = 9, nx = Math.max(1, Math.round(a.w / (r * 2))), ny = Math.max(1, Math.round(a.h / (r * 2)))
+    const sx = a.w / nx, sy = a.h / ny
+    let d = `M ${a.x} ${a.y}`
+    for (let i = 0; i < nx; i++) d += ` a ${sx / 2} ${r} 0 0 1 ${sx} 0`
+    for (let i = 0; i < ny; i++) d += ` a ${r} ${sy / 2} 0 0 1 0 ${sy}`
+    for (let i = 0; i < nx; i++) d += ` a ${sx / 2} ${r} 0 0 1 ${-sx} 0`
+    for (let i = 0; i < ny; i++) d += ` a ${r} ${sy / 2} 0 0 1 0 ${-sy}`
+    svg.path(d, { lw: 1.2, fill: '#fff' })
+    // Δ revision tag
+    const tx = a.x + 8, ty = a.y + 8
+    svg.path(`M ${tx + 13} ${ty} L ${tx + 26} ${ty + 23} L ${tx} ${ty + 23} Z`, { lw: 1.2, fill: '#fff' })
+    svg.text(tx + 13, ty + 15, a.rev ?? '', { size: 9, anchor: 'middle', weight: 'bold' })
+    wrap(a.text, a.w - 50, size).forEach((l, i) => svg.text(a.x + 42, a.y + 14 + i * lh, l, { size }))
+    return
+  }
+  if (a.kind === 'callout' && a.leader) {
+    const lx = a.leader.x, ly = a.leader.y
+    const inside = lx > a.x && lx < a.x + a.w && ly > a.y && ly < a.y + a.h
+    const sx = inside ? a.x + a.w / 2 : Math.min(Math.max(lx, a.x), a.x + a.w), sy = inside ? a.y + a.h : Math.min(Math.max(ly, a.y), a.y + a.h)
+    svg.line(sx, sy, lx, ly, { lw: 1.2 })
+    const ang = Math.atan2(ly - sy, lx - sx)
+    svg.path(`M ${lx} ${ly} L ${lx - 10 * Math.cos(ang - 0.4)} ${ly - 10 * Math.sin(ang - 0.4)} L ${lx - 10 * Math.cos(ang + 0.4)} ${ly - 10 * Math.sin(ang + 0.4)} Z`, { lw: 0.5, fill: '#000' })
+  }
+  svg.rect(a.x, a.y, a.w, a.h, { lw: a.kind === 'callout' ? 1.4 : 1, fill: '#fff' })
+  wrap(a.text, a.w - 16, size).forEach((l, i) => svg.text(a.x + 8, a.y + 14 + i * lh, l, { size }))
+}

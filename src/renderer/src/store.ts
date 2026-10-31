@@ -39,6 +39,8 @@ export interface AppState {
   selectedBay: PatchBayId | null
   /** Rack panel (blank, brush, logo…) selected on the Rack page. */
   selectedAccessory: { rack: string; id: string } | null
+  /** Wiring diagram page shown (group id); null = all pages. */
+  diagramPage: string | null
   showInspector: boolean
   issues: ValidationIssue[]
   /** Bumped to ask the diagram to fit view. */
@@ -97,6 +99,7 @@ export const useStore = create<AppState>((set, get) => ({
   selectedRack: null,
   selectedBay: null,
   selectedAccessory: null,
+  diagramPage: null,
   showInspector: true,
   issues: [],
   fitRequest: 0,

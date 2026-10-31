@@ -57,12 +57,11 @@ export function addToGroup(p: Project, ids: EquipmentId[], groupId: string) {
   pruneGroups(p)
 }
 
-/** Drops empty groups and dangling memberships. */
+/** Drops dangling memberships (devices pointing at a deleted page). */
 export function pruneGroups(p: Project) {
   const ids = new Set(groupsOf(p).map((g) => g.id))
   for (const e of p.equipment) if (e.groupId && !ids.has(e.groupId)) delete e.groupId
-  const used = new Set(p.equipment.map((e) => e.groupId).filter(Boolean))
-  p.groups = groupsOf(p).filter((g) => used.has(g.id))
+  // Pages stay even when empty (a new page starts empty); delete them explicitly.
 }
 
 /** Puts every ungrouped device into a group for its main system (Audio, Video, Lighting…). */

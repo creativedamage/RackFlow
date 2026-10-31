@@ -49,6 +49,31 @@ export function newSheet(p: Project, o: SheetOptions, page: number, pages: numbe
     const top = h - MARGIN / 2 - TB_H
     titleBlock(svg, p, o, { x: MARGIN / 2, y: top, w: w - MARGIN, h: TB_H }, page, pages, subtitle)
     area = { ...area, h: top - MARGIN - 2 }
+    // Revision block: bottom-right, just above the title block (latest revisions).
+    const revs = (p.revisions ?? []).slice(-6)
+    if (revs.length) {
+      const rw = Math.min(170, w * 0.4), rh = 5.5, head = 6
+      const bh = head + rh * (revs.length + 1)
+      const bx = w - MARGIN / 2 - rw, by = top - bh
+      svg.rect(bx, by, rw, bh, { lw: 0.5, fill: '#fff' })
+      svg.text(bx + 2, by + head / 2, 'REVISIONS', { size: 2.6, weight: 'bold' })
+      const cols = [{ t: 'REV', w: 0.1 }, { t: 'DATE', w: 0.18 }, { t: 'DESCRIPTION', w: 0.57 }, { t: 'BY', w: 0.15 }]
+      let y = by + head
+      svg.line(bx, y, bx + rw, y, { lw: 0.35 })
+      const row = (vals: string[], bold: boolean) => {
+        let x = bx
+        cols.forEach((c, i) => {
+          svg.text(x + 1.5, y + rh / 2, vals[i], { size: bold ? 2.2 : 2.6, weight: bold ? 'bold' : 'normal', maxWidth: rw * c.w - 3, fill: bold ? '#555' : '#000' })
+          x += rw * c.w
+          if (i < cols.length - 1) svg.line(x, y, x, by + bh, { lw: 0.25 })
+        })
+        y += rh
+        svg.line(bx, y, bx + rw, y, { lw: 0.25 })
+      }
+      row(cols.map((c) => c.t), true)
+      for (const r of revs) row([r.rev, r.date, r.description.toUpperCase(), r.by.toUpperCase()], false)
+      area = { ...area, h: Math.min(area.h, by - MARGIN - 2) }
+    }
   }
   return { svg, area }
 }
@@ -62,7 +87,7 @@ function titleBlock(svg: Svg, p: Project, o: SheetOptions, r: { x: number; y: nu
     { label: 'LOCATION', value: p.info.location || '', w: 0.12 },
     { label: 'DRAWING', value: [o.title, subtitle].filter(Boolean).join(' – '), w: 0.2 },
     { label: 'DESIGNER', value: p.info.designer || '', w: 0.1 },
-    { label: 'REV', value: p.info.revision || '', w: 0.05 },
+    { label: 'REV', value: (p.revisions?.length ? p.revisions[p.revisions.length - 1].rev : p.info.revision) || '', w: 0.05 },
     { label: 'DATE', value: new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }), w: 0.08 },
     { label: 'SHEET', value: `${o.drawingNumber ? `${o.drawingNumber}.` : ''}${page} OF ${pages}`, w: 0.07 },
   ]

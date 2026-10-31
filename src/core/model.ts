@@ -271,6 +271,26 @@ export type WireMode = 'all' | 'smart' | 'stubs'
 export interface DiagramSettings { autoTidy?: boolean; wires?: WireMode }
 export interface LogoAsset { id: string; name: string; /** data: URL (PNG / JPEG / SVG). */ dataUrl: string }
 
+export type AnnotationKind = 'callout' | 'note' | 'revision'
+/** A note placed anywhere on the wiring diagram (and printed on its page). */
+export interface Annotation {
+  id: string
+  kind: AnnotationKind
+  x: number
+  y: number
+  w: number
+  h: number
+  text: string
+  /** Page (group id) it belongs to; undefined = the general page. */
+  page?: string
+  /** Callouts: where the leader arrow points (diagram coordinates). */
+  leader?: CanvasPoint
+  /** Revision notes: which revision (e.g. "B"). */
+  rev?: string
+}
+
+export interface Revision { id: string; rev: string; date: string; description: string; by: string }
+
 export interface ProjectInfo { name: string; client: string; designer: string; revision: string; location?: string }
 
 export interface Project {
@@ -286,6 +306,10 @@ export interface Project {
   diagram?: DiagramSettings
   /** Images used on drawings (logo blank panels, title block). */
   logos?: LogoAsset[]
+  /** Callouts, notes and revision notes placed on the wiring diagram. */
+  annotations?: Annotation[]
+  /** Revision history (newest last), printed in the revision block. */
+  revisions?: Revision[]
 }
 
 // --- Patch bays (types here to keep the document schema in one file) ---

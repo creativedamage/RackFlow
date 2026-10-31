@@ -25,7 +25,7 @@ export function SchematicPrintDialog({ onClose }: { onClose: () => void }) {
         <Field label="Sheets">
           <Select value={o.split} onChange={(split) => set({ ...o, split })} options={[
             { value: 'none', label: 'Everything on one sheet' },
-            { value: 'group', label: 'One sheet per group' },
+            { value: 'group', label: 'One sheet per page' },
             { value: 'room', label: 'One sheet per room' },
           ]} />
         </Field>

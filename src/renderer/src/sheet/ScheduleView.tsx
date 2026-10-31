@@ -216,7 +216,7 @@ function DeviceSheet() {
   const columns = useMemo<SheetColumn<DeviceRow>[]>(() => [
     { key: 'tag', title: 'Tag', width: 100, get: (r) => r.eq.tag, set: (r, v) => { if (v.trim()) r.eq.tag = v.trim() } },
     { key: 'room', title: 'Room', width: 150, get: (r) => r.eq.room, set: (r, v) => { r.eq.room = v } },
-    { key: 'group', title: 'Group', width: 150, get: (r) => groupsOf(project).find((g) => g.id === r.eq.groupId)?.name ?? '', value: (r) => r.eq.groupId ?? '',
+    { key: 'group', title: 'Page', width: 150, get: (r) => groupsOf(project).find((g) => g.id === r.eq.groupId)?.name ?? '', value: (r) => r.eq.groupId ?? '',
       options: () => [{ value: '', label: '—' }, ...groupsOf(project).map((g) => ({ value: g.id, label: g.name }))],
       render: (r) => { const g = groupsOf(project).find((x) => x.id === r.eq.groupId); return g ? <span className="sys"><i style={{ background: groupColor(g) }} />{g.name}</span> : '' },
       set: () => { /* applied in commit (needs the whole draft) */ } },
@@ -259,7 +259,7 @@ function DeviceSheet() {
     <>
       <div className="schedule-bar">
         <input type="search" placeholder="Filter devices…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <span className="muted small">{rows.length} device{rows.length === 1 ? '' : 's'} · Tag, Room, Group and Notes are editable (paste a new group name to create one)</span>
+        <span className="muted small">{rows.length} device{rows.length === 1 ? '' : 's'} · Tag, Room, Page and Notes are editable (type a new page name to create one)</span>
         <span className="spacer" />
         <button disabled={!rows.length} onClick={csv}>Export CSV</button>
       </div>

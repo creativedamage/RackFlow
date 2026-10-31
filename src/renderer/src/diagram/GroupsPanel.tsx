@@ -12,14 +12,46 @@ export const SYSTEM_OPTIONS: { value: DeviceGroup['system']; label: string }[] =
   { value: 'custom', label: 'Custom colour' },
 ]
 
-/** Groups the current selection (⌘G) – shared by the panel, the inspector and the keyboard. */
+/** Makes a page from the current selection (⌘G) – shared by the panel, the inspector and the keyboard. */
 export function groupSelection(name?: string, system?: DeviceGroup['system']) {
   const s = useStore.getState()
   const ids = s.selection
-  if (ids.length < 1) { s.notify('Select the devices to group first (drag a box or ⌘-click).', { kind: 'info' }); return }
+  if (ids.length < 1) { s.notify('Select the devices for the new page first (drag a box or ⌘-click).', { kind: 'info' }); return }
   let g: DeviceGroup | undefined
-  s.apply('Group Devices', (d) => { g = createGroup(d, ids, { name, system }) })
-  if (g) s.notify(`Grouped ${ids.length} device${ids.length === 1 ? '' : 's'} as “${g.name}”`, { undo: true })
+  s.apply('New Page', (d) => { g = createGroup(d, ids, { name: name ?? nextPageName(d.groups ?? []), system }) })
+  if (g) s.notify(`Moved ${ids.length} device${ids.length === 1 ? '' : 's'} to page “${g.name}”`, { undo: true })
+}
+
+const nextPageName = (gs: DeviceGroup[]) => { let n = gs.length + 1; while (gs.some((g) => g.name === `Page ${n}`)) n++; return `Page ${n}` }
+
+/** Top tab bar: All pages · each page · + New Page. Anything in a page group is its own page. */
+export function PageTabs() {
+  const groups = useStore((s) => s.project.groups)
+  const page = useStore((s) => s.diagramPage)
+  const counts = useStore((s) => s.project.equipment)
+  const set = useStore((s) => s.set)
+  const list = groups ?? []
+  useEffect(() => { if (page && !list.some((g) => g.id === page)) set({ diagramPage: null }) }, [list, page, set])
+  const n = (id: string | null) => counts.filter((e) => (id ? e.groupId === id : true)).length
+  const unassigned = counts.filter((e) => !e.groupId || !list.some((g) => g.id === e.groupId)).length
+  return (
+    <div className="page-tabs" role="tablist">
+      <button className={page === null ? 'on' : ''} onClick={() => set({ diagramPage: null })} title="Show every page together">All pages <span>{n(null)}</span></button>
+      {list.map((g) => (
+        <button key={g.id} className={page === g.id ? 'on' : ''} onClick={() => set({ diagramPage: g.id })} title={`Show only “${g.name}”. Wires to other pages show as labelled flags.`}>
+          <i style={{ background: groupColor(g) }} />{g.name} <span>{n(g.id)}</span>
+        </button>
+      ))}
+      {list.length > 0 && unassigned > 0 && <span className="muted small pt-hint">{unassigned} not on a page</span>}
+      <button className="pt-add" onClick={() => {
+        const s = useStore.getState()
+        if (s.selection.length) { groupSelection(); return }
+        let g: DeviceGroup | undefined
+        s.apply('New Page', (d) => { g = createGroup(d, [], { name: nextPageName(d.groups ?? []) }) })
+        if (g) { s.set({ diagramPage: g!.id }); s.notify(`New page “${g!.name}” – anything you add now goes on it`, { kind: 'success' }) }
+      }} title="New page (from the selected devices, or empty)">＋ Page</button>
+    </div>
+  )
 }
 
 /** Top-left diagram panel: every group with its colour, spotlight, rename, ungroup; group / auto-group buttons. */
@@ -42,8 +74,8 @@ export function GroupsPanel() {
       if (e.shiftKey) {
         const gids = new Set(s.project.equipment.filter((x) => s.selection.includes(x.id) && x.groupId).map((x) => x.groupId!))
         if (!gids.size) return
-        s.apply('Ungroup', (d) => { for (const id of gids) ungroup(d, id) })
-        s.notify(`Ungrouped ${gids.size} group${gids.size === 1 ? '' : 's'}`, { undo: true })
+        s.apply('Remove from Page', (d) => { for (const id of gids) ungroup(d, id) })
+        s.notify(`Deleted ${gids.size} page${gids.size === 1 ? '' : 's'}`, { undo: true })
       } else groupSelection()
     }
     window.addEventListener('keydown', onKey)
@@ -55,10 +87,10 @@ export function GroupsPanel() {
   return (
     <Panel position="top-left" className={`groups-panel ${open ? '' : 'closed'}`}>
       <div className="gp-head" onClick={() => setOpen(!open)}>
-        <span>Groups</span>{groups.length > 0 && <span className="gp-n">{groups.length}</span>}<span className="gp-caret">{open ? '▾' : '▸'}</span>
+        <span>Pages</span>{groups.length > 0 && <span className="gp-n">{groups.length}</span>}<span className="gp-caret">{open ? '▾' : '▸'}</span>
       </div>
       {open && <>
-        {groups.length === 0 && <p className="gp-empty">Group devices by system (Audio, Video, Lighting…) to colour-code and move them together.</p>}
+        {groups.length === 0 && <p className="gp-empty">Put devices on pages (e.g. Audio, Video, Stage). Each page is its own tab and prints as its own sheet, named after the page.</p>}
         <ul className="gp-list">
           {groups.map((g) => {
             const n = membersOf(project, g.id).length
@@ -75,24 +107,24 @@ export function GroupsPanel() {
                     onBlur={(e) => { const v = e.target.value.trim(); setRenaming(null); if (v && v !== g.name) apply('Rename Group', (d) => { const x = d.groups?.find((y) => y.id === g.id); if (x) x.name = v }) }}
                     onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setRenaming(null) }} />
                 ) : (
-                  <button className="gp-name" title="Click to select its devices · double-click to rename"
-                    onClick={() => useStore.getState().select(membersOf(project, g.id).map((e) => e.id))}
+                  <button className="gp-name" title="Click to show this page · double-click to rename"
+                    onClick={() => useStore.getState().set({ diagramPage: g.id })}
                     onDoubleClick={() => setRenaming(g.id)}>{g.name}</button>
                 )}
                 <span className="gp-count">{n}</span>
-                <button className={`gp-icon ${focus === g.id ? 'on' : ''}`} title={focus === g.id ? 'Show everything' : 'Spotlight this group (dim the rest)'} onClick={() => setFocus(focus === g.id ? null : g.id)}>◉</button>
-                <button className="gp-icon" title="Ungroup" onClick={() => { apply('Ungroup', (d) => ungroup(d, g.id)); useStore.getState().notify(`Ungrouped “${g.name}”`, { undo: true }) }}>×</button>
+                <button className={`gp-icon ${useStore.getState().diagramPage === g.id ? 'on' : ''}`} title="Show only this page" onClick={() => useStore.getState().set({ diagramPage: g.id })}>▤</button>
+                <button className="gp-icon" title="Delete page (its devices stay on the diagram, unassigned)" onClick={() => { apply('Delete Page', (d) => ungroup(d, g.id)); useStore.getState().notify(`Deleted page “${g.name}” – its devices are still on the diagram`, { undo: true }) }}>×</button>
               </li>
             )
           })}
         </ul>
         <div className="gp-actions">
-          <button disabled={!selection.length} onClick={() => groupSelection()} title="Group the selected devices (⌘G)">Group selected{selection.length ? ` (${selection.length})` : ''}</button>
+          <button disabled={!selection.length} onClick={() => groupSelection()} title="Move the selected devices to a new page (⌘G)">New page from selection{selection.length ? ` (${selection.length})` : ''}</button>
           <button onClick={() => {
             let n = 0
-            apply('Auto-group by System', (d) => { n = autoGroupBySystem(d) })
-            useStore.getState().notify(n ? `Grouped ${n} device${n === 1 ? '' : 's'} by system` : 'Every device is already in a group.', { undo: !!n, kind: n ? 'success' : 'info' })
-          }} title="Put every ungrouped device into Audio, Video, Lighting… by what it mostly carries">Auto-group by system</button>
+            apply('Pages by System', (d) => { n = autoGroupBySystem(d) })
+            useStore.getState().notify(n ? `Put ${n} device${n === 1 ? '' : 's'} on Audio / Video / Lighting… pages` : 'Every device is already on a page.', { undo: !!n, kind: n ? 'success' : 'info' })
+          }} title="Put every device that isn't on a page onto Audio, Video, Lighting… pages by what it mostly carries">Pages by system</button>
         </div>
       </>}
     </Panel>

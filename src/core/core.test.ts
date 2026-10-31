@@ -209,7 +209,8 @@ describe('device groups', () => {
     expect(byName['Video']).toEqual([pj.tag, matrix.tag])
     expect(byName['Lighting']).toEqual([fx.tag])
     removeEquipment(p, [fx.id])
-    expect(groupsOf(p).some((x) => x.name === 'Lighting')).toBe(false)
+    // Pages stay when they empty out.
+    expect(membersOf(p, groupsOf(p).find((x) => x.name === 'Lighting')!.id)).toHaveLength(0)
     ungroup(p, g.id)
     expect(dsp.groupId).toBeUndefined()
     expect(createGroup(p, [dsp.id]).name).toBe('Audio')
