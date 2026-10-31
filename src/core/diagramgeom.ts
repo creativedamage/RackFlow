@@ -7,7 +7,7 @@ import { plateAspect } from './platelayout'
 
 export const NODE_WIDTH = 240
 export const HEADER_H = 40
-export const ROW_H = 18
+export const ROW_H = 24
 
 export const SMALL_W = 170
 export const SMALL_HEAD = 24

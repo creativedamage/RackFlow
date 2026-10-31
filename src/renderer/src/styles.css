@@ -184,7 +184,7 @@ textarea { resize: vertical; width: 100%; }
 .device-tag { font-weight: 700; font-size: 12.5px; }
 .device-model { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 70px; }
 .device-cat { position: absolute; right: 10px; top: 6px; font-size: 9px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; }
-.port-row { position: absolute; height: 18px; width: 50%; display: flex; align-items: center; }
+.port-row { position: absolute; height: 24px; width: 50%; display: flex; align-items: center; }
 .port-row.left { left: 0; padding-left: 10px; }
 .port-row.right { right: 0; padding-right: 10px; justify-content: flex-end; }
 .port-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
@@ -679,7 +679,7 @@ button.link.show-all:hover { text-decoration: underline; }
 
 /* Cable labels sit in their own layer above every device */
 .react-flow__edgelabel-renderer { z-index: 1500 !important; }
-.cable-label { position: absolute; pointer-events: all; cursor: pointer; font: 600 9px/1 ui-monospace, Menlo, monospace; padding: 2px 5px; border-radius: 6px; border: 1px solid; background: var(--bg); color: var(--text); white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.cable-label { position: absolute; pointer-events: all; cursor: pointer; font: 600 9px/1 ui-monospace, Menlo, monospace; padding: 2px 4px; border-radius: 6px; border: 1px solid; background: var(--bg); color: var(--text); white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
 .cable-label:hover { filter: brightness(0.96); }
 .app-menu { position: relative; -webkit-app-region: no-drag; }
 button.app-mark { border: none; background: transparent; padding: 2px 6px; cursor: pointer; }
@@ -973,7 +973,7 @@ input.mono { font-family: var(--mono); }
 .device-header.small .device-model { font-size: 9.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; }
 .device-node.small .plate-thumb { left: 8px; right: 8px; }
 .small-cat { position: absolute; left: 0; right: 0; top: 30px; text-align: center; font-size: 10px; color: var(--text-2); }
-.port-row.compact { width: 12px; height: 18px; }
+.port-row.compact { width: 12px; height: 24px; }
 .port-row.compact.right { right: 0; }
 .size-bar { display: flex; gap: 2px; background: var(--node-bg); border: 1px solid var(--line); border-radius: 6px; padding: 2px; box-shadow: var(--shadow); }
 .size-bar button { border: none; background: none; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; color: var(--text-2); }

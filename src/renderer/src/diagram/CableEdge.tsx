@@ -34,7 +34,7 @@ const sameRects = (a: Rect[], b: Rect[]) => a.length === b.length && a.every((r,
 interface EndInfo { x: number; y: number; dir: number; device: string; far: string }
 /** A bundle of stubs from one device side to the same far device. */
 export interface StubGroup { key: string; ids: string[]; ys: number[]; x: number; dir: number; leader: string; /** Bracket x. */ bx: number }
-interface Plan { channel: Map<string, number>; stub: Map<string, boolean>; groups: Map<string, StubGroup> }
+interface Plan { channel: Map<string, number>; stub: Map<string, boolean>; groups: Map<string, StubGroup>; labels: Map<string, Pt> }
 
 /**
  * One plan for every wire, rebuilt when a device moves or the wiring changes:
@@ -104,7 +104,30 @@ function planFor(s: ReactFlowState, rects: Rect[]): Plan {
     const g: StubGroup = { key, ids: ms.map((m) => m.id), ys: ms.map((m) => m.end.y), x: ms[0].end.x, dir: ms[0].end.dir, leader: ms[0].id, bx: ms[0].end.x + ms[0].end.dir * (STUB + width + 14) }
     for (const m of ms) groups.set(`${m.id}|${m.end.device}|${m.end.dir}`, g)
   }
-  const plan = { channel, stub, groups }
+  // Cable-number labels: spread along each wire so labels on parallel runs never sit on top of each other.
+  const labels = new Map<string, Pt>()
+  const placed: { x0: number; y0: number; x1: number; y1: number }[] = []
+  const free = (b: { x0: number; y0: number; x1: number; y1: number }) =>
+    !placed.some((q) => b.x0 < q.x1 && b.x1 > q.x0 && b.y0 < q.y1 && b.y1 > q.y0) &&
+    !rects.some((r) => b.x0 < r.x1 - CLEAR && b.x1 > r.x0 + CLEAR && b.y0 < r.y1 - CLEAR && b.y1 > r.y0 + CLEAR)
+  const order = [...edges].filter((e) => ends.has(e.id) && !stub.get(e.id) && e.data?.label).sort((a, b) => (a.data!.label).localeCompare(b.data!.label, undefined, { numeric: true }))
+  for (const e of order) {
+    const [A, B] = ends.get(e.id)!
+    const raw = route(A, A.dir, B, B.dir, rects, e.data?.lane ?? 0, channel.get(e.id))
+    // Merge straight-through points so a straight wire is one segment (labels line up neatly).
+    const pts = raw.filter((q, i) => i === 0 || i === raw.length - 1 || !((raw[i - 1].x === q.x && q.x === raw[i + 1].x) || (raw[i - 1].y === q.y && q.y === raw[i + 1].y)))
+    const w = e.data!.label.length * 6 + 14, h = 15
+    const segs = pts.slice(1).map((p, i) => ({ a: pts[i], b: p, len: Math.abs(p.x - pts[i].x) + Math.abs(p.y - pts[i].y) })).filter((s) => s.len > 4).sort((x, y) => y.len - x.len)
+    let best: Pt | null = null
+    search: for (const s of segs) for (const f of [0.5, 0.35, 0.65, 0.22, 0.78, 0.12, 0.88, 0.42, 0.58, 0.3, 0.7]) {
+      const q = { x: s.a.x + (s.b.x - s.a.x) * f, y: s.a.y + (s.b.y - s.a.y) * f }
+      const box = { x0: q.x - w / 2 - 3, y0: q.y - h / 2 - 2, x1: q.x + w / 2 + 3, y1: q.y + h / 2 + 2 }
+      if (free(box)) { best = q; placed.push(box); break search }
+    }
+    if (!best) { best = labelPoint(pts, rects); placed.push({ x0: best.x - w / 2, y0: best.y - h / 2, x1: best.x + w / 2, y1: best.y + h / 2 }) }
+    labels.set(e.id, best)
+  }
+  const plan = { channel, stub, groups, labels }
   cache = { rects, edges, sel, plan }
   return plan
 }
@@ -179,7 +202,7 @@ export const CableEdge = memo(function CableEdge(props: EdgeProps<CableEdgeType>
   }
   const pts = route({ x: sourceX, y: sourceY }, sDir, { x: targetX, y: targetY }, tDir, rects, data?.lane ?? 0, channel)
   const path = roundedPath(pts)
-  const lp = labelPoint(pts, rects)
+  const lp = plan.labels.get(id) ?? labelPoint(pts, rects)
   return (
     <>
       <BaseEdge id={id} path={path} interactionWidth={14} style={stroke} />
