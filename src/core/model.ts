@@ -196,6 +196,18 @@ export interface EquipmentInstance {
   circuit?: CircuitInfo
   /** Diagram group (system) this device belongs to. */
   groupId?: string
+  /** Network sheet: addressing per network port (key = port id, or 'mgmt' for a switch). */
+  network?: Record<string, NetInfo>
+}
+
+/** One network interface's addressing on the Network sheet. */
+export interface NetInfo {
+  ip?: string
+  vlan?: string
+  /** Manual switch / port when the cable path doesn't reach a switch (yet). */
+  switchTag?: string
+  switchPort?: string
+  notes?: string
 }
 
 /** A named system on the wiring diagram (e.g. "FOH Audio", "Stage Video"). */

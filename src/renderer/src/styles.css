@@ -760,3 +760,8 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .tp-detail { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-top: 1px solid #000; background: #2c2c2e; font-size: 12px; }
 .tp-detail .muted { color: #a1a1a6; font-size: 11px; }
 .pb-head .mini { margin: 0 6px; background: #48484a; border-color: #5a5a5e; color: #fff; }
+
+/* Network sheet */
+.net-bad { color: var(--danger); font-weight: 600; }
+.net-manual { font-style: italic; }
+.net-switch-row .xsheet-td { background: var(--bg-2); }
