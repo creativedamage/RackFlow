@@ -47,3 +47,19 @@ describe('category check', () => {
     expect(p.cables[0].specKey).toBe('cat5e')
   })
 })
+
+import { connectMany } from './index'
+describe('patching multiples onto a two-sided panel', () => {
+  it('keeps every connection on the rear when the first lands on the rear', () => {
+    const p = newProject()
+    const bay = addPatchBay(p, BUILT_IN_PATCH_TEMPLATES.find((x) => x.key === 'leviton.6a586-u24')!, { x: 0, y: 0 })
+    const plates = Array.from({ length: 4 }, () => addEquipment(p, makePlateProduct(newPlateSpec('wallPlate'), { model: 'WP' }), { x: 0, y: 0 }))
+    const srcs = plates.map((w) => ({ equipment: w.id, port: w.product.ports.find((q) => q.connector === 'idcPunchdown')!.id }))
+    const res = connectMany(p, srcs, { equipment: bay.equipment, port: 'r1.c01' })
+    expect(res.made.map((m) => m.to.port)).toEqual(['r1.c01', 'r1.c02', 'r1.c03', 'r1.c04'])
+    const sw = addEquipment(p, BUILT_IN_PRODUCTS.find((x) => x.category === 'networkSwitch' && x.ports.filter((q) => q.connector === 'rj45').length > 4)!, { x: 0, y: 0 })
+    const swp = sw.product.ports.filter((q) => q.connector === 'rj45').slice(0, 3).map((q) => ({ equipment: sw.id, port: q.id }))
+    const res2 = connectMany(p, swp, { equipment: bay.equipment, port: 'r1.c01.f' })
+    expect(res2.made.map((m) => m.to.port)).toEqual(['r1.c01.f', 'r1.c02.f', 'r1.c03.f'])
+  })
+})

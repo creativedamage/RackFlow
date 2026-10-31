@@ -23,10 +23,12 @@ export function connectMany(p: Project, sources: PortAddress[], firstTarget: Por
   const ports = eq.product.ports
   const start = ports.findIndex((x) => x.id === firstTarget.port)
   if (start < 0) return { made: [], skipped: [...sources] }
-  const dir = ports[start].direction
+  const first = ports[start]
   const srcKeys = new Set(sources.map(addrKey))
   const seen = new Set<string>()
-  const queue = ports.slice(start).filter((x, i) => i === 0 || x.direction === dir)
+  // Stay on the same side as the first port: same direction and panel face
+  // (so on a two-sided patch panel, rear stays rear and front stays front).
+  const queue = ports.slice(start).filter((x, i) => i === 0 || (x.direction === first.direction && x.face === first.face))
   let cursor = 0
   for (const src of sources) {
     const k = addrKey(src)
