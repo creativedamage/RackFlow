@@ -118,6 +118,10 @@ export const CONNECTORS = {
   etherCON: c('etherCON', ['ethernet1G'], { crossMates: ['rj45'] }),
   lcDuplex: c('LC Duplex', ['ethernet10G']),
   scDuplex: c('SC Duplex', ['ethernet10G']),
+  mdc: c('MDC Duplex', ['ethernet10G']),
+  mpo8: c('MTP/MPO-8', ['ethernet10G']),
+  mpo12: c('MTP/MPO-12', ['ethernet10G']),
+  mpo24: c('MTP/MPO-24', ['ethernet10G']),
   opticalCON: c('opticalCON', ['ethernet10G']),
   usbA: c('USB-A', ['usb3']),
   usbB: c('USB-B', ['usb3']),
@@ -163,6 +167,6 @@ export const suggestedSignals = (t: ConnectorType): SignalType[] => [...meta(t).
 /** Gender a panel-mounted jack of this type usually has (for new ports). */
 export function typicalPanelGender(t: ConnectorType): Gender {
   const female: ConnectorType[] = ['hdmi', 'displayPort', 'dvi', 'bnc', 'hd15', 'trs6_35', 'trs3_5', 'bantamTT', 'rca', 'rj45', 'etherCON',
-    'lcDuplex', 'scDuplex', 'opticalCON', 'usbA', 'usbB', 'usbC', 'db9', 'db25', 'sma', 'tnc', 'speakonNL2', 'speakonNL4', 'nema5_15', 'nema5_20', 'nemaL5_20', 'nemaL5_30', 'nemaL6_20', 'nemaL6_30', 'nemaL14_30', 'nemaL21_30', 'schuko']
+    'lcDuplex', 'scDuplex', 'mdc', 'mpo8', 'mpo12', 'mpo24', 'opticalCON', 'usbA', 'usbB', 'usbC', 'db9', 'db25', 'sma', 'tnc', 'speakonNL2', 'speakonNL4', 'nema5_15', 'nema5_20', 'nemaL5_20', 'nemaL5_30', 'nemaL6_20', 'nemaL6_30', 'nemaL14_30', 'nemaL21_30', 'schuko']
   return female.includes(t) ? 'female' : 'male'
 }

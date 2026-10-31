@@ -10,7 +10,7 @@ import { DOMAINS } from '../signals'
 import { portDomain } from '../project'
 import { planChannels, type ChannelWire } from '../autolayout'
 import { headerHeight, NODE_WIDTH, nodeGeom, previewHeight, ROW_H, splitPorts } from '../diagramgeom'
-import { plateInner, withLayout } from '../platelayout'
+import { productFace } from '../platelayout'
 import { crossings, route, WIRE_CLEAR, type Pt, type Rect } from '../wireroute'
 import { groupsOf } from '../groups'
 import { newSheet, sheetSize, type SheetOptions } from './sheet'
@@ -38,7 +38,7 @@ const SMART_LEN = 1400
 export function connectorBadge(c: PortTemplate['connector']): string {
   const m: Record<string, string> = {
     hdmi: 'HDMI', displayPort: 'DP', dvi: 'DVI', bnc: 'BNC', hd15: 'VGA', xlr3: 'XLR', miniXlr: 'TA3', trs6_35: 'TRS', trs3_5: '3.5', bantamTT: 'TT', rca: 'RCA',
-    speakonNL2: 'NL2', speakonNL4: 'NL4', euroblock: 'PHX', bindingPost: 'BP', rj45: 'RJ45', etherCON: 'ECON', lcDuplex: 'LC', scDuplex: 'SC', opticalCON: 'OCON',
+    speakonNL2: 'NL2', speakonNL4: 'NL4', euroblock: 'PHX', bindingPost: 'BP', rj45: 'RJ45', etherCON: 'ECON', lcDuplex: 'LC', scDuplex: 'SC', mdc: 'MDC', mpo8: 'MTP8', mpo12: 'MTP', mpo24: 'MT24', opticalCON: 'OCON',
     usbA: 'USB', usbB: 'USB', usbC: 'USBC', db9: 'DB9', db25: 'DB25', idcPunchdown: 'IDC', xlr5: 'XLR5', lemo: 'LEMO', smpteFiber: 'SMPT', sma: 'SMA', tnc: 'TNC',
     iecC13C14: 'IEC', iecC19C20: 'C20', powerCON: 'PCON', powerCONTrue1: 'TRU1', dcBarrel: 'DC', xlr4: 'XLR4', camlok: 'CAM', schuko: 'SCH',
   }
@@ -247,11 +247,11 @@ function drawDevice(svg: Svg, e: EquipmentInstance, o: SchematicOptions) {
   if (e.room?.trim()) svg.text(x + NODE_WIDTH / 2, y + 36, `(${e.room.trim().toUpperCase()})`, { size: 8, anchor: 'middle', fill: '#444', maxWidth: NODE_WIDTH - 16 })
   // Plate / box / panel face drawing.
   const ph = previewHeight(e)
-  if (ph && e.product.plate) {
-    const L = withLayout(e.product.plate).layout!
+  const face = ph ? productFace(e.product) : null
+  if (face) {
     const top = y + (e.room?.trim() ? 54 : 40), availH = ph - 8, availW = NODE_WIDTH - 20
-    const k = Math.min(availW / L.w, availH / L.h)
-    svg.raw(`<g transform="translate(${x + (NODE_WIDTH - L.w * k) / 2} ${top + (availH - L.h * k) / 2}) scale(${k})">${plateInner(e.product.plate)}</g>`)
+    const k = Math.min(availW / face.w, availH / face.h)
+    svg.raw(`<g transform="translate(${x + (NODE_WIDTH - face.w * k) / 2} ${top + (availH - face.h * k) / 2}) scale(${k})">${face.inner()}</g>`)
   }
   svg.line(x, y + h - 4, x + NODE_WIDTH, y + h - 4, { lw: 0.5 })
   const kind = e.product.category === 'other' ? 'DEVICE' : CATEGORIES[e.product.category].name.toUpperCase()

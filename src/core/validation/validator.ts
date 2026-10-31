@@ -67,7 +67,7 @@ function catalogFits(from: PortTemplate, to: PortTemplate, signal: SignalType | 
     })
 }
 
-const PASSIVE = new Set(['patchBay', 'wallBox', 'wallPlate', 'floorBox', 'connectorPanel'])
+const PASSIVE = new Set(['patchBay', 'wallBox', 'wallPlate', 'floorBox', 'connectorPanel', 'fiberEnclosure'])
 /** Passive jacks (patch bays, wall plates, floor boxes); their power outlets are real sources, not pass-through. */
 const isPatchBay = (r: ResolvedPort) => PASSIVE.has(r.equipment.product.category) && SIGNALS[r.port.signals[0]]?.domain !== 'power'
 const opposite = (d: PortTemplate['direction']): PortTemplate['direction'] => (d === 'input' ? 'output' : d === 'output' ? 'input' : 'bidirectional')

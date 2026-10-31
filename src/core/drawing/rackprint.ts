@@ -2,6 +2,7 @@
 // ears with screws, tag on the left, manufacturer / model / type centred,
 // blank, brush, vent and logo panels drawn and labelled.
 
+import { productFace } from '../platelayout'
 import { CATEGORIES, type Project, type Rack, type RackFace } from '../model'
 import { RackLayout, type RackOccupant } from '../rack'
 import { accessoryLabel } from '../rackpanels'
@@ -148,6 +149,13 @@ function drawOccupant(svg: Svg, p: Project, rack: Rack, occ: RackOccupant, x: nu
   if (!eq) return
   const tagSize = Math.min(17, Math.max(10, h * 0.34))
   const half = !!occ.halfSlot
+  // Rack connector panels and fiber enclosures: draw the real face (modules, connectors, engravings).
+  const face = productFace(eq.product)
+  if (face?.rack && !half) {
+    svg.raw(`<g transform="translate(${x} ${y}) scale(${w / face.w} ${h / face.h})">${face.inner({ bare: true })}</g>`)
+    svg.text(inner.x + 2, inner.y + 3.2, eq.tag, { size: 4.2, baseline: 'middle', weight: 'bold' })
+    return
+  }
   // Patch panels: draw their jacks.
   if (eq.product.category === 'patchBay') {
     const front = eq.product.ports.filter((q) => q.face !== 'rear')

@@ -17,6 +17,7 @@ import { RackView } from './rack/RackView'
 import { PatchEditor } from './patch/PatchEditor'
 import { TemplatesPanel } from './patch/TemplatesPanel'
 import { PlateDesigner } from './product/PlateDesigner'
+import { FiberBuilder } from './product/FiberBuilder'
 import { Toasts } from './components/Toasts'
 import { ScheduleView } from './sheet/ScheduleView'
 import { LedView } from './led/LedView'
@@ -145,7 +146,9 @@ export function App() {
         {rightPanel && (mode === 'patch' ? <TemplatesPanel /> : <Inspector />)}
         {rightPanel && <PanelResizer which={mode === 'patch' ? 'tp' : 'insp'} />}
         {editingProduct && <ProductEditor key={editingProduct.key} initial={editingProduct} />}
-        {editingPlate && <PlateDesigner key={editingPlate.product.key + (editingPlate.instanceId ?? '')} initial={editingPlate.product} instanceId={editingPlate.instanceId} />}
+        {editingPlate && (editingPlate.product.fiber
+          ? <FiberBuilder key={editingPlate.product.key + (editingPlate.instanceId ?? '')} initial={editingPlate.product} instanceId={editingPlate.instanceId} />
+          : <PlateDesigner key={editingPlate.product.key + (editingPlate.instanceId ?? '')} initial={editingPlate.product} instanceId={editingPlate.instanceId} />)}
         {editingTemplate && <TemplateEditor key={editingTemplate.key} initial={editingTemplate} />}
         {finding && <DeviceFinder initialQuery={finding.query} />}
         {editingView && <ViewEditor key={editingView} id={editingView} onClose={() => useStore.getState().set({ editingView: null })} />}

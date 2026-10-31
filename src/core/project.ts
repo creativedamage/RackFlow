@@ -98,7 +98,10 @@ export function connect(p: Project, a: PortAddress, b: PortAddress, specKey: str
   const cat = cats.filter((c) => tags.includes(c)).sort((x, y) => cats.indexOf(y) - cats.indexOf(x))[0] ?? 'cat6a'
   const preferred = verdict.suggestedCables.find((s) => s.key === cat || s.key.startsWith(`${cat}.`))
   const tp = verdict.suggestedCables[0] && /^cat\d/.test(verdict.suggestedCables[0].key)
-  const spec = cableSpec(specKey) ?? (tp && preferred ? preferred : verdict.suggestedCables[0])
+  // Fiber: single-mode (OS2) or multimode (OM3/4/5) from the panels it lands on.
+  const fiberMode = tags.includes('multimode') ? '.mm' : tags.includes('singlemode') ? '.sm' : null
+  const fiberPick = fiberMode && verdict.suggestedCables.find((s) => s.key.startsWith('fiber.') && s.key.endsWith(fiberMode))
+  const spec = cableSpec(specKey) ?? (fiberPick || (tp && preferred ? preferred : verdict.suggestedCables[0]))
   const prefix = spec?.labelPrefix ?? (verdict.signal ? CABLE_PREFIX[SIGNALS[verdict.signal].domain] : 'X')
   const c: Cable = {
     id: newId(), label: nextCableLabel(p, prefix, verdict.signal ? SIGNALS[verdict.signal].domain : 'other'), from: { ...from }, to: { ...to },

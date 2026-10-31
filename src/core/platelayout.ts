@@ -3,7 +3,8 @@
 // free text anywhere – drawn to scale (millimetres). The same drawing is used
 // in the designer, as the preview on the wiring-diagram card and in print.
 
-import type { PlateInsert, PlateKind, PlateLayout, PlateSpec, PlateText } from './model'
+import type { PlateInsert, PlateKind, PlateLayout, PlateSpec, PlateText, ProductDefinition } from './model'
+import { fiberFaceSize, fiberInner } from './fiber'
 import { PLATE_MODULES } from './plates'
 
 export type PlateFinish = PlateLayout['finish']
@@ -281,6 +282,8 @@ export interface PlateDrawOpts {
   interactive?: boolean
   /** Show grid dots every n mm (designer). */
   grid?: number
+  /** Rack panels: leave out the outline and ears (the rack elevation draws its own). */
+  bare?: boolean
 }
 
 /** Inner SVG (mm units) of the plate face; wrap with plateSVG() for a stand-alone image. */
@@ -292,14 +295,16 @@ export function plateInner(spec0: PlateSpec, o: PlateDrawOpts = {}): string {
   const out: string[] = []
   const line = (sw: number) => `fill="none" stroke="currentColor" stroke-width="${sw}"`
   // Face – outline only, like a CAD panel drawing.
-  if (L.shape === 'round') out.push(`<circle cx="${L.w / 2}" cy="${L.h / 2}" r="${Math.min(L.w, L.h) / 2}" ${line(0.7)}/><circle cx="${L.w / 2}" cy="${L.h / 2}" r="${Math.min(L.w, L.h) / 2 - 6}" ${line(0.3)}/>`)
+  if (o.bare) { /* outline and ears come from the rack elevation */ } else if (L.shape === 'round') out.push(`<circle cx="${L.w / 2}" cy="${L.h / 2}" r="${Math.min(L.w, L.h) / 2}" ${line(0.7)}/><circle cx="${L.w / 2}" cy="${L.h / 2}" r="${Math.min(L.w, L.h) / 2 - 6}" ${line(0.3)}/>`)
   else {
     out.push(`<rect x="0" y="0" width="${L.w}" height="${L.h}" rx="${spec.kind === 'rackPanel' ? 0.8 : spec.kind === 'floorBox' ? 6 : 3}" ${line(0.7)}/>`)
     if (spec.kind === 'floorBox') out.push(`<rect x="5" y="5" width="${n(L.w - 10)}" height="${n(L.h - 10)}" rx="3" ${line(0.3)}/>`)
   }
   // Screws: per gang (wall plates, 3.28" apart), corners (floor boxes), ear slots (rack).
   const screw = (x: number, y: number, r = 2.2) => out.push(`<circle cx="${n(x)}" cy="${n(y)}" r="${r}" ${line(0.35)}/><line x1="${n(x - r * 0.7)}" y1="${n(y)}" x2="${n(x + r * 0.7)}" y2="${n(y)}" ${line(0.3)}/>`)
-  if (size.ru) {
+  if (size.ru && o.bare) {
+    // no ears
+  } else if (size.ru) {
     // EIA-310 ears: slots 6.8 × 3.8 at 7.9 mm from the edge, holes at 6.35 / 22.2 / 38.1 mm per U (outer two used).
     for (const ex of [7.9, L.w - 7.9]) for (let u = 0; u < size.ru; u++) for (const hy of [6.35, 38.1]) {
       const cy = u * 44.45 + hy
@@ -373,3 +378,31 @@ export function plateSVG(spec: PlateSpec, o: PlateDrawOpts & { pad?: number } = 
 export const plateAspect = (spec: PlateSpec) => { const L = withLayout(spec).layout!; return L.h / L.w }
 
 export const newPlateText = (x: number, y: number, text = 'TEXT'): PlateText => ({ id: `t.${Math.random().toString(36).slice(2, 9)}`, x, y, text, size: 3.5 })
+
+// MARK: Any device face (plates, boxes, rack panels, fiber enclosures)
+
+export interface Face {
+  w: number
+  h: number
+  /** Rack-mount (19") – drawn into the rack elevation too. */
+  rack: boolean
+  inner: (o?: { labels?: boolean; bare?: boolean }) => string
+}
+
+/** The drawable front of a product, if it has one. */
+export function productFace(p: ProductDefinition): Face | null {
+  if (p.fiber) { const f = p.fiber; const s = fiberFaceSize(f); return { ...s, rack: true, inner: (o) => fiberInner(f, o) } }
+  if (p.plate) {
+    const spec = p.plate, L = withLayout(spec).layout!
+    return { w: L.w, h: L.h, rack: spec.kind === 'rackPanel', inner: (o) => plateInner(spec, { labels: o?.labels, bare: o?.bare }) }
+  }
+  return null
+}
+
+/** Stand-alone SVG of a product's face (diagram card preview). */
+export function faceSVG(p: ProductDefinition, o: { labels?: boolean; pad?: number; stretch?: boolean; bare?: boolean } = {}): string {
+  const f = productFace(p)
+  if (!f) return ''
+  const pad = o.pad ?? 2
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-pad} ${-pad} ${n(f.w + pad * 2)} ${n(f.h + pad * 2)}" preserveAspectRatio="${o.stretch ? 'none' : 'xMidYMid meet'}">${f.inner({ labels: o.labels, bare: o.bare })}</svg>`
+}

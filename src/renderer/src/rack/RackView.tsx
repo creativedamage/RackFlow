@@ -1,6 +1,7 @@
 import { deviceMenu } from '../product/productActions'
 import { showContextMenu } from '../components/ContextMenu'
 import { useMemo, useState } from 'react'
+import { faceSVG, productFace } from '@core/index'
 import { ACCESSORY_KINDS, accessoryLabel, canHaveLogo, addAccessory, addRack, fillWithBlanks, RackLayout, type AccessoryKind, type EquipmentId, type Rack, type RackAccessory, type RackFace } from '@core/index'
 import { RackPrintDialog } from './RackPrint'
 import { uploadLogo } from './AccessoryInspector'
@@ -194,6 +195,8 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
                 }
               }}
             >
+              {(() => { const eq = id ? project.equipment.find((e) => e.id === id) : undefined; const f = eq && !o.halfSlot ? productFace(eq.product) : null
+                return f?.rack ? <div className="rack-face" dangerouslySetInnerHTML={{ __html: faceSVG(eq!.product, { pad: 0, stretch: true, bare: true }) }} /> : null })()}
               <b>{o.name}</b>{id && <span className="rack-model ellipsis">{project.equipment.find((e) => e.id === id)?.product.model}</span>}
               {height > 16 && <span className="muted">{o.typicalWatts.toFixed(0)} W · {o.weightKG.toFixed(1)} kg</span>}
               {other && <span className="face-tag">{o.face}</span>}

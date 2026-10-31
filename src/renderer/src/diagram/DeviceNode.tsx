@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react'
 import { Handle, NodeToolbar, Position, type NodeProps, type Node } from '@xyflow/react'
-import { CATEGORIES, connectorName, DOMAINS, nodeGeom, plateSVG, portDomain, previewHeight, SIGNALS, SMALL_HEAD, SMALL_W, viewsOf, type EquipmentInstance, type PortTemplate } from '@core/index'
+import { CATEGORIES, connectorName, DOMAINS, nodeGeom, faceSVG, portDomain, previewHeight, SIGNALS, SMALL_HEAD, SMALL_W, viewsOf, type EquipmentInstance, type PortTemplate } from '@core/index'
 import { pickIndex, useWiring } from './wiring'
 import { setPortsInView } from '@core/index'
 import { useStore } from '../store'
@@ -32,7 +32,7 @@ export const DeviceNode = memo(function DeviceNode({ data, selected }: NodeProps
   const size = eq.nodeSize ?? 'medium'
   const viewId = useStore((st) => st.diagramView)
   const ph = previewHeight(eq)
-  const preview = useMemo(() => (eq.product.plate ? plateSVG(eq.product.plate, { labels: size !== 'small' || ph > 60 }) : ''), [eq.product.plate, size, ph])
+  const preview = useMemo(() => faceSVG(eq.product, { labels: size !== 'small' || ph > 60 }), [eq.product, size, ph])
   const geom = size === 'small' ? nodeGeom(eq) : null
 
   const state = (p: PortTemplate) => {

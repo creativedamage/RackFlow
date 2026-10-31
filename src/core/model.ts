@@ -39,7 +39,7 @@ export type EquipmentCategory =
   | 'networkSwitch' | 'controlProcessor' | 'touchPanel'
   | 'lightingConsole' | 'lightingFixture' | 'dimmer' | 'dmxNode'
   | 'intercom' | 'conferencing' | 'recorder' | 'converter'
-  | 'patchBay' | 'wallBox' | 'wallPlate' | 'floorBox' | 'connectorPanel' | 'powerSource' | 'pdu' | 'ups' | 'computer' | 'rackAccessory' | 'other'
+  | 'patchBay' | 'wallBox' | 'wallPlate' | 'floorBox' | 'connectorPanel' | 'fiberEnclosure' | 'powerSource' | 'pdu' | 'ups' | 'computer' | 'rackAccessory' | 'other'
 
 export const CATEGORIES: Record<EquipmentCategory, { name: string; tag: string }> = {
   projector: { name: 'Projector', tag: 'PJ' },
@@ -76,6 +76,7 @@ export const CATEGORIES: Record<EquipmentCategory, { name: string; tag: string }
   wallBox: { name: 'Wall Box', tag: 'WB' },
   floorBox: { name: 'Floor Box / Stage Pocket', tag: 'FB' },
   connectorPanel: { name: 'Connector Panel (rack)', tag: 'CNP' },
+  fiberEnclosure: { name: 'Fiber Enclosure', tag: 'FIB' },
   powerSource: { name: 'Building Power', tag: 'PWR' },
   pdu: { name: 'PDU', tag: 'PDU' },
   ups: { name: 'UPS', tag: 'UPS' },
@@ -133,6 +134,8 @@ export interface ProductDefinition {
   supply?: PowerSupply
   /** Wall plates / floor boxes: the layout they were built from (re-opened by the plate builder). */
   plate?: PlateSpec
+  /** Modular fiber enclosure (slots, cassettes / panels, engravings). */
+  fiber?: import('./fiber').FiberSpec
 }
 
 export type PlateKind = 'wallBox' | 'wallPlate' | 'floorBox' | 'rackPanel'

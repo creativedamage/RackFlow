@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AccessoryKind, EquipmentId, EquipmentInstance, PatchBayTemplate } from '@core/index'
 import {
-  BUILT_IN_KEYS, viewMembers, viewsOf, makePlateProduct, newPlateSpec, CATEGORIES, CATEGORY_KEYS, DOMAINS, FORMATS, addRack, groupsOf, newCustomProduct, newCustomTemplate, productDomains, templateName, totalChannels,
+  BUILT_IN_KEYS, viewMembers, viewsOf, makeFiberProduct, newFiberSpec, makePlateProduct, newPlateSpec, CATEGORIES, CATEGORY_KEYS, DOMAINS, FORMATS, addRack, groupsOf, newCustomProduct, newCustomTemplate, productDomains, templateName, totalChannels,
   type EquipmentCategory, type PlateKind, type ProductDefinition, type SignalDomain, panelDescription } from '@core/index'
 import { useStore } from '../store'
 import { addBayToProject } from '../patch/addBay'
@@ -20,10 +20,10 @@ const SHOW: { value: Show; label: string }[] = [
   { value: 'devices', label: 'All devices' },
   { value: 'project', label: 'In this project' },
   { value: 'patch', label: 'Patch bays & panels' },
-  { value: 'plates', label: 'Wall plates, boxes & panels' },
+  { value: 'plates', label: 'Wall boxes, plates, panels & fiber' },
   { value: 'mine', label: '★ My custom & edited' },
 ]
-const PLATE_CATS = new Set<EquipmentCategory>(['wallBox', 'wallPlate', 'floorBox', 'connectorPanel'])
+const PLATE_CATS = new Set<EquipmentCategory>(['wallBox', 'wallPlate', 'floorBox', 'connectorPanel', 'fiberEnclosure'])
 const PAGE = 120
 
 const primaryColor = (p: ProductDefinition) => { const d = [...productDomains(p)][0]; return d ? DOMAINS[d].color : '#9aa0a6' }
@@ -110,6 +110,7 @@ export function Sidebar() {
     { label: 'Wall Plate (gang)…', onClick: () => plate('wallPlate', 'Wall Plate') },
     { label: 'Floor Box / Stage Pocket…', onClick: () => plate('floorBox', 'Floor Box') },
     { label: 'Rack Connector Panel…', onClick: () => plate('rackPanel', 'Connector Panel') },
+    { label: 'Fiber Enclosure (modular)…', hint: 'cassettes + engraving', onClick: () => useStore.getState().set({ editingPlate: { product: makeFiberProduct(newFiberSpec('fhd-1u'), { model: '' }), instanceId: null } }) },
     'sep',
     { label: 'Patch Bay Template…', onClick: () => set({ editingTemplate: newCustomTemplate() }) },
     { label: 'LED Wall…', onClick: () => set({ mode: 'led', ledPicking: true }) },

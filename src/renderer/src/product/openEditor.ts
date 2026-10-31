@@ -16,7 +16,7 @@ export function openProductEditor(p: ProductDefinition, instanceId: string | nul
     s.notify('Add it from the Patch Bays tab, then use Layout… on the bay to change rows, termination or category', { kind: 'info' })
     return
   }
-  s.set(p.plate
+  s.set(p.plate || p.fiber
     ? { editingPlate: { product: structuredClone(p), instanceId }, editingProduct: null, editingInstance: null }
     : { editingProduct: structuredClone(p), editingInstance: instanceId, editingPlate: null })
 }

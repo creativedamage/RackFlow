@@ -2,6 +2,7 @@
 // built from standard inserts. Each insert gives a front jack (what you plug into
 // in the room) and a rear termination (the tie line back to the rack).
 
+import { makeFiberProduct } from './fiber'
 import { newId, type PlateInsert, type PlateKind, type PlateSpec, type PortTemplate, type ProductDefinition } from './model'
 import type { ConnectorType, Gender, SignalType } from './signals'
 
@@ -132,6 +133,9 @@ export const newPlateSpec = (kind: PlateKind = 'wallPlate'): PlateSpec => kind =
 
 /** Built-in starting points (generic). */
 export const PLATE_PRODUCTS: ProductDefinition[] = [
+  { ...makeFiberProduct({ enclosure: 'fhd-1u', fiberType: 'OS2', slots: [{ module: 'mtp12-6lc' }, { module: 'mtp12-6lc' }, { module: null }, { module: null }] }, { key: 'fs.fhd.1u.2x12.os2', manufacturer: 'FS.com', model: 'FHD 1U enclosure, 2× MTP-12 → 6× LC cassettes (24F OS2)' }), source: 'builtIn', verified: false },
+  { ...makeFiberProduct({ enclosure: 'fhd-1u', fiberType: 'OM4', slots: [{ module: 'mtp12-6lc' }, { module: 'mtp12-6lc' }, { module: null }, { module: null }] }, { key: 'fs.fhd.1u.2x12.om4', manufacturer: 'FS.com', model: 'FHD 1U enclosure, 2× MTP-12 → 6× LC cassettes (24F OM4)' }), source: 'builtIn', verified: false },
+  { ...makeFiberProduct({ enclosure: 'fhd-1u', fiberType: 'OS2', slots: [{ module: 'lc12' }, { module: 'lc12' }, { module: 'lc12' }, { module: 'lc12' }] }, { key: 'fs.fhd.1u.4x12lc.os2', manufacturer: 'FS.com', model: 'FHD 1U enclosure, 4× 12-LC adapter panels (96F OS2)' }), source: 'builtIn', verified: false },
   { ...makePlateProduct({ kind: 'wallPlate', style: '1-Gang', inserts: [{ module: 'hdmi', count: 1, rear: 'same' }, { module: 'usbc', count: 1, rear: 'same' }, { module: 'rj45', count: 1, rear: 'idcPunchdown' }] },
     { key: 'generic.plate.av1', manufacturer: 'Generic', model: 'AV Wall Plate: HDMI + USB-C + RJ45' }), source: 'builtIn' },
   { ...makePlateProduct({ kind: 'wallPlate', style: '2-Gang', inserts: [{ module: 'xlrF', count: 4, rear: 'idcPunchdown' }] },
