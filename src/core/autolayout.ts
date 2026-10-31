@@ -306,9 +306,10 @@ export function planChannels(wires: ChannelWire[], gap = 18, spacing = 7): Map<s
  * in rings, trying right / below first.
  */
 export function freeSpot(p: Project, size: { width: number; height: number }, preferred: CanvasPoint,
-  geom: (eq: EquipmentInstance) => NodeGeom, opts: { ignore?: string; margin?: number; grid?: number } = {}): CanvasPoint {
+  geom: (eq: EquipmentInstance) => NodeGeom, opts: { ignore?: string | string[]; margin?: number; grid?: number; among?: (e: EquipmentInstance) => boolean } = {}): CanvasPoint {
   const margin = opts.margin ?? 60, grid = opts.grid ?? 20
-  const boxes = p.equipment.filter((e) => e.id !== opts.ignore).map((e) => {
+  const ignore = new Set(Array.isArray(opts.ignore) ? opts.ignore : opts.ignore ? [opts.ignore] : [])
+  const boxes = p.equipment.filter((e) => !ignore.has(e.id) && (!opts.among || opts.among(e))).map((e) => {
     const g = geom(e)
     return { x0: e.position.x - margin, y0: e.position.y - margin - 30, x1: e.position.x + g.width + margin, y1: e.position.y + g.height + margin }
   })
@@ -335,5 +336,30 @@ export function freeSpot(p: Project, size: { width: number; height: number }, pr
 export function placeInFreeSpace(p: Project, eqId: string, geom: (eq: EquipmentInstance) => NodeGeom, preferred?: CanvasPoint) {
   const eq = p.equipment.find((e) => e.id === eqId)
   if (!eq) return
-  eq.position = freeSpot(p, geom(eq), preferred ?? eq.position, geom, { ignore: eqId })
+  // Only devices on the same page can overlap it on screen / on its sheet.
+  eq.position = freeSpot(p, geom(eq), preferred ?? eq.position, geom, { ignore: eqId, among: (e) => (e.groupId ?? null) === (eq.groupId ?? null) || !eq.groupId })
+}
+
+/**
+ * Moves devices to another page (null = off every page), keeping their layout
+ * relative to each other and dropping the block into open space on that page.
+ * Wires to devices left behind become off-page flags automatically.
+ */
+export function moveToPage(p: Project, ids: string[], pageId: string | null, geom: (eq: EquipmentInstance) => NodeGeom) {
+  const moving = p.equipment.filter((e) => ids.includes(e.id))
+  if (!moving.length) return 0
+  if (pageId && !(p.groups ?? []).some((g) => g.id === pageId)) return 0
+  for (const e of moving) { if (pageId) e.groupId = pageId; else delete e.groupId }
+  // Bounding box of the moved block.
+  const x0 = Math.min(...moving.map((e) => e.position.x)), y0 = Math.min(...moving.map((e) => e.position.y))
+  const x1 = Math.max(...moving.map((e) => e.position.x + geom(e).width)), y1 = Math.max(...moving.map((e) => e.position.y + geom(e).height))
+  const others = p.equipment.filter((e) => !ids.includes(e.id) && (pageId ? e.groupId === pageId : !e.groupId))
+  // Prefer to the right of what's already on the page, top-aligned; else keep the spot.
+  const preferred = others.length
+    ? { x: Math.max(...others.map((e) => e.position.x + geom(e).width)) + 300, y: Math.min(...others.map((e) => e.position.y)) }
+    : { x: x0, y: y0 }
+  // Wide margin: wires to other pages end in flags beside the ports.
+  const at = freeSpot(p, { width: x1 - x0, height: y1 - y0 }, preferred, geom, { ignore: ids, among: (e) => others.includes(e), margin: 150 })
+  for (const e of moving) e.position = { x: Math.round(e.position.x - x0 + at.x), y: Math.round(e.position.y - y0 + at.y) }
+  return moving.length
 }

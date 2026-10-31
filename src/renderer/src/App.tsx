@@ -1,3 +1,4 @@
+import { ExportAllDialog } from './print/ExportAllDialog'
 import { PanelResizer, usePanelWidth } from './components/PanelResizer'
 import { tidyDiagram } from './diagram/tidy'
 import { DeviceFinder } from './product/DeviceFinder'
@@ -17,6 +18,7 @@ import { TemplatesPanel } from './patch/TemplatesPanel'
 import { PlateBuilder } from './product/PlateBuilder'
 import { Toasts } from './components/Toasts'
 import { ScheduleView } from './sheet/ScheduleView'
+import { LedView } from './led/LedView'
 import { usePatchUI } from './patch/patchState'
 import { Inspector } from './inspector/Inspector'
 import { ProductEditor } from './product/ProductEditor'
@@ -48,6 +50,7 @@ export function App() {
   const editingPlate = useStore((s) => s.editingPlate)
   const editingProduct = useStore((s) => s.editingProduct)
   const finding = useStore((s) => s.finding)
+  const exportingAll = useStore((s) => s.exportingAll)
   const editingTemplate = useStore((s) => s.editingTemplate)
   const title = useStore((s) => s.project.info.name)
   const dirty = useStore((s) => s.dirty)
@@ -91,11 +94,13 @@ export function App() {
       case 'mode:rack': s.set({ mode: 'rack' }); break
       case 'mode:patch': s.set({ mode: 'patch' }); break
       case 'mode:sheet': s.set({ mode: 'sheet' }); break
+      case 'mode:led': s.set({ mode: 'led' }); break
       case 'zoomFit': s.set({ mode: 'diagram', fitRequest: s.fitRequest + 1 }); break
       case 'toggleInspector': s.set({ showInspector: !s.showInspector }); break
       case 'newProduct': s.set({ editingProduct: newCustomProduct() }); break
       case 'editDevice': editSelection(); break
       case 'tidy': s.set({ mode: 'diagram' }); setTimeout(() => { const n = tidyDiagram({ selectionOnly: s.selection.length > 1 }); if (n) useStore.getState().notify(`Tidied ${n} devices`, { undo: true, kind: 'success' }) }, 0); break
+      case 'exportAll': s.set({ exportingAll: true }); break
       case 'findDevice': s.set({ finding: { query: '' } }); break
       case 'newTemplate': s.set({ editingTemplate: newCustomTemplate() }); break
     }
@@ -107,7 +112,7 @@ export function App() {
 
   // The right panel shows only when there's something to inspect (design checks live in the ⚠︎ notifications).
   const hasSubject = useStore((s) => s.selection.length > 0 || !!s.selectedCable || (s.mode === 'rack' && (!!s.selectedRack || !!s.selectedAccessory)))
-  const rightPanel = showInspector && mode !== 'sheet' && (mode === 'patch' || hasSubject)
+  const rightPanel = showInspector && mode !== 'sheet' && mode !== 'led' && (mode === 'patch' || hasSubject)
   const inspW = usePanelWidth('insp')
   const tpW = usePanelWidth('tp')
 
@@ -115,12 +120,13 @@ export function App() {
     <ReactFlowProvider>
       <div className={`app ${isMac ? 'mac' : ''} ${rightPanel ? '' : 'no-inspector'} mode-${mode}`} style={{ ['--insp-w' as string]: `${inspW}px`, ['--tp-w' as string]: `${tpW}px` }}>
         <Toolbar />
-        {mode !== 'sheet' && <Sidebar />}
+        {mode !== 'sheet' && mode !== 'led' && <Sidebar />}
         <main className="canvas-area">
           {mode === 'diagram' && <DiagramView />}
           {mode === 'rack' && <RackView />}
           {mode === 'patch' && <PatchEditor />}
           {mode === 'sheet' && <ScheduleView />}
+          {mode === 'led' && <LedView />}
         </main>
         {rightPanel && (mode === 'patch' ? <TemplatesPanel /> : <Inspector />)}
         {rightPanel && <PanelResizer which={mode === 'patch' ? 'tp' : 'insp'} />}
@@ -128,6 +134,7 @@ export function App() {
         {editingPlate && <PlateBuilder key={editingPlate.product.key + (editingPlate.instanceId ?? '')} initial={editingPlate.product} instanceId={editingPlate.instanceId} />}
         {editingTemplate && <TemplateEditor key={editingTemplate.key} initial={editingTemplate} />}
         {finding && <DeviceFinder initialQuery={finding.query} />}
+        {exportingAll && <ExportAllDialog onClose={() => useStore.getState().set({ exportingAll: false })} />}
         <Toasts />
         <ContextMenu />
       </div>

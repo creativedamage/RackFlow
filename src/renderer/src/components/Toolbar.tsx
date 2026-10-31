@@ -42,6 +42,7 @@ export function Toolbar() {
           { value: 'rack', label: 'Rack Elevation', title: '⌘2' },
           { value: 'patch', label: 'Patch Labels', title: '⌘3' },
           { value: 'sheet', label: 'Schedule', title: '⌘4 · spreadsheet of every cable and device' },
+          { value: 'led', label: 'LED Walls', title: '⌘5 · LED wall data & power mapping' },
         ]}
       />
 

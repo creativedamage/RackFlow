@@ -1,0 +1,68 @@
+// "Export Everything": every drawing and schedule in one go.
+
+import type { Project } from './model'
+import { schematicSheets, defaultSchematic } from './drawing/schematic'
+import { rackElevationSheets, defaultRackPrint } from './drawing/rackprint'
+import { ledSheets, defaultLedPrint } from './drawing/ledmap'
+import { sheetsToHTML, sheetSize } from './drawing/sheet'
+import { defaultPrintOptions, layoutLabels, pagesToPrintHTML } from './patchbay/layout'
+import { cablesToCSV } from './schedule'
+import { networkRows, rowSwitch, rowSwitchPort } from './network'
+import { CATEGORIES } from './model'
+
+export type ExportPart = 'wiring' | 'racks' | 'labels' | 'led' | 'cables' | 'equipment' | 'network'
+export const EXPORT_PARTS: { key: ExportPart; name: string; file: string }[] = [
+  { key: 'wiring', name: 'Wiring diagram (every page)', file: 'Wiring Diagram.pdf' },
+  { key: 'racks', name: 'Rack elevations (front & rear)', file: 'Rack Elevations.pdf' },
+  { key: 'labels', name: 'Patch bay labels', file: 'Patch Labels.pdf' },
+  { key: 'led', name: 'LED wall maps (data & power)', file: 'LED Wall Maps.pdf' },
+  { key: 'cables', name: 'Cable schedule (CSV)', file: 'Cable Schedule.csv' },
+  { key: 'equipment', name: 'Equipment list (CSV)', file: 'Equipment List.csv' },
+  { key: 'network', name: 'Network / IP schedule (CSV)', file: 'Network Schedule.csv' },
+]
+
+export interface ExportFile { name: string; kind: 'pdf' | 'text'; content: string; count: number }
+
+const csv = (rows: string[][]) => rows.map((r) => r.map((v) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)).join(',')).join('\n')
+
+/** Builds every requested file (PDFs as print-ready HTML, schedules as CSV). Parts with nothing in them are skipped. */
+export function buildExport(p: Project, parts: ExportPart[], sheet = 'ansiB'): ExportFile[] {
+  const out: ExportFile[] = []
+  const name = (k: ExportPart) => EXPORT_PARTS.find((x) => x.key === k)!.file
+  if (parts.includes('wiring') && p.equipment.length) {
+    const o = { ...defaultSchematic(p), sheet: sheet === 'ansiB' ? 'archD' : sheet, split: p.groups?.length ? 'group' as const : 'none' as const }
+    const pages = schematicSheets(p, o)
+    if (pages.length) out.push({ name: name('wiring'), kind: 'pdf', content: sheetsToHTML(pages, sheetSize(o)), count: pages.length })
+  }
+  if (parts.includes('racks') && p.racks.length) {
+    const o = { ...defaultRackPrint(), sheet, face: 'both' as const }
+    const pages = rackElevationSheets(p, o)
+    if (pages.length) out.push({ name: name('racks'), kind: 'pdf', content: sheetsToHTML(pages, sheetSize(o)), count: pages.length })
+  }
+  if (parts.includes('labels') && p.patchBays.length) {
+    const pages = layoutLabels(p.patchBays, defaultPrintOptions())
+    if (pages.length) out.push({ name: name('labels'), kind: 'pdf', content: pagesToPrintHTML(pages), count: pages.length })
+  }
+  if (parts.includes('led') && p.ledWalls?.length) {
+    const o = { ...defaultLedPrint(), sheet }
+    const pages = ledSheets(p, o)
+    if (pages.length) out.push({ name: name('led'), kind: 'pdf', content: sheetsToHTML(pages, sheetSize(o)), count: pages.length })
+  }
+  if (parts.includes('cables') && p.cables.length) out.push({ name: name('cables'), kind: 'text', content: cablesToCSV(p), count: p.cables.length })
+  if (parts.includes('equipment') && p.equipment.length) {
+    const page = (id?: string) => p.groups?.find((g) => g.id === id)?.name ?? ''
+    out.push({ name: name('equipment'), kind: 'text', count: p.equipment.length, content: csv([
+      ['Tag', 'Manufacturer', 'Model', 'Category', 'Room', 'Page', 'Rack', 'U', 'Max W', 'Notes'],
+      ...p.equipment.map((e) => [e.tag, e.product.manufacturer, e.product.model, CATEGORIES[e.product.category].name, e.room, page(e.groupId),
+        p.racks.find((r) => r.id === e.rackPlacement?.rack)?.name ?? '', e.rackPlacement ? String(e.rackPlacement.startUnit) : '', String(e.product.power.maxWatts), e.notes]),
+    ]) })
+  }
+  if (parts.includes('network')) {
+    const rows = networkRows(p)
+    if (rows.length) out.push({ name: name('network'), kind: 'text', count: rows.length, content: csv([
+      ['IP Address', 'Device ID', 'Interface', 'Manufacturer', 'Model', 'Location', 'Switch', 'Switch Port', 'VLAN', 'Notes'],
+      ...rows.map((r) => [r.info.ip ?? '', r.eq.tag, r.interface, r.eq.product.manufacturer, r.eq.product.model, r.eq.room, r.isSwitch ? '' : rowSwitch(r), r.isSwitch ? '' : rowSwitchPort(r), r.info.vlan ?? '', r.info.notes ?? '']),
+    ]) })
+  }
+  return out
+}

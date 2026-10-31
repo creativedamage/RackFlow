@@ -310,6 +310,10 @@ export interface Project {
   annotations?: Annotation[]
   /** Revision history (newest last), printed in the revision block. */
   revisions?: Revision[]
+  /** LED walls (panel grid + data / power mapping). */
+  ledWalls?: import('./led').LedWall[]
+  /** Custom LED panels made in this project. */
+  ledPanels?: import('./led').LedPanel[]
 }
 
 // --- Patch bays (types here to keep the document schema in one file) ---

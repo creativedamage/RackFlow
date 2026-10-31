@@ -27,6 +27,21 @@ mac:
     - ext: rackflow
       name: RackFlow Project
       role: Editor
+  # Declares the .rackflow type so macOS lists projects in Open Recent / Dock.
+  extendInfo:
+    UTExportedTypeDeclarations:
+      - UTTypeIdentifier: com.rackflow.project
+        UTTypeDescription: RackFlow Project
+        UTTypeConformsTo: [public.json, public.data]
+        UTTypeTagSpecification:
+          public.filename-extension: [rackflow]
+    CFBundleDocumentTypes:
+      - CFBundleTypeName: RackFlow Project
+        CFBundleTypeRole: Editor
+        LSHandlerRank: Owner
+        LSItemContentTypes: [com.rackflow.project]
+        CFBundleTypeExtensions: [rackflow]
+        CFBundleTypeIconFile: icon.icns
 dmg:
   artifactName: "RackFlow-${version}-${arch}.dmg"
   title: "RackFlow ${version}"

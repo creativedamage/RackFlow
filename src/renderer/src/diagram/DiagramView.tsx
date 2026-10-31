@@ -17,7 +17,7 @@ import { pickIndex } from './wiring'
 import { DeviceNode, headerHeight, NODE_WIDTH, ROW_H, splitPorts, type DeviceNodeType } from './DeviceNode'
 import { GroupFrame, type GroupFrameType } from './GroupFrame'
 import { CableEdge, type CableEdgeType } from './CableEdge'
-import { GroupsPanel, PageTabs, useGroupFocus } from './GroupsPanel'
+import { GroupsPanel, PageTabs, moveDevicesToPage, pageMenuItems, useGroupFocus } from './GroupsPanel'
 import { NoteNode, type NoteNodeType } from './NoteNode'
 import { useWiring } from './wiring'
 import { tidyDiagram } from './tidy'
@@ -32,6 +32,8 @@ type AnyNode = DeviceNodeType | GroupFrameType | NoteNodeType
 const FRAME_PAD = 22, FRAME_LABEL = 26
 const nodeH = (n: DeviceNodeType) => n.measured?.height ?? headerHeight(n.data.eq) + Math.max(...Object.values(splitPorts(n.data.eq)).map((x) => x.length), 1) * ROW_H + 8
 const GRID = 8
+
+const pointOf = (e: MouseEvent | TouchEvent | React.MouseEvent) => ('touches' in e ? { x: (e.changedTouches[0] ?? e.touches[0])?.clientX ?? 0, y: (e.changedTouches[0] ?? e.touches[0])?.clientY ?? 0 } : { x: e.clientX, y: e.clientY })
 
 export function DiagramView() {
   const project = useStore((s) => s.project)
@@ -170,6 +172,12 @@ export function DiagramView() {
   }, [project, cableSeverity, selectedCable, selection, select, wireMode])
 
   useEffect(() => { if (fitRequest) void fitView({ padding: 0.15, duration: 250 }) }, [fitRequest, fitView])
+  // Library ▸ Inventory → frame one device (after any page switch has rendered).
+  useEffect(() => {
+    const on = (e: Event) => { const id = (e as CustomEvent<string>).detail; setTimeout(() => void fitView({ nodes: [{ id }], padding: 1.2, maxZoom: 1.2, duration: 300 }), 120) }
+    window.addEventListener('diagram:locate', on)
+    return () => window.removeEventListener('diagram:locate', on)
+  }, [fitView])
   // Switching page frames what's on it.
   useEffect(() => { const t = setTimeout(() => void fitView({ padding: 0.15, duration: 250 }), 60); return () => clearTimeout(t) }, [page, fitView])
 
@@ -204,7 +212,20 @@ export function DiagramView() {
     if (picked && 'id' in picked) select([], picked.id as CableId)
   }, [select])
 
-  const onNodeDragStop = useCallback((_: unknown, __: unknown, draggedAll: AnyNode[]) => {
+  const onNodeDragStop = useCallback((ev: MouseEvent | TouchEvent | React.MouseEvent, __: unknown, draggedAll: AnyNode[]) => {
+    // Dropped on a page tab → move those devices to that page.
+    const pt = pointOf(ev)
+    const tab = (document.elementsFromPoint(pt.x, pt.y).find((el) => el instanceof HTMLElement && el.dataset.page !== undefined) as HTMLElement | undefined)
+    const devs = draggedAll.filter((n) => n.type === 'device').map((n) => n.id)
+    document.querySelectorAll('.page-tabs .drop').forEach((el) => el.classList.remove('drop'))
+    if (tab && devs.length) {
+      const target = tab.dataset.page || null
+      const s = useStore.getState()
+      // Undo the visual drag first (positions weren't committed), then move.
+      s.set({ project: { ...s.project, equipment: [...s.project.equipment] } })
+      if (target || s.project.equipment.some((e) => devs.includes(e.id) && e.groupId)) moveDevicesToPage(devs, target)
+      return
+    }
     const groupIds = new Set(draggedAll.filter((n) => n.type === 'groupFrame').map((n) => (n as GroupFrameType).data.id))
     const movedNotes = draggedAll.filter((n) => n.type === 'note')
     if (movedNotes.length) {
@@ -311,7 +332,7 @@ export function DiagramView() {
 
   return (
     <div className="diagram-wrap">
-    {(project.groups?.length ?? 0) > 0 && <PageTabs />}
+    <PageTabs />
     <div className="diagram" onDragOver={(e) => { if (e.dataTransfer.types.includes(DRAG_MIME)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' } }} onDrop={onDrop}>
       <ReactFlow<AnyNode, CableEdgeType>
         nodes={allNodes}
@@ -321,13 +342,24 @@ export function DiagramView() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeDragStop={onNodeDragStop}
+        onNodeDrag={(ev) => {
+          const pt = pointOf(ev)
+          const over = document.elementsFromPoint(pt.x, pt.y).find((el) => el instanceof HTMLElement && el.dataset.page !== undefined)
+          document.querySelectorAll('.page-tabs [data-page]').forEach((el) => el.classList.toggle('drop', el === over))
+        }}
         onDelete={onDelete}
         onNodeDoubleClick={(ev, n) => {
           if (n.type === 'groupFrame') { select(project.equipment.filter((e) => e.groupId === (n as GroupFrameType).data.id).map((e) => e.id)); return }
           if ((ev.target as HTMLElement).closest('.react-flow__handle')) return
           select([n.id as EquipmentId]); editPlacedDevice(n.id)
         }}
-        onNodeContextMenu={(ev, n) => { if (n.type !== 'device') return; select([n.id as EquipmentId]); showContextMenu(ev, deviceMenu(n.id)) }}
+        onNodeContextMenu={(ev, n) => {
+          if (n.type !== 'device') return
+          const cur = useStore.getState().selection
+          const ids = cur.includes(n.id as EquipmentId) ? cur : [n.id as EquipmentId]
+          if (ids !== cur) select(ids)
+          showContextMenu(ev, [...deviceMenu(n.id), ...pageMenuItems(ids)])
+        }}
         onConnectStart={onConnectStart}
         onConnectEnd={endWiring}
         onConnect={onConnect}

@@ -67,6 +67,7 @@ const browserShim: RackflowAPI = {
   openReleasePage: async (url) => { window.open(url ?? 'https://github.com/creativedamage/RackFlow/releases/latest', '_blank') },
   onUpdateStatus: () => () => {},
   fetchSpecPage: async () => { throw new Error('The browser preview can’t fetch pages – paste the specs instead.') },
+  exportAll: async (files) => { for (const f of files) download(f.kind === 'pdf' ? f.name.replace(/\.pdf$/, '.html') : f.name, f.content, f.kind === 'pdf' ? 'text/html' : 'text/csv'); return 'Downloads' },
   askSaveChanges: async (name) => (confirm(`Save changes to “${name}” first?\n\nOK = Save · Cancel = choose whether to discard`) ? 'save' : confirm('Discard your changes and continue?') ? 'discard' : 'cancel'),
   aiStatus: async () => ({ hasKey: false, model: 'claude-sonnet-4-5', canEncrypt: false }),
   aiSettings: async () => { throw new Error('AI lookup needs the Mac app.') },
@@ -85,7 +86,7 @@ if (!isElectron) {
     const mod = e.metaKey || e.ctrlKey
     if (!mod) return
     const k = e.key.toLowerCase()
-    const map: Record<string, MenuCommand> = { n: 'new', o: 'open', s: e.shiftKey ? 'saveAs' : 'save', z: e.shiftKey ? 'redo' : 'undo', y: 'redo', 1: 'mode:diagram', 2: 'mode:rack', 3: 'mode:patch', 4: 'mode:sheet', 0: 'zoomFit', e: 'editDevice', ...(e.shiftKey ? { f: 'findDevice' as MenuCommand } : {}), ...(e.altKey ? { l: 'tidy' as MenuCommand, '¬': 'tidy' as MenuCommand } : {}) }
+    const map: Record<string, MenuCommand> = { n: 'new', o: 'open', s: e.shiftKey ? 'saveAs' : 'save', z: e.shiftKey ? 'redo' : 'undo', y: 'redo', 1: 'mode:diagram', 2: 'mode:rack', 3: 'mode:patch', 4: 'mode:sheet', 5: 'mode:led', 0: 'zoomFit', e: e.shiftKey ? 'exportAll' : 'editDevice', ...(e.shiftKey ? { f: 'findDevice' as MenuCommand } : {}), ...(e.altKey ? { l: 'tidy' as MenuCommand, '¬': 'tidy' as MenuCommand } : {}) }
     const cmd = map[k]
     if (!cmd) return
     e.preventDefault()

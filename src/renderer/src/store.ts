@@ -11,7 +11,7 @@ import {
 } from '@core/index'
 import { api } from './platform'
 
-export type Mode = 'diagram' | 'rack' | 'patch' | 'sheet'
+export type Mode = 'diagram' | 'rack' | 'patch' | 'sheet' | 'led'
 
 interface HistoryEntry { project: Project; label: string }
 
@@ -41,6 +41,9 @@ export interface AppState {
   selectedAccessory: { rack: string; id: string } | null
   /** Wiring diagram page shown (group id); null = all pages. */
   diagramPage: string | null
+  exportingAll: boolean
+  selectedLedWall: string | null
+  ledPicking: boolean
   showInspector: boolean
   issues: ValidationIssue[]
   /** Bumped to ask the diagram to fit view. */
@@ -100,6 +103,9 @@ export const useStore = create<AppState>((set, get) => ({
   selectedBay: null,
   selectedAccessory: null,
   diagramPage: null,
+  exportingAll: false,
+  selectedLedWall: null,
+  ledPicking: false,
   showInspector: true,
   issues: [],
   fitRequest: 0,

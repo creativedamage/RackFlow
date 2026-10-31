@@ -39,6 +39,7 @@ const api: RackflowAPI = {
   aiSettings: (patch) => ipcRenderer.invoke('ai:settings', patch),
   aiLookup: (req) => ipcRenderer.invoke('ai:lookup', req),
 
+  exportAll: (files, folder) => ipcRenderer.invoke('export:all', files, folder),
   askSaveChanges: (name) => ipcRenderer.invoke('dialog:saveChanges', name),
 
   onMenu: (cb) => on<MenuCommand>('menu', cb),

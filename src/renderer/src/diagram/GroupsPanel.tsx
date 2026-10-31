@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Panel } from '@xyflow/react'
 import { create } from 'zustand'
-import { autoGroupBySystem, createGroup, DOMAINS, groupColor, groupsOf, membersOf, ungroup, type DeviceGroup, type SignalDomain } from '@core/index'
+import { autoGroupBySystem, createGroup, DOMAINS, groupColor, groupsOf, membersOf, moveToPage, nodeGeom, ungroup, type DeviceGroup, type SignalDomain } from '@core/index'
+import type { MenuItem } from '../components/ContextMenu'
 import { useStore } from '../store'
 
 /** Which group (if any) is spotlighted; everything else dims. */
@@ -22,6 +23,37 @@ export function groupSelection(name?: string, system?: DeviceGroup['system']) {
   if (g) s.notify(`Moved ${ids.length} device${ids.length === 1 ? '' : 's'} to page “${g.name}”`, { undo: true })
 }
 
+/** Moves devices to a page (null = off all pages); the block lands in open space there. */
+export function moveDevicesToPage(ids: string[], pageId: string | null | 'new') {
+  const s = useStore.getState()
+  if (!ids.length) return
+  let name = 'no page', target: string | null = null
+  s.apply(pageId === null ? 'Remove from Page' : 'Move to Page', (d) => {
+    if (pageId === 'new') { const g = createGroup(d, [], { name: nextPageName(d.groups ?? []) }); target = g.id; name = g.name }
+    else { target = pageId; name = groupsOf(d).find((g) => g.id === pageId)?.name ?? name }
+    moveToPage(d, ids, target, nodeGeom)
+  })
+  const st = useStore.getState()
+  const cross = st.project.cables.filter((c) => (ids.includes(c.from.equipment) !== ids.includes(c.to.equipment))).length
+  st.notify(`Moved ${ids.length} device${ids.length === 1 ? '' : 's'} to ${target ? `“${name}”` : 'no page'}${cross ? ` – ${cross} wire${cross === 1 ? '' : 's'} to other pages show as off-page flags` : ''}`, { undo: true, kind: 'success' })
+  // Follow the devices if we're looking at a single page.
+  if (st.diagramPage && st.diagramPage !== target) st.set({ diagramPage: target })
+}
+
+/** "Move to Page" items for a device context menu. */
+export function pageMenuItems(ids: string[]): MenuItem[] {
+  const s = useStore.getState()
+  const pages = groupsOf(s.project)
+  const current = new Set(s.project.equipment.filter((e) => ids.includes(e.id)).map((e) => e.groupId ?? null))
+  const n = ids.length > 1 ? ` (${ids.length})` : ''
+  return [
+    'sep',
+    ...pages.filter((g) => !(current.size === 1 && current.has(g.id))).map((g): MenuItem => ({ label: `Move${n} to Page ▸ ${g.name}`, onClick: () => moveDevicesToPage(ids, g.id) })),
+    { label: `Move${n} to New Page`, onClick: () => moveDevicesToPage(ids, 'new') },
+    ...(pages.length && [...current].some(Boolean) ? [{ label: `Remove${n} from Page`, onClick: () => moveDevicesToPage(ids, null) } as MenuItem] : []),
+  ]
+}
+
 const nextPageName = (gs: DeviceGroup[]) => { let n = gs.length + 1; while (gs.some((g) => g.name === `Page ${n}`)) n++; return `Page ${n}` }
 
 /** Top tab bar: All pages · each page · + New Page. Anything in a page group is its own page. */
@@ -36,18 +68,24 @@ export function PageTabs() {
   const unassigned = counts.filter((e) => !e.groupId || !list.some((g) => g.id === e.groupId)).length
   return (
     <div className="page-tabs" role="tablist">
-      <button className={page === null ? 'on' : ''} onClick={() => set({ diagramPage: null })} title="Show every page together">All pages <span>{n(null)}</span></button>
+      <button data-page="" className={page === null ? 'on' : ''} onClick={() => set({ diagramPage: null })} title="Show every page together">All pages <span>{n(null)}</span></button>
       {list.map((g) => (
-        <button key={g.id} className={page === g.id ? 'on' : ''} onClick={() => set({ diagramPage: g.id })} title={`Show only “${g.name}”. Wires to other pages show as labelled flags.`}>
+        <button key={g.id} data-page={g.id} className={page === g.id ? 'on' : ''} onClick={() => set({ diagramPage: g.id })} title={`Show only “${g.name}”. Drop devices here to move them to this page.`}>
           <i style={{ background: groupColor(g) }} />{g.name} <span>{n(g.id)}</span>
         </button>
       ))}
       {list.length > 0 && unassigned > 0 && <span className="muted small pt-hint">{unassigned} not on a page</span>}
+      {list.length === 0 && <span className="muted small pt-hint">Split a big diagram into sheets – ＋ Page, then drag devices onto a tab</span>}
       <button className="pt-add" onClick={() => {
         const s = useStore.getState()
         if (s.selection.length) { groupSelection(); return }
         let g: DeviceGroup | undefined
-        s.apply('New Page', (d) => { g = createGroup(d, [], { name: nextPageName(d.groups ?? []) }) })
+        s.apply('New Page', (d) => {
+          // The first page takes everything that's already drawn, so nothing goes missing.
+          const first = !(d.groups ?? []).length && d.equipment.length
+          g = createGroup(d, [], { name: first ? 'Page 1' : nextPageName(d.groups ?? []) })
+          if (first) { for (const e of d.equipment) e.groupId = g.id; g = createGroup(d, [], { name: 'Page 2' }) }
+        })
         if (g) { s.set({ diagramPage: g!.id }); s.notify(`New page “${g!.name}” – anything you add now goes on it`, { kind: 'success' }) }
       }} title="New page (from the selected devices, or empty)">＋ Page</button>
     </div>

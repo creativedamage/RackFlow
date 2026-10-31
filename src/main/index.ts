@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type MenuItemConstructorOptions } from 'electron'
 import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join } from 'node:path'
 import type { MenuCommand, OpenedFile } from '../preload/api'
@@ -79,12 +80,35 @@ function createWindow() {
 
 const send = (cmd: MenuCommand) => win?.webContents.send('menu', cmd)
 
+// MARK: Recent projects – our own list, so Open Recent works whether or not
+// macOS has registered the .rackflow document type for an ad-hoc signed app.
+
+const recentFile = () => join(app.getPath('userData'), 'Recent.json')
+let recent: string[] = []
+async function loadRecent() { try { recent = (JSON.parse(await readFile(recentFile(), 'utf8')) as string[]).filter((x) => typeof x === 'string') } catch { recent = [] } }
+function noteRecent(path: string) {
+  recent = [path, ...recent.filter((x) => x !== path)].slice(0, 12)
+  app.addRecentDocument(path)
+  void mkdir(app.getPath('userData'), { recursive: true }).then(() => writeFile(recentFile(), JSON.stringify(recent), 'utf8')).catch(() => undefined)
+  buildMenu()
+}
+function recentMenu(): MenuItemConstructorOptions[] {
+  const items: MenuItemConstructorOptions[] = recent.map((p) => ({
+    label: basename(p).replace(/\.rackflow$/, ''), sublabel: dirname(p),
+    toolTip: p,
+    click: () => { if (existsSync(p)) void openPath(p); else { dialog.showErrorBox('File not found', `${p}\n\nIt may have been moved or deleted.`); recent = recent.filter((x) => x !== p); buildMenu() } },
+  }))
+  if (!items.length) items.push({ label: 'No Recent Projects', enabled: false })
+  items.push({ type: 'separator' }, { label: 'Clear Menu', enabled: recent.length > 0, click: () => { recent = []; app.clearRecentDocuments(); void writeFile(recentFile(), '[]', 'utf8').catch(() => undefined); buildMenu() } })
+  return items
+}
+
 async function openPath(path: string) {
   try {
     const data = await readFile(path, 'utf8')
     const file: OpenedFile = { path, data }
     win?.webContents.send('open-file', file)
-    app.addRecentDocument(path)
+    noteRecent(path)
   } catch (err) {
     dialog.showErrorBox('Couldn’t open file', String(err))
   }
@@ -115,10 +139,12 @@ function buildMenu() {
       submenu: [
         cmd('New Project', 'new', 'CmdOrCtrl+N'),
         cmd('Open…', 'open', 'CmdOrCtrl+O'),
-        { role: 'recentDocuments', submenu: [{ role: 'clearRecentDocuments' }] } as MenuItemConstructorOptions,
+        { label: 'Open Recent', submenu: recentMenu() },
         { type: 'separator' },
         cmd('Save', 'save', 'CmdOrCtrl+S'),
         cmd('Save As…', 'saveAs', 'Shift+CmdOrCtrl+S'),
+        { type: 'separator' },
+        cmd('Export Everything…', 'exportAll', 'Shift+CmdOrCtrl+E'),
         { type: 'separator' },
         cmd('Find Device…', 'findDevice', 'Shift+CmdOrCtrl+F'),
         cmd('New Custom Product…', 'newProduct', 'Alt+CmdOrCtrl+N'),
@@ -149,6 +175,7 @@ function buildMenu() {
         cmd('Rack Elevation', 'mode:rack', 'CmdOrCtrl+2'),
         cmd('Patch Labels', 'mode:patch', 'CmdOrCtrl+3'),
         cmd('Schedule (Spreadsheet)', 'mode:sheet', 'CmdOrCtrl+4'),
+        cmd('LED Walls', 'mode:led', 'CmdOrCtrl+5'),
         { type: 'separator' },
         cmd('Tidy Up Wiring Diagram', 'tidy', 'Alt+CmdOrCtrl+L'),
         { type: 'separator' },
@@ -220,7 +247,7 @@ function registerIPC() {
     const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: projectFilters })
     if (r.canceled || !r.filePaths[0]) return null
     const path = r.filePaths[0]
-    app.addRecentDocument(path)
+    noteRecent(path)
     return { path, data: await readFile(path, 'utf8') } satisfies OpenedFile
   })
 
@@ -236,7 +263,7 @@ function registerIPC() {
     const tmp = join(dirname(target), `.${basename(target)}.tmp`)
     await writeFile(tmp, data, 'utf8')
     await rename(tmp, target)
-    app.addRecentDocument(target)
+    noteRecent(target)
     return target
   })
 
@@ -286,6 +313,23 @@ function registerIPC() {
     return r.filePath
   })
 
+  // Export Everything: one folder with every PDF and CSV.
+  ipcMain.handle('export:all', async (_e, files: { name: string; kind: 'pdf' | 'text'; content: string }[], folderName: string) => {
+    if (!win) return null
+    const r = await dialog.showOpenDialog(win, { title: 'Choose where to save the export', buttonLabel: 'Export Here', properties: ['openDirectory', 'createDirectory'] })
+    if (r.canceled || !r.filePaths[0]) return null
+    const dir = join(r.filePaths[0], folderName.replace(/[\\/:*?"<>|]/g, '-'))
+    await mkdir(dir, { recursive: true })
+    for (const f of files) {
+      const target = join(dir, f.name)
+      if (f.kind === 'text') { await writeFile(target, f.content, 'utf8'); continue }
+      const pdf = await withPrintWindow(f.content, (w) => w.webContents.printToPDF({ preferCSSPageSize: true, printBackground: true, margins: { top: 0, bottom: 0, left: 0, right: 0 } }))
+      await writeFile(target, pdf)
+    }
+    void shell.openPath(dir)
+    return dir
+  })
+
   ipcMain.handle('labels:pdf', async (_e, html: string, name: string) => {
     if (!win) return null
     const r = await dialog.showSaveDialog(win, { defaultPath: `${name}.pdf`, filters: [{ name: 'PDF', extensions: ['pdf'] }] })
@@ -323,13 +367,14 @@ app.on('second-instance', (_e, argv) => {
   if (win) { if (win.isMinimized()) win.restore(); win.focus() }
 })
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   registerIPC()
   ipcMain.handle('update:check', () => checkForUpdates({ userInitiated: true }))
   ipcMain.handle('update:status', () => updateStatus())
   ipcMain.handle('update:install', () => installAndRestart())
   ipcMain.handle('update:openPage', (_e, url?: string) => openReleasePage(url))
   ipcMain.handle('app:version', () => app.getVersion())
+  await loadRecent()
   buildMenu()
   createWindow()
   startUpdater()

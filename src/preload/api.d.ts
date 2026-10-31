@@ -8,8 +8,8 @@ import type { Manufacturer } from '../core/manufacturers'
 export type MenuCommand =
   | 'new' | 'open' | 'save' | 'saveAs' | 'save-and-close'
   | 'undo' | 'redo' | 'delete' | 'selectAll' | 'zoomFit'
-  | 'mode:diagram' | 'mode:rack' | 'mode:patch' | 'mode:sheet'
-  | 'newProduct' | 'newTemplate' | 'toggleInspector' | 'editDevice' | 'findDevice' | 'tidy'
+  | 'mode:diagram' | 'mode:rack' | 'mode:patch' | 'mode:sheet' | 'mode:led'
+  | 'newProduct' | 'newTemplate' | 'toggleInspector' | 'editDevice' | 'findDevice' | 'tidy' | 'exportAll'
 
 export interface AiStatus { hasKey: boolean; model: string; canEncrypt: boolean }
 
@@ -60,6 +60,8 @@ export interface RackflowAPI {
   aiLookup(req: { query: string; url?: string; text?: string }): Promise<{ json: unknown; via: string }>
 
   /** Native Save / Don't Save / Cancel sheet before replacing the open project. */
+  /** Writes every export file into a new folder the user picks; returns the folder. */
+  exportAll(files: { name: string; kind: 'pdf' | 'text'; content: string }[], folderName: string): Promise<string | null>
   askSaveChanges(name: string): Promise<'save' | 'discard' | 'cancel'>
 
   onMenu(cb: (cmd: MenuCommand) => void): () => void
