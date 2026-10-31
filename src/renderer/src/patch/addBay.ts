@@ -1,4 +1,5 @@
-import { addPatchBay, type PatchBayTemplate } from '@core/index'
+import { addPatchBay, nodeGeom, placeInFreeSpace, type PatchBayTemplate } from '@core/index'
+import { viewCenterNow } from '../diagram/placement'
 import { useStore } from '../store'
 import { usePatchUI } from './patchState'
 
@@ -7,10 +8,13 @@ import { usePatchUI } from './patchState'
 export function addBayToProject(t: PatchBayTemplate): string | null {
   let bayId = '', tag = ''
   useStore.getState().apply(`Add ${t.series}`, (d) => {
+    // Next to the last bay (or in view / beside everything), then into the nearest open space.
     const lastBay = [...d.patchBays].reverse().map((b) => d.equipment.find((e) => e.id === b.equipment)).find(Boolean)
-    const maxY = d.equipment.reduce((m, e) => Math.max(m, e.position.y), 0)
-    const at = lastBay ? { x: lastBay.position.x + 300, y: lastBay.position.y } : { x: 0, y: d.equipment.length ? maxY + 400 : 0 }
+    const maxX = d.equipment.reduce((m, e) => Math.max(m, e.position.x), -Infinity)
+    const minY = d.equipment.reduce((m, e) => Math.min(m, e.position.y), Infinity)
+    const at = lastBay ? { x: lastBay.position.x + 300, y: lastBay.position.y } : viewCenterNow() ?? (d.equipment.length ? { x: maxX + 320, y: minY } : { x: 0, y: 0 })
     const bay = addPatchBay(d, t, at)
+    placeInFreeSpace(d, bay.equipment, nodeGeom)
     bayId = bay.id
     tag = bay.name
   })

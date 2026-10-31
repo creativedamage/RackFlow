@@ -297,3 +297,43 @@ export function planChannels(wires: ChannelWire[], gap = 18, spacing = 7): Map<s
   }
   return res
 }
+
+// MARK: Free space
+
+/**
+ * Nearest spot to `preferred` where a device of size w×h doesn't overlap any
+ * other device (with a margin for ports, labels and wires). Searches outward
+ * in rings, trying right / below first.
+ */
+export function freeSpot(p: Project, size: { width: number; height: number }, preferred: CanvasPoint,
+  geom: (eq: EquipmentInstance) => NodeGeom, opts: { ignore?: string; margin?: number; grid?: number } = {}): CanvasPoint {
+  const margin = opts.margin ?? 60, grid = opts.grid ?? 20
+  const boxes = p.equipment.filter((e) => e.id !== opts.ignore).map((e) => {
+    const g = geom(e)
+    return { x0: e.position.x - margin, y0: e.position.y - margin - 30, x1: e.position.x + g.width + margin, y1: e.position.y + g.height + margin }
+  })
+  const fits = (x: number, y: number) => boxes.every((b) => x + size.width <= b.x0 || x >= b.x1 || y + size.height <= b.y0 || y >= b.y1)
+  const snap = (v: number) => Math.round(v / grid) * grid
+  const px = snap(preferred.x), py = snap(preferred.y)
+  if (fits(px, py)) return { x: px, y: py }
+  const step = 40
+  for (let r = 1; r < 400; r++) {
+    // Ring of radius r (in steps): right side, bottom, left, top – nearest first.
+    const cands: CanvasPoint[] = []
+    for (let k = -r; k <= r; k++) {
+      cands.push({ x: px + r * step, y: py + k * step }, { x: px + k * step, y: py + r * step }, { x: px - r * step, y: py + k * step }, { x: px + k * step, y: py - r * step })
+    }
+    cands.sort((a, b) => Math.hypot(a.x - px, a.y - py) - Math.hypot(b.x - px, b.y - py))
+    const hit = cands.find((c) => fits(c.x, c.y))
+    if (hit) return hit
+  }
+  // Fallback: below everything.
+  return { x: px, y: Math.max(py, ...boxes.map((b) => b.y1)) + margin }
+}
+
+/** Moves a just-added device into the nearest open space. */
+export function placeInFreeSpace(p: Project, eqId: string, geom: (eq: EquipmentInstance) => NodeGeom, preferred?: CanvasPoint) {
+  const eq = p.equipment.find((e) => e.id === eqId)
+  if (!eq) return
+  eq.position = freeSpot(p, geom(eq), preferred ?? eq.position, geom, { ignore: eqId })
+}

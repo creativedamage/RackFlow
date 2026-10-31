@@ -7,7 +7,7 @@ import {
   type Connection, type Edge, type EdgeChange, type NodeChange, type OnConnectStart,
 } from '@xyflow/react'
 import {
-  addEquipment, addPatchBay, connectMany, groupColor, groupsOf, type BulkResult, candidates as findCandidates, connect, DOMAINS, portDomain, resolve, SIGNALS, validate,
+  addEquipment, addPatchBay, nodeGeom, placeInFreeSpace, connectMany, groupColor, groupsOf, type BulkResult, candidates as findCandidates, connect, DOMAINS, portDomain, resolve, SIGNALS, validate,
   type CableId, type EquipmentId, type PortAddress,
 } from '@core/index'
 import { useStore } from '../store'
@@ -246,13 +246,13 @@ export function DiagramView() {
       const product = s.library.get(payload.key)
       if (!product) return
       let id: EquipmentId | undefined
-      apply(`Add ${product.model}`, (d) => { id = addEquipment(d, product, at).id })
+      apply(`Add ${product.model}`, (d) => { id = addEquipment(d, product, at).id; placeInFreeSpace(d, id, nodeGeom) })
       if (id) select([id])
     } else if (payload.kind === 'patch') {
       const t = s.templates.find((x) => x.key === payload.key)
       if (!t) return
       let bay: { id: string; equipment: EquipmentId } | undefined
-      apply('Add Patch Bay', (d) => { bay = addPatchBay(d, t, at) })
+      apply('Add Patch Bay', (d) => { bay = addPatchBay(d, t, at); placeInFreeSpace(d, bay.equipment, nodeGeom) })
       if (bay) { select([bay.equipment]); s.set({ selectedBay: bay.id as never }) }
     }
   }, [apply, screenToFlowPosition, select])

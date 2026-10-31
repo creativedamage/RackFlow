@@ -62,3 +62,19 @@ describe('drawings', () => {
     expect(sch[0]).toContain(amp.tag)
   })
 })
+
+import { freeSpot, nodeGeom, placeInFreeSpace, addPatchBay, BUILT_IN_PATCH_TEMPLATES } from './index'
+describe('free space', () => {
+  it('puts a new patch bay where nothing is', () => {
+    const p = newProject()
+    for (let i = 0; i < 6; i++) addEquipment(p, prod('generic.dsp.12x8'), { x: (i % 3) * 300, y: Math.floor(i / 3) * 400 })
+    const bay = addPatchBay(p, BUILT_IN_PATCH_TEMPLATES.find((t) => t.key === 'leviton.6a586-u48')!, { x: 300, y: 0 })
+    placeInFreeSpace(p, bay.equipment, nodeGeom)
+    const boxes = p.equipment.map((e) => ({ ...e.position, ...nodeGeom(e) }))
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i], b = boxes[j]
+      expect(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y).toBe(true)
+    }
+    expect(freeSpot(newProject(), { width: 10, height: 10 }, { x: 13, y: 27 }, nodeGeom)).toEqual({ x: 20, y: 20 })
+  })
+})

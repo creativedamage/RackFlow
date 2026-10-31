@@ -1,10 +1,12 @@
-import { addEquipment, type EquipmentId, type ProductDefinition } from '@core/index'
+import { addEquipment, nodeGeom, placeInFreeSpace, type EquipmentId, type ProductDefinition } from '@core/index'
 import { useStore } from '../store'
 
 const GRID = 20
 /** Returns the flow-space centre of the visible diagram; set by DiagramView while it is mounted. */
 let viewCenter: (() => { x: number; y: number }) | null = null
 export const setViewCenterProvider = (fn: typeof viewCenter) => { viewCenter = fn }
+/** Centre of the visible diagram (null when the diagram isn't on screen). */
+export const viewCenterNow = () => viewCenter?.() ?? null
 
 let lastAt = { x: NaN, y: NaN }, cascade = 0
 
@@ -22,7 +24,8 @@ export function addProductToDiagram(product: ProductDefinition): EquipmentId | u
   lastAt = snapped
   const at = { x: snapped.x + cascade * 40, y: snapped.y + cascade * 40 }
   let id: EquipmentId | undefined, tag = ''
-  s.apply(`Add ${product.model}`, (d) => { const e = addEquipment(d, product, at); id = e.id; tag = e.tag })
+  // Into the nearest open space so new gear never lands on top of existing gear.
+  s.apply(`Add ${product.model}`, (d) => { const e = addEquipment(d, product, at); placeInFreeSpace(d, e.id, nodeGeom); id = e.id; tag = e.tag })
   if (id) {
     s.select([id])
     s.notify(s.mode === 'diagram' ? `Added ${tag}` : `Added ${tag} to the Wiring Diagram`, { undo: true })
