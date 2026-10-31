@@ -41,8 +41,31 @@ function createWindow() {
       message: `Do you want to save the changes you made to “${docState.title}”?`,
       detail: 'Your changes will be lost if you don’t save them.',
     })
-    if (choice === 0) send('save-and-close')
+    if (choice === 0) {
+      send('save-and-close')
+      // If the page is stuck it never answers: don't trap the user in the app.
+      const w = win
+      setTimeout(() => {
+        if (!w || w.isDestroyed() || allowClose) return
+        if (dialog.showMessageBoxSync(w, { type: 'warning', buttons: ['Keep Waiting', 'Quit Without Saving'], defaultId: 0, cancelId: 0,
+          message: 'RackFlow isn’t responding to Save.', detail: 'If you already chose where to save, wait a moment. Otherwise you can quit without saving.' }) === 1) { allowClose = true; w.destroy() }
+      }, 15000)
+    }
     else if (choice === 1) { allowClose = true; win.close() }
+  })
+  // A hung or crashed page: offer to reload or quit instead of freezing.
+  win.webContents.on('unresponsive', () => {
+    if (!win) return
+    const c = dialog.showMessageBoxSync(win, { type: 'warning', buttons: ['Wait', 'Reload Window', 'Quit RackFlow'], defaultId: 0, cancelId: 0,
+      message: 'RackFlow is not responding.', detail: 'Reloading or quitting loses unsaved changes since your last save.' })
+    if (c === 1) win.webContents.reload()
+    if (c === 2) { allowClose = true; app.exit(0) }
+  })
+  win.webContents.on('render-process-gone', () => {
+    if (!win) return
+    const c = dialog.showMessageBoxSync(win, { type: 'error', buttons: ['Reload Window', 'Quit RackFlow'], defaultId: 0,
+      message: 'RackFlow’s window crashed.', detail: 'Unsaved changes since your last save are lost.' })
+    if (c === 0) win.webContents.reload(); else { allowClose = true; app.exit(0) }
   })
   win.on('closed', () => { win = null; allowClose = false })
 

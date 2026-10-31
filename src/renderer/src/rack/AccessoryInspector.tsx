@@ -3,6 +3,7 @@ import { useStore } from '../store'
 import { Field, Select, TextInput } from '../components/ui'
 
 const MAX_LOGO_BYTES = 2_000_000
+const NO_LOGOS: LogoAsset[] = []
 
 /** Reads an image file as a data: URL, refusing very large files. */
 export function pickImage(): Promise<{ name: string; dataUrl: string } | null> {
@@ -34,7 +35,9 @@ export async function uploadLogo(): Promise<string | null> {
 
 export function AccessoryInspector({ rack, acc }: { rack: Rack; acc: RackAccessory }) {
   const apply = useStore((s) => s.apply)
-  const logos = useStore((s) => s.project.logos ?? [])
+  // Select the stored array itself (a fresh [] every render would loop forever).
+  const stored = useStore((s) => s.project.logos)
+  const logos = stored ?? NO_LOGOS
   const meta = ACCESSORY_KINDS[acc.kind]
   const upd = (label: string, fn: (a: RackAccessory) => void) => apply(label, (d) => { const a = d.racks.find((r) => r.id === rack.id)?.accessories.find((x) => x.id === acc.id); if (a) fn(a) })
   const logo = logos.find((l) => l.id === acc.logoId)
