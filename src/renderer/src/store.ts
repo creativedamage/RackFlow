@@ -49,6 +49,8 @@ export interface AppState {
   /** View being created / edited ('new' or an id). */
   editingView: string | null
   editingNumbers: boolean
+  /** Appearance: follow macOS, or force light / dark. */
+  theme: 'system' | 'light' | 'dark'
   showInspector: boolean
   issues: ValidationIssue[]
   /** Bumped to ask the diagram to fit view. */
@@ -114,6 +116,7 @@ export const useStore = create<AppState>((set, get) => ({
   diagramView: null,
   editingView: null,
   editingNumbers: false,
+  theme: 'system',
   showInspector: true,
   issues: [],
   fitRequest: 0,

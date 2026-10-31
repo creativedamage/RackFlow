@@ -22,6 +22,7 @@ import { ScheduleView } from './sheet/ScheduleView'
 import { LedView } from './led/LedView'
 import { ViewEditor } from './diagram/ViewEditor'
 import { SheetNumbersDialog } from './diagram/SheetNumbers'
+import { initTheme, showTheme } from './theme'
 import { usePatchUI } from './patch/patchState'
 import { Inspector } from './inspector/Inspector'
 import { ProductEditor } from './product/ProductEditor'
@@ -64,6 +65,8 @@ export function App() {
   useEffect(() => { void useStore.getState().reloadLibrary() }, [])
   useEffect(() => { api.setDocumentState({ title, dirty, path }) }, [title, dirty, path])
 
+  useEffect(() => { void initTheme() }, [])
+
   // Native menu → app commands.
   useEffect(() => api.onMenu(async (cmd) => {
     const s = useStore.getState()
@@ -101,6 +104,7 @@ export function App() {
       case 'mode:patch': s.set({ mode: 'patch' }); break
       case 'mode:sheet': s.set({ mode: 'sheet' }); break
       case 'mode:led': s.set({ mode: 'led' }); break
+      case 'theme:system': case 'theme:light': case 'theme:dark': showTheme(cmd.slice(6) as 'system' | 'light' | 'dark'); break
       case 'zoomFit': s.set({ mode: 'diagram', fitRequest: s.fitRequest + 1 }); break
       case 'toggleInspector': s.set({ showInspector: !s.showInspector }); break
       case 'newProduct': s.set({ editingProduct: newCustomProduct() }); break

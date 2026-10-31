@@ -3,6 +3,7 @@ import { isElectron } from '../platform'
 import { Segmented, TextInput } from './ui'
 import { IssuesButton } from './IssuesButton'
 import { AppMenuButton, UpdatePill } from './UpdatePill'
+import { nextTheme, setTheme } from '../theme'
 
 export function Toolbar() {
   const mode = useStore((s) => s.mode)
@@ -15,6 +16,7 @@ export function Toolbar() {
   const redo = useStore((s) => s.redo)
   const apply = useStore((s) => s.apply)
   const showInspector = useStore((s) => s.showInspector)
+  const theme = useStore((s) => s.theme)
 
   const undoLabel = useStore((s) => s.past[s.past.length - 1]?.label ?? '')
   const redoLabel = useStore((s) => s.future[0]?.label ?? '')
@@ -57,6 +59,14 @@ export function Toolbar() {
           </button>
         </div>
         <IssuesButton />
+        <button className="icon-btn theme-btn" onClick={() => setTheme(nextTheme(theme))} aria-label="Appearance"
+          title={`Appearance: ${theme === 'system' ? 'System (follows macOS)' : theme === 'light' ? 'Light' : 'Dark'} – click for ${nextTheme(theme) === 'system' ? 'System' : nextTheme(theme) === 'light' ? 'Light' : 'Dark'}`}>
+          {theme === 'light'
+            ? <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><circle cx="10" cy="10" r="3.6" /><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.3 4.3l1.4 1.4M14.3 14.3l1.4 1.4M4.3 15.7l1.4-1.4M14.3 5.7l1.4-1.4" /></svg>
+            : theme === 'dark'
+              ? <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"><path d="M16 12.5A6.5 6.5 0 017.5 4a6.5 6.5 0 108.5 8.5z" /></svg>
+              : <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="10" cy="10" r="7" /><path d="M10 3a7 7 0 010 14z" fill="currentColor" /></svg>}
+        </button>
         <button className={`icon-btn ${showInspector ? 'on' : ''}`} onClick={() => set({ showInspector: !showInspector })} title="Toggle inspector (⌥⌘I)">◧</button>
       </div>
     </header>

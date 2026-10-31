@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, shell, type MenuItemConstructorOptions } from 'electron'
 import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -21,7 +21,7 @@ function createWindow() {
     title: 'RackFlow',
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 14, y: 14 },
-    backgroundColor: '#f5f5f7',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#161618' : '#f5f5f7',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -82,6 +82,21 @@ const send = (cmd: MenuCommand) => win?.webContents.send('menu', cmd)
 
 // MARK: Recent projects – our own list, so Open Recent works whether or not
 // macOS has registered the .rackflow document type for an ad-hoc signed app.
+
+// MARK: Appearance (System / Light / Dark) – nativeTheme drives the CSS colour scheme, menus and dialogs.
+
+type Theme = 'system' | 'light' | 'dark'
+const themeFile = () => join(app.getPath('userData'), 'Appearance.json')
+async function loadTheme() {
+  try { const t = JSON.parse(await readFile(themeFile(), 'utf8')).theme; if (t === 'light' || t === 'dark' || t === 'system') nativeTheme.themeSource = t } catch { /* first run */ }
+}
+function setTheme(t: Theme) {
+  nativeTheme.themeSource = t
+  win?.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#161618' : '#f5f5f7')
+  void mkdir(app.getPath('userData'), { recursive: true }).then(() => writeFile(themeFile(), JSON.stringify({ theme: t }), 'utf8')).catch(() => undefined)
+  buildMenu()
+  send(`theme:${t}`)
+}
 
 const recentFile = () => join(app.getPath('userData'), 'Recent.json')
 let recent: string[] = []
@@ -181,6 +196,13 @@ function buildMenu() {
         { type: 'separator' },
         cmd('Zoom to Fit', 'zoomFit', 'CmdOrCtrl+0'),
         cmd('Toggle Inspector', 'toggleInspector', 'Alt+CmdOrCtrl+I'),
+        {
+          label: 'Appearance',
+          submenu: (['system', 'light', 'dark'] as const).map((t): MenuItemConstructorOptions => ({
+            label: t === 'system' ? 'Use System Setting' : t === 'light' ? 'Light' : 'Dark',
+            type: 'radio', checked: nativeTheme.themeSource === t, click: () => setTheme(t),
+          })),
+        },
         { type: 'separator' },
         { role: 'togglefullscreen' },
         ...(app.isPackaged ? [] : [{ role: 'toggleDevTools' as const }, { role: 'reload' as const }]),
@@ -374,6 +396,9 @@ app.whenReady().then(async () => {
   ipcMain.handle('update:install', () => installAndRestart())
   ipcMain.handle('update:openPage', (_e, url?: string) => openReleasePage(url))
   ipcMain.handle('app:version', () => app.getVersion())
+  ipcMain.handle('theme:get', () => nativeTheme.themeSource)
+  ipcMain.handle('theme:set', (_e, t: Theme) => { if (t === 'system' || t === 'light' || t === 'dark') setTheme(t) })
+  await loadTheme()
   await loadRecent()
   buildMenu()
   createWindow()
