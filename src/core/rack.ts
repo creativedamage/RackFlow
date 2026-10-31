@@ -1,5 +1,6 @@
 import type { EquipmentId, Project, Rack, RackFace, RackId } from './model'
 import { findRack, heatBTU } from './project'
+import { ACCESSORY_KINDS, accessoryLabel } from './rackpanels'
 import type { ValidationIssue } from './validation/issues'
 
 /** Anything occupying units: equipment or accessory, normalised. */
@@ -56,8 +57,8 @@ export class RackLayout {
     }
     for (const a of rack.accessories) {
       occ.push({
-        ref: { kind: 'accessory', id: a.id }, name: a.kind, low: a.startUnit, high: a.startUnit + Math.max(a.height, 1) - 1,
-        face: a.face, halfSlot: null, depthMM: a.kind === 'shelf' || a.kind === 'drawer' ? rack.spec.mountingDepthMM / 2 : 25,
+        ref: { kind: 'accessory', id: a.id }, name: accessoryLabel(a) || 'LOGO PANEL', low: a.startUnit, high: a.startUnit + Math.max(a.height, 1) - 1,
+        face: a.face, halfSlot: null, depthMM: a.kind === 'shelf' || a.kind === 'drawer' ? rack.spec.mountingDepthMM / 2 : ACCESSORY_KINDS[a.kind]?.depthMM ?? 25,
         weightKG: 1, heatBTU: 0, typicalWatts: 0, maxWatts: 0,
       })
     }

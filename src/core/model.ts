@@ -232,12 +232,19 @@ export interface RackSpec {
   coolingCapacityBTU: number | null
 }
 
+export type AccessoryKind = 'blank' | 'logo' | 'vent' | 'brush' | 'lacing' | 'cableManager' | 'shelf' | 'drawer'
 export interface RackAccessory {
   id: AccessoryId
-  kind: 'blank' | 'vent' | 'cableManager' | 'shelf' | 'drawer'
+  kind: AccessoryKind
   startUnit: number
   height: number
   face: RackFace
+  /** Text on the elevation (defaults to e.g. "BLANK PANEL"). */
+  label?: string
+  /** Logo blanks: image from project.logos. */
+  logoId?: string
+  /** Logo blanks: background colour of the panel face. */
+  finish?: 'black' | 'white' | 'silver'
 }
 
 export interface Rack {
@@ -246,6 +253,11 @@ export interface Rack {
   spec: RackSpec
   accessories: RackAccessory[]
 }
+
+/** How wires are drawn: every wire in full, long / tangled runs as labelled stubs, or all as stubs. */
+export type WireMode = 'all' | 'smart' | 'stubs'
+export interface DiagramSettings { autoTidy?: boolean; wires?: WireMode }
+export interface LogoAsset { id: string; name: string; /** data: URL (PNG / JPEG / SVG). */ dataUrl: string }
 
 export interface ProjectInfo { name: string; client: string; designer: string; revision: string; location?: string }
 
@@ -258,6 +270,10 @@ export interface Project {
   patchBays: PatchBay[]
   /** Diagram groups / systems. */
   groups?: DeviceGroup[]
+  /** Wiring diagram view settings. */
+  diagram?: DiagramSettings
+  /** Images used on drawings (logo blank panels, title block). */
+  logos?: LogoAsset[]
 }
 
 // --- Patch bays (types here to keep the document schema in one file) ---

@@ -127,6 +127,8 @@ function buildMenu() {
         cmd('Patch Labels', 'mode:patch', 'CmdOrCtrl+3'),
         cmd('Schedule (Spreadsheet)', 'mode:sheet', 'CmdOrCtrl+4'),
         { type: 'separator' },
+        cmd('Tidy Up Wiring Diagram', 'tidy', 'Alt+CmdOrCtrl+L'),
+        { type: 'separator' },
         cmd('Zoom to Fit', 'zoomFit', 'CmdOrCtrl+0'),
         cmd('Toggle Inspector', 'toggleInspector', 'Alt+CmdOrCtrl+I'),
         { type: 'separator' },

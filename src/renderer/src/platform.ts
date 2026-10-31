@@ -84,7 +84,7 @@ if (!isElectron) {
     const mod = e.metaKey || e.ctrlKey
     if (!mod) return
     const k = e.key.toLowerCase()
-    const map: Record<string, MenuCommand> = { n: 'new', o: 'open', s: e.shiftKey ? 'saveAs' : 'save', z: e.shiftKey ? 'redo' : 'undo', y: 'redo', 1: 'mode:diagram', 2: 'mode:rack', 3: 'mode:patch', 4: 'mode:sheet', 0: 'zoomFit', e: 'editDevice', ...(e.shiftKey ? { f: 'findDevice' as MenuCommand } : {}) }
+    const map: Record<string, MenuCommand> = { n: 'new', o: 'open', s: e.shiftKey ? 'saveAs' : 'save', z: e.shiftKey ? 'redo' : 'undo', y: 'redo', 1: 'mode:diagram', 2: 'mode:rack', 3: 'mode:patch', 4: 'mode:sheet', 0: 'zoomFit', e: 'editDevice', ...(e.shiftKey ? { f: 'findDevice' as MenuCommand } : {}), ...(e.altKey ? { l: 'tidy' as MenuCommand, '¬': 'tidy' as MenuCommand } : {}) }
     const cmd = map[k]
     if (!cmd) return
     e.preventDefault()

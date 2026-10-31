@@ -1,7 +1,8 @@
 import { deviceMenu } from '../product/productActions'
 import { showContextMenu } from '../components/ContextMenu'
 import { useMemo, useState } from 'react'
-import { addRack, RackLayout, type EquipmentId, type Rack, type RackFace } from '@core/index'
+import { ACCESSORY_KINDS, accessoryLabel, addAccessory, addRack, fillWithBlanks, RackLayout, type AccessoryKind, type EquipmentId, type Rack, type RackAccessory, type RackFace } from '@core/index'
+import { RackPrintDialog } from './RackPrint'
 import { useStore } from '../store'
 import { DRAG_MIME, type DragPayload } from '../components/Sidebar'
 import { Empty, NumberInput, Segmented, TextInput, Toggle } from '../components/ui'
@@ -17,6 +18,7 @@ export function RackView() {
   const [face, setFace] = useState<RackFace>('front')
   const [unitPx, setUnitPx] = useState(22)
   const [heat, setHeat] = useState(false)
+  const [printing, setPrinting] = useState(false)
 
   const unracked = project.equipment.filter((e) => e.product.physical.rackUnits != null && !e.rackPlacement)
 
@@ -27,8 +29,19 @@ export function RackView() {
         <Toggle checked={heat} onChange={setHeat} label="Heat map" />
         <label className="zoom">Zoom <input type="range" min={12} max={40} value={unitPx} onChange={(e) => setUnitPx(+e.target.value)} /></label>
         <span className="spacer" />
+        <button onClick={() => setPrinting(true)} disabled={!project.racks.length}>Print / Export…</button>
         <button onClick={() => apply('Add Rack', (d) => { addRack(d) })}>+ Add Rack</button>
       </div>
+      <div className="panel-palette" title="Drag a panel into a rack">
+        <span className="muted small">Panels:</span>
+        {PALETTE.map(([kind, h]) => (
+          <div key={`${kind}${h}`} className={`palette-chip acc-${kind}`} draggable
+            onDragStart={(ev) => { const s = JSON.stringify({ kind: 'rack-acc', acc: kind, height: h } satisfies DragPayload); dragCache = s; ev.dataTransfer.setData(DRAG_MIME, s) }}>
+            {ACCESSORY_KINDS[kind].name} {h}U
+          </div>
+        ))}
+      </div>
+      {printing && <RackPrintDialog onClose={() => setPrinting(false)} />}
       <div className="rack-body">
         <div className="unracked">
           <h4>Not yet racked</h4>
@@ -62,20 +75,36 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
   const total = rack.spec.rackUnits
   const bodyW = 300, rail = 26
   const yOf = (high: number) => (total - high) * unitPx
+  const selAcc = useStore((s) => s.selectedAccessory)
+  const logos = project.logos ?? []
+  const fill = (between: boolean) => {
+    let n = 0
+    apply(between ? 'Fill Gaps with Blanks' : 'Fill Rack with Blanks', (d) => { n = fillWithBlanks(d, rack.id, face, { onlyBetween: between }) })
+    useStore.getState().notify(n ? `Added ${n} blank panel${n === 1 ? '' : 's'}` : 'No empty spaces to fill', { undo: !!n })
+  }
 
-  const dragTarget = (e: React.DragEvent): { id: EquipmentId; h: number; depth: number; start: number | null } | null => {
+  type Target = { what: 'eq'; id: EquipmentId; h: number; start: number | null } | { what: 'acc'; acc: AccessoryKind; h: number; start: number | null } | { what: 'move'; id: string; from: string; h: number; start: number | null }
+  const dragTarget = (e: React.DragEvent): Target | null => {
     const raw = e.dataTransfer.getData(DRAG_MIME) || dragCache
     if (!raw) return null
     const p = JSON.parse(raw) as DragPayload
-    if (p.kind !== 'rack-eq') return null
-    const eq = project.equipment.find((x) => x.id === p.id)
-    const h = eq?.product.physical.rackUnits
-    if (!eq || !h) return null
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const unitAtCursor = total - Math.floor((e.clientY - rect.top) / unitPx)
-    const proposed = Math.max(1, unitAtCursor - h + 1)
-    const start = layout.nearestFreeStart(h, eq.product.physical.depthMM, proposed, face, { kind: 'equipment', id: eq.id })
-    return { id: eq.id, h, depth: eq.product.physical.depthMM, start }
+    const at = (h: number, depth: number, ignoring?: { kind: 'equipment'; id: EquipmentId } | { kind: 'accessory'; id: string }) =>
+      layout.nearestFreeStart(h, depth, Math.max(1, unitAtCursor - h + 1), face, ignoring)
+    if (p.kind === 'rack-eq') {
+      const eq = project.equipment.find((x) => x.id === p.id)
+      const h = eq?.product.physical.rackUnits
+      if (!eq || !h) return null
+      return { what: 'eq', id: eq.id, h, start: at(h, eq.product.physical.depthMM, { kind: 'equipment', id: eq.id }) }
+    }
+    if (p.kind === 'rack-acc') return { what: 'acc', acc: p.acc, h: p.height, start: at(p.height, ACCESSORY_KINDS[p.acc].depthMM) }
+    if (p.kind === 'rack-acc-move') {
+      const src = project.racks.find((r) => r.id === p.rack)?.accessories.find((a) => a.id === p.id)
+      if (!src) return null
+      return { what: 'move', id: p.id, from: p.rack, h: src.height, start: at(src.height, ACCESSORY_KINDS[src.kind]?.depthMM ?? 25, p.rack === rack.id ? { kind: 'accessory', id: p.id } : undefined) }
+    }
+    return null
   }
 
   const occupants = layout.occupants.filter((o) => o.face === face || o.depthMM > rack.spec.mountingDepthMM * 0.8)
@@ -88,7 +117,13 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
       <div className="rack-head" style={{ width: bodyW + 2 * rail }}>
         <TextInput className="rack-name" value={rack.name} onCommit={(v) => apply('Rename Rack', (d) => { const r = d.racks.find((x) => x.id === rack.id); if (r) r.name = v })} />
         <span className="muted mono">{layout.usedUnits}/{total}U</span>
-        <button className="mini" onClick={() => setState({ selectedRack: rack.id, selection: [], selectedCable: null, showInspector: true })}>Settings</button>
+        <button className="mini" title="Fill empty spaces with blank panels" onClick={(e) => showContextMenu(e, [
+          { label: 'Fill gaps between devices', onClick: () => fill(true) },
+          { label: 'Fill all empty space', onClick: () => fill(false) },
+          'sep',
+          { label: `Remove all panels (${face})`, danger: true, disabled: !rack.accessories.some((a) => a.face === face), onClick: () => apply('Remove Panels', (d) => { const r = d.racks.find((x) => x.id === rack.id); if (r) r.accessories = r.accessories.filter((a) => a.face !== face) }) },
+        ])}>Blanks ▾</button>
+        <button className="mini" onClick={() => setState({ selectedRack: rack.id, selection: [], selectedCable: null, selectedAccessory: null, showInspector: true })}>Settings</button>
       </div>
       <div
         className="rack"
@@ -106,9 +141,20 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
           dragCache = ''
           if (!t || t.start == null) return
           e.preventDefault()
-          apply('Place in Rack', (d) => {
+          if (t.what === 'eq') apply('Place in Rack', (d) => {
             const eq = d.equipment.find((x) => x.id === t.id)
             if (eq) eq.rackPlacement = { rack: rack.id, startUnit: t.start!, face }
+          })
+          else if (t.what === 'acc') {
+            let added: RackAccessory | null = null
+            apply(`Add ${ACCESSORY_KINDS[t.acc].name}`, (d) => { added = addAccessory(d, rack.id, t.acc, t.h, t.start!, face, t.acc === 'logo' && logos[0] ? { logoId: logos[0].id } : {}) })
+            if (added) setState({ selectedAccessory: { rack: rack.id, id: (added as RackAccessory).id }, selection: [], selectedCable: null, showInspector: true })
+          } else apply('Move Panel', (d) => {
+            const from = d.racks.find((r) => r.id === t.from), to = d.racks.find((r) => r.id === rack.id)
+            const a = from?.accessories.find((x) => x.id === t.id)
+            if (!from || !to || !a) return
+            from.accessories = from.accessories.filter((x) => x.id !== t.id)
+            to.accessories.push({ ...a, startUnit: t.start!, face })
           })
         }}
       >
@@ -124,6 +170,9 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
         {occupants.map((o) => {
           const other = o.face !== face
           const id = o.ref.kind === 'equipment' ? o.ref.id : null
+          const acc = o.ref.kind === 'accessory' ? rack.accessories.find((a) => a.id === o.ref.id) : undefined
+          if (acc) return <AccessoryItem key={`acc:${acc.id}`} rack={rack} acc={acc} other={other} selected={selAcc?.id === acc.id}
+            style={{ top: yOf(o.high), height: (o.high - o.low + 1) * unitPx - 1, left: rail, width: bodyW }} logo={logos.find((l) => l.id === acc.logoId)?.dataUrl} />
           const selected = id != null && selection.includes(id)
           const height = (o.high - o.low + 1) * unitPx - 1
           return (
@@ -144,7 +193,7 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
                 }
               }}
             >
-              <b>{o.name}</b>
+              <b>{o.name}</b>{id && <span className="rack-model ellipsis">{project.equipment.find((e) => e.id === id)?.product.model}</span>}
               {height > 16 && <span className="muted">{o.typicalWatts.toFixed(0)} W · {o.weightKG.toFixed(1)} kg</span>}
               {other && <span className="face-tag">{o.face}</span>}
             </div>
@@ -159,6 +208,29 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
         <dt>Heat</dt><dd>{layout.totalHeatBTU.toFixed(0)} BTU/hr</dd>
         {cog != null && <><dt>CoG</dt><dd>U{cog.toFixed(1)}</dd></>}
       </dl>
+    </div>
+  )
+}
+
+const PALETTE: [AccessoryKind, number][] = [['blank', 1], ['blank', 2], ['logo', 1], ['logo', 2], ['brush', 1], ['vent', 1], ['lacing', 1], ['shelf', 2], ['drawer', 2]]
+
+function AccessoryItem({ rack, acc, other, selected, style, logo }: { rack: Rack; acc: RackAccessory; other: boolean; selected: boolean; style: React.CSSProperties; logo?: string }) {
+  const apply = useStore((s) => s.apply)
+  const setState = useStore((s) => s.set)
+  const remove = () => { apply(`Remove ${ACCESSORY_KINDS[acc.kind].name}`, (d) => { const r = d.racks.find((x) => x.id === rack.id); if (r) r.accessories = r.accessories.filter((a) => a.id !== acc.id) }); setState({ selectedAccessory: null }) }
+  const selectMe = () => setState({ selectedAccessory: { rack: rack.id, id: acc.id }, selection: [], selectedCable: null, showInspector: true })
+  const label = accessoryLabel(acc)
+  return (
+    <div className={`rack-item accessory acc-${acc.kind} finish-${acc.finish ?? 'black'} ${other ? 'other-face' : ''} ${selected ? 'selected' : ''}`} style={style} tabIndex={0}
+      draggable={!other} onDragStart={(e) => { const s = JSON.stringify({ kind: 'rack-acc-move', rack: rack.id, id: acc.id } satisfies DragPayload); dragCache = s; e.dataTransfer.setData(DRAG_MIME, s) }}
+      onClick={selectMe}
+      onKeyDown={(e) => { if (e.key === 'Backspace' || e.key === 'Delete') { e.stopPropagation(); remove() } }}
+      onContextMenu={(e) => { selectMe(); showContextMenu(e, [
+        ...ACCESSORY_KINDS[acc.kind].heights.map((h) => ({ label: `${h}U${h === acc.height ? ' ✓' : ''}`, onClick: () => apply('Panel Height', (d) => { const a = d.racks.find((r) => r.id === rack.id)?.accessories.find((x) => x.id === acc.id); if (a) a.height = h }) })),
+        'sep', { label: 'Remove Panel', danger: true, onClick: remove },
+      ]) }}
+      title={`${ACCESSORY_KINDS[acc.kind].name} ${acc.height}U · drag to move · right-click for options · Delete removes`}>
+      {acc.kind === 'logo' && logo ? <img className="acc-logo" src={logo} alt="" /> : <span className="acc-label">{label || (acc.kind === 'logo' ? 'LOGO PANEL – choose an image' : '')}</span>}
     </div>
   )
 }

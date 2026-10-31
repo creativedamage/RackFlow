@@ -3,26 +3,11 @@ import { Handle, Position, type NodeProps, type Node } from '@xyflow/react'
 import { CATEGORIES, connectorName, DOMAINS, portDomain, SIGNALS, type EquipmentInstance, type PortTemplate } from '@core/index'
 import { pickIndex, useWiring } from './wiring'
 
-export const NODE_WIDTH = 240
-export const HEADER_H = 40
-export const ROW_H = 18
+export { NODE_WIDTH, HEADER_H, ROW_H, headerHeight, splitPorts } from '@core/index'
+import { headerHeight, NODE_WIDTH, ROW_H, splitPorts } from '@core/index'
 
 export type DeviceNodeData = { eq: EquipmentInstance; connected: Set<string>; group?: { name: string; color: string }; dim?: boolean }
-
-/** Header height: taller when the device shows its room / location. */
-export const headerHeight = (eq: EquipmentInstance) => (eq.room?.trim() ? HEADER_H + 14 : HEADER_H)
 export type DeviceNodeType = Node<DeviceNodeData, 'device'>
-
-export function splitPorts(eq: EquipmentInstance) {
-  // Wall plates / floor boxes: room-side jacks on the left, tie lines and outlets on the right.
-  if (eq.product.category === 'wallPlate' || eq.product.category === 'floorBox') {
-    const left = eq.product.ports.filter((p) => p.face === 'front' && p.group !== 'Power')
-    return { left, right: eq.product.ports.filter((p) => !left.includes(p)) }
-  }
-  const left = eq.product.ports.filter((p) => p.direction === 'input')
-  const right = eq.product.ports.filter((p) => p.direction !== 'input')
-  return { left, right }
-}
 
 /**
  * A device card: header (tag + model) and two port columns – inputs on the

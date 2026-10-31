@@ -27,6 +27,8 @@ export interface AppState {
   selectedCable: CableId | null
   selectedRack: RackId | null
   selectedBay: PatchBayId | null
+  /** Rack panel (blank, brush, logo…) selected on the Rack page. */
+  selectedAccessory: { rack: string; id: string } | null
   showInspector: boolean
   issues: ValidationIssue[]
   /** Bumped to ask the diagram to fit view. */
@@ -47,6 +49,8 @@ export interface AppState {
   toast: string | null
 
   apply: (label: string, fn: (draft: Project) => void) => void
+  /** Changes the document without a new undo step (folds into the last one). */
+  amend: (fn: (draft: Project) => void) => void
   undo: () => void
   redo: () => void
   load: (project: Project, path: string | null) => void
@@ -80,6 +84,7 @@ export const useStore = create<AppState>((set, get) => ({
   selectedCable: null,
   selectedRack: null,
   selectedBay: null,
+  selectedAccessory: null,
   showInspector: true,
   issues: [],
   fitRequest: 0,
@@ -101,6 +106,11 @@ export const useStore = create<AppState>((set, get) => ({
     if (next === prev) return
     set({ project: next, dirty: true, past: [...get().past.slice(-MAX_HISTORY + 1), { project: prev, label }], future: [] })
   },
+  amend: (fn) => {
+    const prev = get().project
+    const next = produce(prev, fn)
+    if (next !== prev) set({ project: next, dirty: true })
+  },
   undo: () => {
     const { past, project, future } = get()
     const last = past[past.length - 1]
@@ -119,7 +129,7 @@ export const useStore = create<AppState>((set, get) => ({
   }),
   markSaved: (path) => set({ path, dirty: false }),
   set: (patch) => set(patch),
-  select: (ids, cable = null) => set({ selection: ids, selectedCable: cable }),
+  select: (ids, cable = null) => set({ selection: ids, selectedCable: cable, selectedAccessory: null }),
   focusIssue: (s) => {
     switch (s.kind) {
       case 'equipment': set({ mode: 'diagram', selection: [s.id], selectedCable: null }); break

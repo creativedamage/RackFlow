@@ -19,6 +19,11 @@ import { GroupFrame, type GroupFrameType } from './GroupFrame'
 import { CableEdge, type CableEdgeType } from './CableEdge'
 import { GroupsPanel, useGroupFocus } from './GroupsPanel'
 import { useWiring } from './wiring'
+import { tidyDiagram } from './tidy'
+import { SchematicPrintDialog } from '../print/SchematicPrint'
+import { createPortal } from 'react-dom'
+import { Segmented } from '../components/ui'
+import type { WireMode } from '@core/index'
 
 const nodeTypes = { device: DeviceNode, groupFrame: GroupFrame }
 const edgeTypes = { cable: CableEdge }
@@ -95,11 +100,22 @@ export function DiagramView() {
     return m
   }, [issues])
 
+  const wireMode = project.diagram?.wires ?? 'all'
+  const autoTidy = !!project.diagram?.autoTidy
+  // Auto-tidy: when devices or cables are added, re-arrange in the same undo step.
+  const counts = useRef({ e: project.equipment.length, c: project.cables.length })
+  useEffect(() => {
+    const prev = counts.current
+    counts.current = { e: project.equipment.length, c: project.cables.length }
+    if (autoTidy && (project.equipment.length > prev.e || project.cables.length > prev.c)) tidyDiagram({ amend: true })
+  }, [project.equipment.length, project.cables.length, autoTidy])
+
   const edges: CableEdgeType[] = useMemo(() => {
     const sel = new Set(selection)
     const lanes = new Map<string, number>()
     return project.cables.map((c) => {
       const from = resolve(project, c.from)
+      const to = resolve(project, c.to)
       const d = from ? portDomain(from.port) : null
       const sev = cableSeverity.get(c.id)
       const color = sev === 'error' ? '#e03131' : d ? DOMAINS[d].color : '#888'
@@ -112,10 +128,11 @@ export function DiagramView() {
       return {
         id: c.id, source: c.from.equipment, sourceHandle: c.from.port, target: c.to.equipment, targetHandle: c.to.port,
         type: 'cable' as const, selected: isSel, zIndex: lifted ? 1000 : 0,
-        data: { label: c.label, color, dashed: sev === 'error', lane: lane + project.cables.indexOf(c), onSelect: () => select([], c.id) },
+        data: { label: c.label, color, dashed: sev === 'error', lane: lane + project.cables.indexOf(c), onSelect: () => select([], c.id),
+          mode: wireMode, toText: to ? `${to.equipment.tag} · ${to.port.label}` : undefined, fromText: from ? `${from.equipment.tag} · ${from.port.label}` : undefined },
       }
     })
-  }, [project, cableSeverity, selectedCable, selection, select])
+  }, [project, cableSeverity, selectedCable, selection, select, wireMode])
 
   useEffect(() => { if (fitRequest) void fitView({ padding: 0.15, duration: 250 }) }, [fitRequest, fitView])
 
@@ -285,6 +302,7 @@ export function DiagramView() {
         <MiniMap pannable zoomable nodeColor="var(--node-mini)" maskColor="var(--minimap-mask)" />
         <WiringHint />
         <PickedPanel />
+        <DiagramTools />
         <GroupsPanel />
         {project.equipment.length === 0 && (
           <Panel position="top-center" className="hint-panel">
@@ -334,6 +352,38 @@ function PickedPanel() {
       <b>{picked.length}</b> port{picked.length === 1 ? '' : 's'} picked.{' '}
       {picked.length > 1 ? 'Drag from any of them to the first destination port. The rest land on the ports after it.' : 'Shift-click more ports to patch them together.'}
       <button className="mini" onClick={clear}>Clear (Esc)</button>
+    </Panel>
+  )
+}
+
+/** Top-right tools: Tidy Up, wire drawing mode, auto-tidy. */
+function DiagramTools() {
+  const settings = useStore((s) => s.project.diagram)
+  const selection = useStore((s) => s.selection)
+  const apply = useStore((s) => s.apply)
+  const notify = useStore((s) => s.notify)
+  const { fitView } = useReactFlow()
+  const [printing, setPrinting] = useState(false)
+  const set = (label: string, patch: Partial<NonNullable<typeof settings>>) => apply(label, (d) => { d.diagram = { ...(d.diagram ?? {}), ...patch } })
+  const tidy = (sel: boolean) => {
+    const n = tidyDiagram({ selectionOnly: sel })
+    if (n) { notify(`Tidied ${n} device${n === 1 ? '' : 's'} by signal flow`, { undo: true, kind: 'success' }); setTimeout(() => void fitView({ padding: 0.12, duration: 300 }), 60) }
+  }
+  return (
+    <Panel position="top-right" className="diagram-tools">
+      <button className="primary" onClick={() => tidy(selection.length > 1)} title={selection.length > 1 ? 'Arrange the selected devices by signal flow (⌥⌘L)' : 'Arrange the whole diagram by signal flow: sources left, destinations right, groups kept together (⌥⌘L)'}>
+        ✨ Tidy {selection.length > 1 ? 'Selection' : 'Up'}
+      </button>
+      <Segmented<WireMode> value={settings?.wires ?? 'all'} onChange={(v) => set('Wire Style', { wires: v })} options={[
+        { value: 'all', label: 'All wires', title: 'Draw every wire in full' },
+        { value: 'smart', label: 'Smart', title: 'Long or tangled wires become labelled stubs at each end (like a CAD drawing). Select one to see it in full.' },
+        { value: 'stubs', label: 'Stubs', title: 'Every wire is a labelled stub at each end' },
+      ]} />
+      <button onClick={() => setPrinting(true)} title="Print or export a CAD-style wiring drawing">Print…</button>
+      {printing && createPortal(<SchematicPrintDialog onClose={() => setPrinting(false)} />, document.body)}
+      <label className="check" title="Re-arrange automatically whenever you add a device or cable">
+        <input type="checkbox" checked={!!settings?.autoTidy} onChange={(e) => { set('Auto-Tidy', { autoTidy: e.target.checked }); if (e.target.checked) tidyDiagram({ amend: true }) }} /> Auto-tidy
+      </label>
     </Panel>
   )
 }

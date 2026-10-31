@@ -9,7 +9,7 @@ export type MenuCommand =
   | 'new' | 'open' | 'save' | 'saveAs' | 'save-and-close'
   | 'undo' | 'redo' | 'delete' | 'selectAll' | 'zoomFit'
   | 'mode:diagram' | 'mode:rack' | 'mode:patch' | 'mode:sheet'
-  | 'newProduct' | 'newTemplate' | 'toggleInspector' | 'editDevice' | 'findDevice'
+  | 'newProduct' | 'newTemplate' | 'toggleInspector' | 'editDevice' | 'findDevice' | 'tidy'
 
 export interface AiStatus { hasKey: boolean; model: string; canEncrypt: boolean }
 

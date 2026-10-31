@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import type { AccessoryKind } from '@core/index'
 import {
   BUILT_IN_KEYS, makePlateProduct, newPlateSpec, CATEGORIES, CATEGORY_KEYS, DOMAINS, FORMATS, newCustomProduct, newCustomTemplate, productDomains, templateName, totalChannels,
   type EquipmentCategory, type ProductDefinition, type SignalDomain,
@@ -15,6 +16,7 @@ import { duplicateProduct, productMenu, removeUserProduct } from '../product/pro
 
 export const DRAG_MIME = 'application/x-rackflow'
 export type DragPayload = { kind: 'product'; key: string } | { kind: 'patch'; key: string } | { kind: 'rack-eq'; id: string }
+  | { kind: 'rack-acc'; acc: AccessoryKind; height: number } | { kind: 'rack-acc-move'; rack: string; id: string }
 
 export function Sidebar() {
   const [tab, setTab] = useState<'gear' | 'makers' | 'patch'>('gear')

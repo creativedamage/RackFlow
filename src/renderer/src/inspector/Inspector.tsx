@@ -6,6 +6,7 @@ import {
 } from '@core/index'
 import { useStore } from '../store'
 import { RackSettings } from '../rack/RackView'
+import { AccessoryInspector } from '../rack/AccessoryInspector'
 import { groupSelection, SYSTEM_OPTIONS } from '../diagram/GroupsPanel'
 import { Dot, Field, NumberInput, Select, SeverityIcon, TextInput } from '../components/ui'
 
@@ -19,10 +20,13 @@ export function Inspector() {
   const cable = selectedCable ? project.cables.find((c) => c.id === selectedCable) : undefined
   const eq = selection.length === 1 ? project.equipment.find((e) => e.id === selection[0]) : undefined
   const rack = mode === 'rack' && selectedRack && !eq ? findRack(project, selectedRack) : undefined
+  const selAcc = useStore((s) => s.selectedAccessory)
+  const accRack = mode === 'rack' && selAcc && !eq ? project.racks.find((r) => r.id === selAcc.rack) : undefined
+  const acc = accRack?.accessories.find((a) => a.id === selAcc?.id)
 
   return (
     <aside className="inspector">
-      {cable ? <CableInspector cable={cable} /> : eq ? <EquipmentInspector eq={eq} /> : rack ? <RackSettings rack={rack} /> : selection.length > 1 ? <MultiInspector ids={selection} /> : <IssuesList />}
+      {acc && accRack ? <AccessoryInspector rack={accRack} acc={acc} /> : cable ? <CableInspector cable={cable} /> : eq ? <EquipmentInspector eq={eq} /> : rack ? <RackSettings rack={rack} /> : selection.length > 1 ? <MultiInspector ids={selection} /> : <IssuesList />}
     </aside>
   )
 }

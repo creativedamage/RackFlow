@@ -1,3 +1,4 @@
+import { tidyDiagram } from './diagram/tidy'
 import { DeviceFinder } from './product/DeviceFinder'
 import { ContextMenu } from './components/ContextMenu'
 import { editSelection } from './product/openEditor'
@@ -93,6 +94,7 @@ export function App() {
       case 'toggleInspector': s.set({ showInspector: !s.showInspector }); break
       case 'newProduct': s.set({ editingProduct: newCustomProduct() }); break
       case 'editDevice': editSelection(); break
+      case 'tidy': s.set({ mode: 'diagram' }); setTimeout(() => { const n = tidyDiagram({ selectionOnly: s.selection.length > 1 }); if (n) useStore.getState().notify(`Tidied ${n} devices`, { undo: true, kind: 'success' }) }, 0); break
       case 'findDevice': s.set({ finding: { query: '' } }); break
       case 'newTemplate': s.set({ editingTemplate: newCustomTemplate() }); break
     }

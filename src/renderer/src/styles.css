@@ -707,3 +707,36 @@ button.app-mark:hover { background: var(--bg-3) !important; }
 .finder-ai-settings summary { cursor: pointer; }
 .finder-ai-settings .row { margin-top: 6px; }
 .finder .data-note ul { margin: 4px 0 0 16px; padding: 0; }
+
+/* Diagram tools + wire stubs */
+.diagram-tools { display: flex; gap: 8px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; box-shadow: var(--shadow); backdrop-filter: blur(12px); }
+.diagram-tools .check { display: flex; gap: 4px; align-items: center; font-size: 12px; white-space: nowrap; }
+.cable-stub { position: absolute; z-index: 1500; pointer-events: all; display: flex; gap: 6px; align-items: center; font-size: 9.5px; line-height: 1; padding: 3px 6px; border: 1px solid; border-radius: 4px; background: var(--node-bg); color: var(--text); white-space: nowrap; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.cable-stub b { font-weight: 700; }
+.cable-stub span { color: var(--text-2); }
+.cable-stub:hover { box-shadow: 0 0 0 2px var(--accent-soft); }
+
+/* Rack panels */
+.panel-palette { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 6px 12px; border-bottom: 1px solid var(--line-2); }
+.palette-chip { font-size: 11px; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--line); background: var(--bg); cursor: grab; user-select: none; }
+.palette-chip:hover { border-color: var(--accent); }
+.rack-item.accessory { justify-content: center; cursor: grab; background: #1c1c1e; color: #c9c9cf; border-color: #555; font-size: 10px; letter-spacing: .06em; }
+.rack-item.accessory.finish-white { background: #f4f4f6; color: #333; }
+.rack-item.accessory.finish-silver { background: linear-gradient(#d9d9de, #b9b9c0); color: #222; }
+.rack-item.acc-brush { background: repeating-linear-gradient(90deg, #2a2a2d 0 2px, #3c3c40 2px 3px); }
+.rack-item.acc-brush .acc-label { background: #1c1c1e; padding: 1px 6px; border: 1px solid #666; }
+.rack-item.acc-vent { background: repeating-linear-gradient(90deg, #1c1c1e 0 6px, #45454a 6px 9px); }
+.rack-item.acc-vent .acc-label { background: #1c1c1e; padding: 0 6px; }
+.rack-item.acc-lacing { background: repeating-linear-gradient(90deg, transparent 0 14px, #555 14px 16px), #2b2b2e; }
+.rack-item .acc-logo { max-height: 85%; max-width: 70%; object-fit: contain; pointer-events: none; }
+.rack-item .rack-model { color: #6e6e73; flex: 1; min-width: 0; }
+.logo-preview { padding: 10px; border-radius: 6px; display: flex; justify-content: center; background: #1c1c1e; margin: 6px 0; }
+.logo-preview.finish-white { background: #f4f4f6; } .logo-preview.finish-silver { background: #c9c9cf; }
+.logo-preview img { max-height: 60px; max-width: 100%; }
+
+/* Drawing print preview */
+.drawing-preview .preview-pages { flex: 1; overflow: auto; background: #8e8e93; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.drawing-page { background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.35); flex: none; max-width: none; }
+.drawing-page svg { width: 100%; height: 100%; display: block; }
+.drawing-preview .preview-opts { width: 270px; flex: none; overflow: auto; padding: 14px; border-right: 1px solid var(--line-2); }
+.drawing-preview .preview-opts h4 { margin: 12px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-2); }
