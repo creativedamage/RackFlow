@@ -64,14 +64,94 @@ export function schematicSheets(p: Project, o: SchematicOptions): string[] {
   return pages.map((pg, i) => drawPage(p, o, pg, i + 1, pages.length, sheetOf))
 }
 
-function drawPage(p: Project, o: SchematicOptions, page: Page, n: number, total: number, sheetOf: Map<string, number>): string {
-  const { svg, area } = newSheet(p, o, n, total, page.title)
+/** How far wires, labels and off-sheet flags reach out of each side of a block (diagram units). */
+export function sideReach(p: Project, e: EquipmentInstance, o: Pick<SchematicOptions, 'wires'>): { left: number; right: number } {
+  let left = 0, right = 0
+  for (const c of p.cables) {
+    const mine = c.from.equipment === e.id ? c.from : c.to.equipment === e.id ? c.to : null
+    if (!mine) continue
+    const other = mine === c.from ? c.to : c.from
+    const g = nodeGeom(e).port(mine.port)
+    const oe = p.equipment.find((x) => x.id === other.equipment)
+    const op = oe?.product.ports.find((x) => x.id === other.port)
+    if (!g || !oe || !op) continue
+    // Wire label ("V-0012" / "PB002-VSW001"); stubs add the stub and the flag naming the far end.
+    const label = 84
+    const flag = STUB + Math.max(40, textWidth(`${portRef(oe, op)} (SHT 99)`, 7.5) + 14)
+    const r = o.wires === 'all' ? label : Math.max(label, flag)
+    if (g.side === 'left') left = Math.max(left, r); else right = Math.max(right, r)
+  }
+  return { left, right }
+}
+
+const ZONE_PAD = 36 // room zone border distance from what it encloses
+
+/**
+ * Print positions: the diagram's layout, re-spaced so nothing crowds –
+ * columns are pushed apart far enough for each side's wire labels and
+ * off-sheet flags (and room borders between rooms), then blocks in a column
+ * are pushed down so every block keeps its tag above and type line below.
+ */
+export function printPositions(p: Project, eqs: EquipmentInstance[], o: Pick<SchematicOptions, 'wires'> = { wires: 'smart' }): Map<string, { x: number; y: number }> {
+  const H = (e: EquipmentInstance) => nodeGeom(e).height + 12 // box incl. the type line
+  const reach = new Map(eqs.map((e) => [e.id as string, sideReach(p, e, o)]))
+  const room = (e: EquipmentInstance) => e.room?.trim() ?? ''
+  // 1. Columns: devices whose x is within 120 of each other move together.
+  const byX = [...eqs].sort((a, b) => a.position.x - b.position.x)
+  const cols: EquipmentInstance[][] = []
+  for (const e of byX) {
+    const c = cols[cols.length - 1]
+    if (c && e.position.x - c[0].position.x < 120) c.push(e); else cols.push([e])
+  }
+  const shift = new Map<string, number>()
+  let prevRight = -Infinity, prevRooms = new Set<string>(), prevReach = 0, offset = 0
+  for (const c of cols) {
+    const x0 = Math.min(...c.map((e) => e.position.x)) + offset
+    const leftReach = Math.max(...c.map((e) => reach.get(e.id)!.left))
+    const rooms = new Set(c.map(room))
+    const roomGap = [...rooms].some((r) => !prevRooms.has(r)) || [...prevRooms].some((r) => !rooms.has(r)) ? ZONE_PAD * 2 + 20 : 0
+    const need = prevRight + prevReach + BADGE * 2 + leftReach + 40 + roomGap
+    if (x0 < need) offset += need - x0
+    for (const e of c) shift.set(e.id, offset)
+    prevRight = Math.max(...c.map((e) => e.position.x + offset + NODE_WIDTH))
+    prevReach = Math.max(...c.map((e) => reach.get(e.id)!.right))
+    prevRooms = rooms
+  }
+  // 2. Rows: push blocks down until they clear the ones above them.
+  const order = [...eqs].sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x)
+  const placed: { e: EquipmentInstance; x: number; y: number }[] = []
+  const out = new Map<string, { x: number; y: number }>()
+  const pad = BADGE + 50
+  for (const e of order) {
+    let y = e.position.y
+    const x = e.position.x + (shift.get(e.id) ?? 0)
+    for (let again = true; again;) {
+      again = false
+      for (const q of placed) {
+        if (!(x - pad < q.x + NODE_WIDTH + pad && q.x - pad < x + NODE_WIDTH + pad)) continue
+        const gap = room(q.e) === room(e) ? 60 : 60 + ZONE_PAD * 2 + 30
+        const bottom = q.y + H(q.e) + gap
+        if (y + H(e) + gap > q.y && y < bottom) { y = bottom; again = true }
+      }
+    }
+    placed.push({ e, x, y })
+    out.set(e.id, { x, y })
+  }
+  return out
+}
+
+function drawPage(p0: Project, o: SchematicOptions, page: Page, n: number, total: number, sheetOf: Map<string, number>): string {
+  const { svg, area } = newSheet(p0, o, n, total, page.title)
+  // Work on a copy with print positions so blocks never crowd each other.
+  const pos = printPositions(p0, p0.equipment.filter((e) => page.ids.has(e.id)), o)
+  const p: Project = { ...p0, equipment: p0.equipment.map((e) => (pos.has(e.id) ? { ...e, position: pos.get(e.id)! } : e)) }
   const eqs = p.equipment.filter((e) => page.ids.has(e.id))
   const geo = new Map(eqs.map((e) => [e.id as string, nodeGeom(e)]))
   // Bounds in diagram units (room for tags above, category below, stubs and labels at the sides).
-  const x0 = Math.min(...eqs.map((e) => e.position.x)) - STUB - 160
-  const y0 = Math.min(...eqs.map((e) => e.position.y)) - 60
-  const x1 = Math.max(...eqs.map((e) => e.position.x + NODE_WIDTH)) + STUB + 160
+  const reachOf = new Map(eqs.map((e) => [e.id as string, sideReach(p, e, o)]))
+  const x0 = Math.min(...eqs.map((e) => e.position.x - BADGE - reachOf.get(e.id)!.left - ZONE_PAD)) - 20
+  const y0 = Math.min(...eqs.map((e) => e.position.y)) - 100
+  const x1 = Math.max(...eqs.map((e) => e.position.x + NODE_WIDTH + BADGE + reachOf.get(e.id)!.right + ZONE_PAD)) + 20
   const y1 = Math.max(...eqs.map((e) => e.position.y + geo.get(e.id)!.height)) + 60
   const scale = Math.min(area.w / (x1 - x0), area.h / (y1 - y0), 0.6)
   const ox = area.x + (area.w - (x1 - x0) * scale) / 2, oy = area.y + (area.h - (y1 - y0) * scale) / 2
@@ -80,18 +160,18 @@ function drawPage(p: Project, o: SchematicOptions, page: Page, n: number, total:
     return { id: e.id, x0: e.position.x - BADGE - WIRE_CLEAR, y0: e.position.y - 22 - WIRE_CLEAR, x1: e.position.x + g.width + BADGE + WIRE_CLEAR, y1: e.position.y + g.height + 14 + WIRE_CLEAR }
   })
   svg.group(`translate(${ox} ${oy}) scale(${scale}) translate(${-x0} ${-y0})`, (g) => {
-    if (o.rooms && o.split !== 'room') drawRooms(g, eqs, geo)
+    if (o.rooms && o.split !== 'room') drawRooms(g, eqs, geo, reachOf)
     for (const e of eqs) drawDevice(g, e, o)
     drawWires(g, p, o, eqs, rects, sheetOf, n)
   })
   return svg.toString()
 }
 
-function drawRooms(svg: Svg, eqs: EquipmentInstance[], geo: Map<string, { width: number; height: number }>) {
+function drawRooms(svg: Svg, eqs: EquipmentInstance[], geo: Map<string, { width: number; height: number }>, reach: Map<string, { left: number; right: number }>) {
   const rooms = new Map<string, EquipmentInstance[]>()
   for (const e of eqs) if (e.room?.trim()) rooms.set(e.room.trim(), [...(rooms.get(e.room.trim()) ?? []), e])
   if (rooms.size < 1) return
-  const boxOf = (e: EquipmentInstance) => ({ x0: e.position.x - BADGE - 40, y0: e.position.y - 52, x1: e.position.x + NODE_WIDTH + BADGE + 40, y1: e.position.y + geo.get(e.id)!.height + 34 })
+  const boxOf = (e: EquipmentInstance) => ({ x0: e.position.x - BADGE - (reach.get(e.id)?.left ?? 0) - ZONE_PAD / 2, y0: e.position.y - 30 - ZONE_PAD, x1: e.position.x + NODE_WIDTH + BADGE + (reach.get(e.id)?.right ?? 0) + ZONE_PAD / 2, y1: e.position.y + geo.get(e.id)!.height + 12 + ZONE_PAD })
   const near = (a: { x0: number; y0: number; x1: number; y1: number }, b: typeof a) => a.x0 < b.x1 + 80 && b.x0 < a.x1 + 80 && a.y0 < b.y1 + 80 && b.y0 < a.y1 + 80
   for (const [room, ms] of rooms) {
     // Devices of one room that sit apart get separate zones instead of one box over everything.
@@ -112,7 +192,10 @@ function drawRooms(svg: Svg, eqs: EquipmentInstance[], geo: Map<string, { width:
     }
     for (const z of zones) {
       svg.rect(z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0, { lw: 1, dash: '14 8', stroke: '#444' })
-      svg.text(z.x0 + 8, z.y0 + 12, room.toUpperCase(), { size: 12, fill: '#444' })
+      // Room name on the top border, on a white backing so lines never run through it.
+      const label = room.toUpperCase(), tw = textWidth(label, 12) + 14
+      svg.rect(z.x0 + 10, z.y0 - 8, tw, 16, { fill: '#fff', stroke: 'none', lw: 0 })
+      svg.text(z.x0 + 15, z.y0, label, { size: 12, fill: '#444' })
     }
   }
 }

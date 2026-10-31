@@ -2,7 +2,7 @@
 // Coordinates are millimetres on the sheet.
 
 export const CAD_FONT = `'Arial Narrow', 'Helvetica Neue Condensed', 'Roboto Condensed', 'Liberation Sans Narrow', Arial, sans-serif`
-const AVG_EM = 0.5 // average glyph advance for a condensed face, in ems
+const AVG_EM = 0.6 // average glyph advance (uppercase-heavy CAD text), in ems
 
 export const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const n = (v: number) => (Math.round(v * 100) / 100).toString()
