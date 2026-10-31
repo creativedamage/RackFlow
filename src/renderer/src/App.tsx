@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { ExportAllDialog } from './print/ExportAllDialog'
 import { PanelResizer, usePanelWidth } from './components/PanelResizer'
 import { tidyDiagram } from './diagram/tidy'
@@ -20,6 +21,7 @@ import { Toasts } from './components/Toasts'
 import { ScheduleView } from './sheet/ScheduleView'
 import { LedView } from './led/LedView'
 import { ViewEditor } from './diagram/ViewEditor'
+import { SheetNumbersDialog } from './diagram/SheetNumbers'
 import { usePatchUI } from './patch/patchState'
 import { Inspector } from './inspector/Inspector'
 import { ProductEditor } from './product/ProductEditor'
@@ -53,6 +55,7 @@ export function App() {
   const finding = useStore((s) => s.finding)
   const exportingAll = useStore((s) => s.exportingAll)
   const editingView = useStore((s) => s.editingView)
+  const editingNumbers = useStore((s) => s.editingNumbers)
   const editingTemplate = useStore((s) => s.editingTemplate)
   const title = useStore((s) => s.project.info.name)
   const dirty = useStore((s) => s.dirty)
@@ -138,6 +141,7 @@ export function App() {
         {editingTemplate && <TemplateEditor key={editingTemplate.key} initial={editingTemplate} />}
         {finding && <DeviceFinder initialQuery={finding.query} />}
         {editingView && <ViewEditor key={editingView} id={editingView} onClose={() => useStore.getState().set({ editingView: null })} />}
+        {editingNumbers && createPortal(<SheetNumbersDialog onClose={() => useStore.getState().set({ editingNumbers: false })} />, document.body)}
         {exportingAll && <ExportAllDialog onClose={() => useStore.getState().set({ exportingAll: false })} />}
         <Toasts />
         <ContextMenu />

@@ -48,6 +48,7 @@ export interface AppState {
   diagramView: string | null
   /** View being created / edited ('new' or an id). */
   editingView: string | null
+  editingNumbers: boolean
   showInspector: boolean
   issues: ValidationIssue[]
   /** Bumped to ask the diagram to fit view. */
@@ -112,6 +113,7 @@ export const useStore = create<AppState>((set, get) => ({
   ledPicking: false,
   diagramView: null,
   editingView: null,
+  editingNumbers: false,
   showInspector: true,
   issues: [],
   fitRequest: 0,

@@ -39,6 +39,7 @@ export function SchematicPrintDialog({ onClose }: { onClose: () => void }) {
             }} />
           })}
         </>)}
+        <button className="mini" onClick={() => useStore.getState().set({ editingNumbers: true })} title="Prefix + start number (AV101, AV102…) or a custom number per page">Sheet Numbers…</button>
         <Toggle label="Room zones (dashed)" checked={o.rooms} onChange={(rooms) => set({ ...o, rooms })} />
         <Toggle label="Colour by signal" checked={o.color} onChange={(color) => set({ ...o, color })} />
         <p className="muted small">Tip: ✨ Tidy Up the diagram first. Wires that leave a sheet end in an arrow naming the device, port and sheet they go to.</p>

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
@@ -79,13 +79,19 @@ export function Segmented<T extends string>({ value, options, onChange }: { valu
 }
 
 export function Modal({ title, onClose, children, footer, wide }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    // Esc closes only the top-most dialog (e.g. Sheet Numbers over Print).
+    const k = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      const all = document.querySelectorAll('.modal-backdrop')
+      if (all[all.length - 1] === ref.current) onClose()
+    }
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
   }, [onClose])
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="modal-backdrop" ref={ref} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-label={title}>
         <header className="modal-header"><h2>{title}</h2><button className="icon-btn" onClick={onClose} aria-label="Close">✕</button></header>
         <div className="modal-body">{children}</div>

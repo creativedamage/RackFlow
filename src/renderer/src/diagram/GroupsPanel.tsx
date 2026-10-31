@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Panel } from '@xyflow/react'
 import { create } from 'zustand'
-import { autoGroupBySystem, createGroup, deleteView, DOMAINS, groupColor, groupsOf, membersOf, moveToPage, nodeGeom, setInView, ungroup, viewMembers, viewsOf, type DeviceGroup, type SignalDomain } from '@core/index'
+import { autoGroupBySystem, createGroup, deleteView, pageNumbers, GENERAL_PAGE, DOMAINS, groupColor, groupsOf, membersOf, moveToPage, nodeGeom, setInView, ungroup, viewMembers, viewsOf, type DeviceGroup, type SignalDomain } from '@core/index'
 import { showContextMenu } from '../components/ContextMenu'
 import { tidyDiagram } from './tidy'
 import type { MenuItem } from '../components/ContextMenu'
@@ -90,6 +90,9 @@ export function PageTabs() {
   const set = useStore((s) => s.set)
   const views = useStore((s) => s.project.views)
   const viewId = useStore((s) => s.diagramView)
+  const project = useStore((s) => s.project)
+  const nums = pageNumbers(project)
+  const numMenu = (e: React.MouseEvent) => showContextMenu(e, [{ label: 'Sheet Numbers…', onClick: () => set({ editingNumbers: true }) }])
   const list = groups ?? []
   useEffect(() => { if (viewId && !(views ?? []).some((v) => v.id === viewId)) set({ diagramView: null }) }, [views, viewId, set])
   useEffect(() => { if (page && !list.some((g) => g.id === page)) set({ diagramPage: null }) }, [list, page, set])
@@ -97,10 +100,10 @@ export function PageTabs() {
   const unassigned = counts.filter((e) => !e.groupId || !list.some((g) => g.id === e.groupId)).length
   return (
     <div className="page-tabs" role="tablist">
-      <button data-page="" className={page === null && !viewId ? 'on' : ''} onClick={() => set({ diagramPage: null, diagramView: null })} title="Show every page together">All pages <span>{n(null)}</span></button>
+      <button data-page="" className={page === null && !viewId ? 'on' : ''} onClick={() => set({ diagramPage: null, diagramView: null })} onContextMenu={numMenu} title="Show every page together">{!list.length && nums.get(GENERAL_PAGE) && <b className="pt-num">{nums.get(GENERAL_PAGE)}</b>}All pages <span>{n(null)}</span></button>
       {list.map((g) => (
-        <button key={g.id} data-page={g.id} className={page === g.id && !viewId ? 'on' : ''} onClick={() => set({ diagramPage: g.id, diagramView: null })} title={`Show only “${g.name}”. Drop devices here to move them to this page.`}>
-          <i style={{ background: groupColor(g) }} />{g.name} <span>{n(g.id)}</span>
+        <button key={g.id} data-page={g.id} className={page === g.id && !viewId ? 'on' : ''} onClick={() => set({ diagramPage: g.id, diagramView: null })} onContextMenu={numMenu} title={`Show only “${g.name}”. Drop devices here to move them to this page.`}>
+          <i style={{ background: groupColor(g) }} />{nums.get(g.id) && <b className="pt-num">{nums.get(g.id)}</b>}{g.name} <span>{n(g.id)}</span>
         </button>
       ))}
       {list.length > 0 && unassigned > 0 && <span className="muted small pt-hint">{unassigned} not on a page</span>}
@@ -123,15 +126,18 @@ export function PageTabs() {
           onDoubleClick={() => set({ editingView: v.id })}
           onContextMenu={(e) => showContextMenu(e, [
             { label: 'Edit View…', onClick: () => set({ editingView: v.id }) },
+            { label: 'Sheet Numbers…', onClick: () => set({ editingNumbers: true }) },
             { label: 'Tidy This View', onClick: () => { openView(v.id); tidyDiagram() } },
             'sep',
             { label: 'Delete View', danger: true, onClick: () => { useStore.getState().apply('Delete View', (d) => deleteView(d, v.id)); useStore.getState().notify(`Deleted view “${v.name}” – the devices are still on the diagram`, { undo: true }) } },
           ])}
           title={`Signal view: only ${v.domains.map((d) => DOMAINS[d].name).join(', ')} ports. Double-click or right-click to edit.`}>
-          <span className="pt-doms">{v.domains.map((d) => <i key={d} style={{ background: DOMAINS[d].color }} />)}</span>{v.name} <span>{viewMembers(useStore.getState().project, v).length}</span>
+          <span className="pt-doms">{v.domains.map((d) => <i key={d} style={{ background: DOMAINS[d].color }} />)}</span>{nums.get(v.id) && <b className="pt-num">{nums.get(v.id)}</b>}{v.name} <span>{viewMembers(useStore.getState().project, v).length}</span>
         </button>
       ))}
       <button className="pt-add" onClick={() => set({ editingView: 'new' })} title="New signal view: chosen devices with only some signal types (e.g. audio tie lines), with its own layout. The main diagram keeps every port.">＋ View</button>
+      <span className="pt-fill" />
+      <button className="pt-numbers" onClick={() => set({ editingNumbers: true })} title="Sheet numbers – prefix and start (AV101, AV102…) or a custom number per page"># Sheet Numbers</button>
     </div>
   )
 }

@@ -4,6 +4,7 @@
 // cross-sheet runs, and dashed room zones.
 
 import { viewPrintProject, viewsOf } from '../views'
+import { autoNumber, GENERAL_PAGE, pageNumbers, sheetLabel } from '../sheetnumbers'
 import { CATEGORIES, type Annotation, type Cable, type EquipmentInstance, type PortTemplate, type Project, type WireMode } from '../model'
 import { DOMAINS } from '../signals'
 import { portDomain } from '../project'
@@ -70,10 +71,18 @@ export function schematicSheets(p0: Project, o: SchematicOptions): string[] {
   pages.forEach((pg, i) => pg.ids.forEach((id) => sheetOf.set(id, i + 1)))
   const extra = views.map((v) => ({ v, ...viewPrintProject(p0, v) })).filter((x) => x.ids.size)
   const total = pages.length + extra.length
+  // Sheet numbers: each page's / view's own number (AV101…) when splitting by page, else
+  // the automatic sequence, else the drawing number counted up (AV-201, AV-202…).
+  const nums = pageNumbers(p0), numbering = p0.diagram?.numbering
+  const byIndex = (i: number) => (numbering ? autoNumber(numbering, i) : sheetLabel(o.drawingNumber, i))
+  const labels: (string | undefined)[] = [
+    ...pages.map((pg, i) => (o.split === 'group' ? nums.get(pg.pageId ?? GENERAL_PAGE) ?? sheetLabel(o.drawingNumber, i) : byIndex(i))),
+    ...extra.map(({ v }, i) => nums.get(v.id) ?? byIndex(pages.length + i)),
+  ]
   return [
-    ...pages.map((pg, i) => drawPage(p, o, pg, i + 1, total, sheetOf)),
+    ...pages.map((pg, i) => drawPage(p, o, pg, i + 1, total, sheetOf, labels)),
     // Wires leaving a view end in arrows naming the device and the main sheet it's on.
-    ...extra.map(({ v, project: vp, ids }, i) => drawPage(vp, { ...o, split: 'group' }, { title: v.name.toUpperCase(), pageId: v.id, ids }, pages.length + i + 1, total, sheetOf)),
+    ...extra.map(({ v, project: vp, ids }, i) => drawPage(vp, { ...o, split: 'group' }, { title: v.name.toUpperCase(), pageId: v.id, ids }, pages.length + i + 1, total, sheetOf, labels)),
   ]
 }
 
@@ -90,7 +99,7 @@ export function sideReach(p: Project, e: EquipmentInstance, o: Pick<SchematicOpt
     if (!g || !oe || !op) continue
     // Wire label ("V-0012" / "PB002-VSW001"); stubs add the stub and the flag naming the far end.
     const label = 84
-    const flag = STUB + Math.max(40, textWidth(`${portRef(oe, op)} (SHT 99)`, 7.5) + 14)
+    const flag = STUB + Math.max(40, textWidth(`${portRef(oe, op)} (SHT AV1099)`, 7.5) + 14)
     const r = o.wires === 'all' ? label : Math.max(label, flag)
     if (g.side === 'left') left = Math.max(left, r); else right = Math.max(right, r)
   }
@@ -153,8 +162,8 @@ export function printPositions(p: Project, eqs: EquipmentInstance[], o: Pick<Sch
   return out
 }
 
-function drawPage(p0: Project, o: SchematicOptions, page: Page, n: number, total: number, sheetOf: Map<string, number>): string {
-  const { svg, area } = newSheet(p0, o, n, total, page.title)
+function drawPage(p0: Project, o: SchematicOptions, page: Page, n: number, total: number, sheetOf: Map<string, number>, labels: (string | undefined)[] = []): string {
+  const { svg, area } = newSheet(p0, o, n, total, page.title, labels[n - 1])
   // Work on a copy with print positions so blocks never crowd each other.
   const pos = printPositions(p0, p0.equipment.filter((e) => page.ids.has(e.id)), o)
   const p: Project = { ...p0, equipment: p0.equipment.map((e) => (pos.has(e.id) ? { ...e, position: pos.get(e.id)! } : e)) }
@@ -182,7 +191,7 @@ function drawPage(p0: Project, o: SchematicOptions, page: Page, n: number, total
   svg.group(`translate(${ox} ${oy}) scale(${scale}) translate(${-x0} ${-y0})`, (g) => {
     if (o.rooms && o.split !== 'room') drawRooms(g, eqs, geo, reachOf)
     for (const e of eqs) drawDevice(g, e, o)
-    drawWires(g, p, o, eqs, rects, sheetOf, n)
+    drawWires(g, p, o, eqs, rects, sheetOf, n, labels)
     for (const a of notes) drawNote(g, a)
   })
   return svg.toString()
@@ -262,7 +271,7 @@ function endOf(p: Project, a: Cable['from']): End | null {
   return { eq, port, dir, pt: { x: eq.position.x + g.x + dir * BADGE, y: eq.position.y + g.y } }
 }
 
-function drawWires(svg: Svg, p: Project, o: SchematicOptions, eqs: EquipmentInstance[], rects: Rect[], sheetOf: Map<string, number>, page: number) {
+function drawWires(svg: Svg, p: Project, o: SchematicOptions, eqs: EquipmentInstance[], rects: Rect[], sheetOf: Map<string, number>, page: number, labels: (string | undefined)[] = []) {
   const onPage = new Set(eqs.map((e) => e.id as string))
   const cables = p.cables.filter((c) => onPage.has(c.from.equipment) || onPage.has(c.to.equipment))
   // Channel plan for wires drawn in full on this sheet.
@@ -296,7 +305,7 @@ function drawWires(svg: Svg, p: Project, o: SchematicOptions, eqs: EquipmentInst
       for (const [here, there] of [[a, b], [b, a]] as const) {
         if (!onPage.has(here.eq.id)) continue
         const sheet = sheetOf.get(there.eq.id)
-        const ref = `${portRef(there.eq, there.port)}${sheet && sheet !== page ? ` (SHT ${sheet})` : ''}`
+        const ref = `${portRef(there.eq, there.port)}${sheet && sheet !== page ? ` (SHT ${labels[sheet - 1] ?? sheet})` : ''}`
         offSheet(svg, here, c.label, tags, ref, stroke)
       }
     }

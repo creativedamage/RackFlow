@@ -2,6 +2,7 @@
 
 import type { LogoAsset, Project } from '../model'
 import { Svg } from './svg'
+import { sheetLabel } from '../sheetnumbers'
 
 export interface SheetSize { key: string; name: string; w: number; h: number }
 /** Landscape dimensions in mm. */
@@ -40,14 +41,14 @@ export function sheetSize(o: SheetOptions): { w: number; h: number } {
 }
 
 /** A blank sheet with border and (optionally) a title block along the bottom. */
-export function newSheet(p: Project, o: SheetOptions, page: number, pages: number, subtitle = ''): SheetFrame {
+export function newSheet(p: Project, o: SheetOptions, page: number, pages: number, subtitle = '', sheetNo?: string): SheetFrame {
   const { w, h } = sheetSize(o)
   const svg = new Svg(w, h)
   svg.rect(MARGIN / 2, MARGIN / 2, w - MARGIN, h - MARGIN, { lw: 0.5 })
   let area = { x: MARGIN, y: MARGIN, w: w - MARGIN * 2, h: h - MARGIN * 2 }
   if (o.titleBlock) {
     const top = h - MARGIN / 2 - TB_H
-    titleBlock(svg, p, o, { x: MARGIN / 2, y: top, w: w - MARGIN, h: TB_H }, page, pages, subtitle)
+    titleBlock(svg, p, o, { x: MARGIN / 2, y: top, w: w - MARGIN, h: TB_H }, page, pages, subtitle, sheetNo ?? sheetLabel(o.drawingNumber, page - 1))
     area = { ...area, h: top - MARGIN - 2 }
     // Revision block: bottom-right, just above the title block (latest revisions).
     const revs = (p.revisions ?? []).slice(-6)
@@ -78,7 +79,7 @@ export function newSheet(p: Project, o: SheetOptions, page: number, pages: numbe
   return { svg, area }
 }
 
-function titleBlock(svg: Svg, p: Project, o: SheetOptions, r: { x: number; y: number; w: number; h: number }, page: number, pages: number, subtitle: string) {
+function titleBlock(svg: Svg, p: Project, o: SheetOptions, r: { x: number; y: number; w: number; h: number }, page: number, pages: number, subtitle: string, sheetNo?: string) {
   svg.line(r.x, r.y, r.x + r.w, r.y, { lw: 0.5 })
   const logo: LogoAsset | undefined = (p.logos ?? []).find((l) => l.id === o.logoId)
   const cells: { label: string; value: string; w: number }[] = [
@@ -89,7 +90,7 @@ function titleBlock(svg: Svg, p: Project, o: SheetOptions, r: { x: number; y: nu
     { label: 'DESIGNER', value: p.info.designer || '', w: 0.1 },
     { label: 'REV', value: (p.revisions?.length ? p.revisions[p.revisions.length - 1].rev : p.info.revision) || '', w: 0.05 },
     { label: 'DATE', value: new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }), w: 0.08 },
-    { label: 'SHEET', value: `${o.drawingNumber ? `${o.drawingNumber}.` : ''}${page} OF ${pages}`, w: 0.07 },
+    { label: sheetNo ? `SHEET  ·  ${page} OF ${pages}` : 'SHEET', value: sheetNo ?? `${page} OF ${pages}`, w: 0.07 },
   ]
   const logoW = logo ? Math.min(60, r.w * 0.12) : 0
   let x = r.x
@@ -102,8 +103,8 @@ function titleBlock(svg: Svg, p: Project, o: SheetOptions, r: { x: number; y: nu
   for (const c of cells) {
     const cw = rest * c.w
     svg.text(x + 2, r.y + 4, c.label, { size: 2.2, fill: '#555', baseline: 'middle' })
-    const size = c.label === 'PROJECT' || c.label === 'DRAWING' ? 5 : 4
-    svg.text(x + 2, r.y + r.h / 2 + 3, c.value.toUpperCase(), { size, weight: c.label === 'PROJECT' || c.label === 'DRAWING' ? 'bold' : 'normal', maxWidth: cw - 4 })
+    const size = c.label === 'PROJECT' || c.label === 'DRAWING' || (sheetNo && c.label.startsWith('SHEET')) ? 5 : 4
+    svg.text(x + 2, r.y + r.h / 2 + 3, c.value.toUpperCase(), { size, weight: c.label === 'PROJECT' || c.label === 'DRAWING' || (sheetNo && c.label.startsWith('SHEET')) ? 'bold' : 'normal', maxWidth: cw - 4 })
     x += cw
     if (x < r.x + r.w - 1) svg.line(x, r.y, x, r.y + r.h, { lw: 0.35 })
   }

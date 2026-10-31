@@ -900,3 +900,14 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .ve-row.off { color: var(--text-2); }
 .ve-row b { font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
 .ve-sec { padding: 6px 10px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-2); background: var(--bg-2); position: sticky; top: 0; }
+.page-tabs .pt-num { font-family: ui-monospace, Menlo, monospace; font-size: 11px; font-weight: 700; color: var(--accent); margin-right: 1px; }
+.page-tabs .pt-fill { flex: 1; }
+.page-tabs .pt-numbers { color: var(--text-2); font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+.sn-auto { margin: 4px 0 10px; }
+.sn-auto label { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; }
+.sn-table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 13px; }
+.sn-table th { text-align: left; font-size: 11px; color: var(--text-2); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.sn-table td { padding: 4px 6px; border-bottom: 1px solid var(--line-2); }
+.sn-table input { width: 120px; font-family: ui-monospace, Menlo, monospace; text-transform: uppercase; }
+.sn-table input.invalid { border-color: var(--danger); }
+.error-text { color: var(--danger); }

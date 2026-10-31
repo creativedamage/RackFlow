@@ -21,6 +21,8 @@ export interface SignalView {
   positions: Record<string, CanvasPoint>
   /** Hide ports that have no cable (keeps big patch bays readable). */
   hideUnused?: boolean
+  /** Custom sheet number; empty = automatic. */
+  number?: string
 }
 
 export const viewsOf = (p: Project): SignalView[] => p.views ?? []

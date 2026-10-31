@@ -217,6 +217,8 @@ export interface DeviceGroup {
   /** Colour family; 'custom' uses `color`. */
   system: SignalDomain | 'custom'
   color?: string
+  /** Custom sheet number (e.g. "AV101"); empty = automatic. */
+  number?: string
 }
 
 export interface PortAddress { equipment: EquipmentId; port: string }
@@ -268,7 +270,14 @@ export interface Rack {
 
 /** How wires are drawn: every wire in full, long / tangled runs as labelled stubs, or all as stubs. */
 export type WireMode = 'all' | 'smart' | 'stubs'
-export interface DiagramSettings { autoTidy?: boolean; wires?: WireMode }
+export interface DiagramSettings {
+  autoTidy?: boolean
+  wires?: WireMode
+  /** Automatic page numbers (prefix + start); unset = pages aren't numbered. */
+  numbering?: import('./sheetnumbers').SheetNumbering
+  /** Custom number for the sheet of devices that aren't on a page. */
+  generalNumber?: string
+}
 export interface LogoAsset { id: string; name: string; /** data: URL (PNG / JPEG / SVG). */ dataUrl: string }
 
 export type AnnotationKind = 'callout' | 'note' | 'revision'

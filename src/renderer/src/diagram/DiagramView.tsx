@@ -7,7 +7,7 @@ import {
   type Connection, type Edge, type EdgeChange, type NodeChange, type OnConnectStart,
 } from '@xyflow/react'
 import {
-  addEquipment, addPatchBay, addToGroup, layoutView, setInView, viewOffFlags, viewProject, viewsOf, nodeGeom, placeInFreeSpace, connectMany, groupColor, groupsOf, type BulkResult, candidates as findCandidates, connect, DOMAINS, portDomain, resolve, SIGNALS, validate,
+  addEquipment, addPatchBay, addToGroup, pageNumbers, GENERAL_PAGE, layoutView, setInView, viewOffFlags, viewProject, viewsOf, nodeGeom, placeInFreeSpace, connectMany, groupColor, groupsOf, type BulkResult, candidates as findCandidates, connect, DOMAINS, portDomain, resolve, SIGNALS, validate,
   type CableId, type EquipmentId, type PortAddress,
 } from '@core/index'
 import { useStore } from '../store'
@@ -81,7 +81,9 @@ export function DiagramView() {
       if (!a || !b || onPage(a) === onPage(b)) continue
       const [here, hereAddr, there, thereAddr] = onPage(a) ? [a, c.from, b, c.to] : [b, c.to, a, c.from]
       const tp = there.product.ports.find((x) => x.id === thereAddr.port)
-      const pg = there.groupId ? groups.get(there.groupId)?.name : undefined
+      const pgName = there.groupId ? groups.get(there.groupId)?.name : undefined
+      const pgNo = pageNumbers(project).get(there.groupId && pgName ? there.groupId : GENERAL_PAGE)
+      const pg = pgName ? (pgNo ? `${pgNo} ${pgName}` : pgName) : pgNo
       offPage.set(here.id, { ...(offPage.get(here.id) ?? {}), [hereAddr.port]: `${c.label} ▸ ${there.tag} · ${tp?.label ?? ''}${pg ? ` (${pg})` : ' (no page)'}` })
     }
     setNodes((prev) => {
