@@ -49,7 +49,7 @@ function EquipmentInspector({ eq }: { eq: EquipmentInstance }) {
             <button className="primary" onClick={() => editPlacedDevice(eq.id)} title="Edit this device’s ports, specs and power (⌘E). Also: double-click it on the diagram.">✎ Edit Device…</button>
             {p.key.includes('@') && <span className="badge" title="This device has its own edited specs">Edited</span>}
           </div>}
-      <Field label="Tag"><TextInput value={eq.tag} onCommit={(v) => upd('Rename Device', (e) => { e.tag = v })} /></Field>
+      <Field label="Tag"><TextInput value={eq.tag} onCommit={(v) => { const tag = v.trim(); if (!tag) return; apply('Rename Device', (d) => { const x = d.equipment.find((e) => e.id === eq.id); if (x) x.tag = tag; const b = d.patchBays.find((q) => q.equipment === eq.id); if (b) b.name = tag }) }} /></Field>
       <Field label="Room"><TextInput value={eq.room} placeholder="e.g. Main Hall" onCommit={(v) => upd('Set Room', (e) => { e.room = v })} /></Field>
       <Field label="Group">
         <Select value={eq.groupId ?? ''} onChange={(v: string) => {

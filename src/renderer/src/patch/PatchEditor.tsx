@@ -206,6 +206,8 @@ function Grid() {
 
   const onKey = (e: React.KeyboardEvent) => {
     const { sel, title, editing, setSel, set } = ui.getState()
+    // Typing in the bay header fields (name, location) isn't cell input.
+    if (!editing && isFormField(e.target)) return
     if (editing) {
       // Keys that arrive before the editor has focus belong to the text being typed.
       if ('seed' in editing && e.key.length === 1 && !e.metaKey && !e.ctrlKey) { e.preventDefault(); set({ editing: { ...editing, seed: (editing.seed ?? '') + e.key } }) }
@@ -270,6 +272,7 @@ function Grid() {
   }
 
   const onCopy = (e: React.ClipboardEvent, cut = false) => {
+    if (!ui.getState().editing && isFormField(e.target)) return
     const { sel } = ui.getState()
     const bay = sel && bays.find((b) => b.id === sel.bay)
     if (!sel || !bay) return
@@ -278,6 +281,7 @@ function Grid() {
     if (cut) editSelection('Cut', (b, s) => clearRange(b, s))
   }
   const onPaste = (e: React.ClipboardEvent) => {
+    if (!ui.getState().editing && isFormField(e.target)) return
     const text = e.clipboardData.getData('text/plain')
     if (!text) return
     e.preventDefault()
@@ -345,3 +349,5 @@ function AddBayButton() {
   }
   return <button className="primary add-bay" onClick={show}>+ Add Patch Bay</button>
 }
+
+const isFormField = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))

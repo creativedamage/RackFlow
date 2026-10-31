@@ -43,7 +43,7 @@ export const BayGrid = memo(function BayGrid({ bay, index, count }: { bay: Patch
   const header = (
     <div className={`pb-head ${active ? 'active' : ''}`}>
       <span className="pb-idx">{index + 1}</span>
-      <TextInput className="pb-name" value={bay.name} onCommit={(v) => editBay(bay.id, 'Rename Patch Bay', (b) => { b.name = v })} />
+      <TextInput className="pb-name" value={bay.name} onCommit={(v) => { const name = v.trim(); if (!name) return; useStore.getState().apply('Rename Patch Bay', (d) => { const b = d.patchBays.find((x) => x.id === bay.id); if (!b) return; b.name = name; const e = d.equipment.find((x) => x.id === b.equipment); if (e) e.tag = name }) }} />
       <TextInput className="pb-loc" value={bay.location} placeholder="Location" onCommit={(v) => editBay(bay.id, 'Bay Location', (b) => { b.location = v })} />
       <span className="pb-meta">{t.manufacturer}</span>
       <span className="pb-meta">{t.series}</span>
