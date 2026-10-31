@@ -3,7 +3,8 @@ import { produce } from 'immer'
 import {
   applyMeasured, cellSpanMM, CONNECTOR_TYPES, connectorIsPower, connectorName, finishPerCell, fitToWidth, FORMAT_KEYS, FORMATS, geometryProblems,
   newId, NORMALLING_NAMES, repeatPattern, rowsFor, templateName, toPerCell, totalChannels,
-  type LabelStripGeometry, type Normalling, type PatchBayTemplate, type PortDirection,
+  CABLE_CATEGORIES, CABLE_CATEGORY_KEYS, isTwoSided, retemplateBay, TERMINATIONS, TERMINATION_KEYS, TWO_SIDED_FORMATS,
+  type CableCategory, type LabelStripGeometry, type Normalling, type PatchBayTemplate, type PatchTermination, type PortDirection,
 } from '@core/index'
 import { DEFAULT_STYLE } from '@core/patchbay/patchbay'
 import { api } from '../platform'
@@ -31,7 +32,23 @@ export function TemplateEditor({ initial }: { initial: PatchBayTemplate }) {
   const [measure, setMeasure] = useState<{ first: number | null; last: number | null }>({ first: null, last: null })
   const templates = useStore((s) => s.templates)
   const isSavedUser = templates.some((x) => x.key === initial.key && x.source === 'user')
-  const close = () => useStore.getState().set({ editingTemplate: null })
+  const close = () => useStore.getState().set({ editingTemplate: null, editingTemplateBay: null })
+  const bayId = useStore((s) => s.editingTemplateBay)
+  const bay = useStore((s) => (bayId ? s.project.patchBays.find((b) => b.id === bayId) : undefined))
+  const panelish = TWO_SIDED_FORMATS.includes(t.format)
+  /** Apply the edited layout to the placed bay (bay mode). */
+  const applyToBay = () => {
+    if (!bay) return
+    let dropped = 0
+    useStore.getState().apply(`Change ${bay.name} Layout`, (d) => { dropped = retemplateBay(d, bay.id, t) })
+    useStore.getState().notify(`Updated ${bay.name}${dropped ? ` · ${dropped} cable${dropped === 1 ? '' : 's'} on removed ports deleted` : ''}`, { undo: true, kind: dropped ? 'warning' : 'success' })
+    close()
+  }
+  const addRow = () => edit((d) => {
+    const n = d.rows.length + 1
+    d.rows = rowsFor(n, d.rows[d.rows.length - 1]?.strip ?? g, d.rows, TWO_SIDED_FORMATS.includes(d.format))
+    if (TWO_SIDED_FORMATS.includes(d.format)) { d.rows.forEach((r, i) => { if (/^(Port|Row \d+)$/.test(r.name)) r.name = `Row ${i + 1}` }); d.rackUnits = Math.max(d.rackUnits, n) }
+  })
   const edit = (fn: (d: PatchBayTemplate) => void) => setT((cur) => produce(cur, fn))
 
   const row = t.rows.find((r) => r.id === rowId) ?? t.rows[0]
@@ -89,21 +106,27 @@ export function TemplateEditor({ initial }: { initial: PatchBayTemplate }) {
 
   const sockR = Math.max(1.5, (g.socketDiameterMM ?? 4.4) / 2)
   return (
-    <Modal title="Edit Custom Template" onClose={close} wide
+    <Modal title={bay ? `Change Layout – ${bay.name}` : "Edit Custom Template"} onClose={close} wide
       footer={<>
         <button onClick={close}>Cancel</button>
         {isSavedUser && <button className="danger" onClick={() => void del()}>Delete Template…</button>}
         <button onClick={share} title="Download a .rftemplate.json you can send to someone (import it from the Templates panel)">Share Template…</button>
         <span className="spacer" />
         <span className="muted">{problems[0] ?? `${totalChannels(t)} points · ${t.rows.length} row${t.rows.length > 1 ? 's' : ''}`}</span>
-        <button disabled={problems.length > 0} onClick={saveAs}>Save As…</button>
-        <button className="primary" disabled={problems.length > 0} onClick={() => void save()}>Save</button>
+        <button disabled={problems.length > 0} onClick={saveAs}>{bay ? 'Save to Library As…' : 'Save As…'}</button>
+        {bay
+          ? <button className="primary" disabled={problems.length > 0} onClick={applyToBay} title="Change this bay's rows, ports and wiring sides. Labels on cells that still exist are kept.">Apply to {bay.name}</button>
+          : <button className="primary" disabled={problems.length > 0} onClick={() => void save()}>Save</button>}
       </>}>
       <div className="tpl-editor">
         <div className="tpl-head">
           <label>Patchbay Make:<TextInput value={t.manufacturer} onCommit={(v) => edit((d) => { d.manufacturer = v })} /></label>
           <label>Patchbay Model:<TextInput value={t.series} onCommit={(v) => edit((d) => { d.series = v })} /></label>
-          <label>Patchbay Type:<Select value={t.format} onChange={(f) => edit((d) => { d.format = f; d.rearConnector = FORMATS[f].rear })} options={FORMAT_KEYS.map((f) => ({ value: f, label: FORMATS[f].name }))} /></label>
+          <label>Patchbay Type:<Select value={t.format} onChange={(f) => edit((d) => {
+            d.format = f; d.rearConnector = FORMATS[f].rear
+            if (TWO_SIDED_FORMATS.includes(f)) { d.termination ??= f === 'rj45' ? 'punchdown' : 'feedThrough'; d.normalling = 'isolated'; if (f === 'rj45') d.cableCategory ??= 'cat6a'; d.rows = rowsFor(d.rows.length, d.rows[0].strip, d.rows.map((r) => ({ ...r, rearDirection: 'bidirectional' as const })), true) }
+            else { d.termination = undefined; d.cableCategory = undefined }
+          })} options={FORMAT_KEYS.map((f) => ({ value: f, label: FORMATS[f].name }))} /></label>
         </div>
 
         <div className="tpl-tabs">
@@ -115,7 +138,22 @@ export function TemplateEditor({ initial }: { initial: PatchBayTemplate }) {
         {tab === 'layout' && (
           <div className="tpl-panel tpl-grid">
             <div className="tpl-col">
-              <Q label="How many rows?"><Select value={t.rows.length} onChange={(n) => { edit((d) => { d.rows = rowsFor(n, d.rows[0]?.strip ?? g, d.rows) }); setRowId(1) }} options={[1, 2, 3, 4].map((n) => ({ value: n, label: String(n) }))} /></Q>
+              <Q label="How many rows?">
+                <span className="tpl-inline">
+                  <Select value={t.rows.length} onChange={(n) => { edit((d) => { d.rows = rowsFor(n, d.rows[0]?.strip ?? g, d.rows, TWO_SIDED_FORMATS.includes(d.format)); if (TWO_SIDED_FORMATS.includes(d.format)) d.rackUnits = Math.max(d.rackUnits, n) }); setRowId(1) }} options={[1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ value: n, label: String(n) }))} />
+                  <button className="mini" disabled={t.rows.length >= 8} onClick={addRow} title={panelish ? 'Adds a row of sockets and another rack unit' : 'Adds another row of sockets'}>+ Add {panelish ? '1RU ' : ''}Row</button>
+                </span>
+              </Q>
+              {panelish && (<>
+                <Q label="Termination:"><Select value={t.termination ?? 'punchdown'} onChange={(v: PatchTermination) => edit((d) => { d.termination = v })} options={TERMINATION_KEYS.map((k) => ({ value: k, label: TERMINATIONS[k].name }))} /></Q>
+                {t.format === 'rj45' && <Q label="Category:">
+                  <span className="tpl-inline">
+                    <Select value={t.cableCategory ?? 'cat6a'} onChange={(v: CableCategory) => edit((d) => { d.cableCategory = v })} options={CABLE_CATEGORY_KEYS.map((k) => ({ value: k, label: CABLE_CATEGORIES[k].name }))} />
+                    <Toggle label="Shielded" checked={!!t.shielded} onChange={(v) => edit((d) => { d.shielded = v })} />
+                  </span>
+                </Q>}
+                <p className="muted small" style={{ margin: '0 0 8px' }}>{isTwoSided(t) ? 'Front jacks (patch cords) and rear terminations are both wireable on the diagram.' : 'Only the rear is wired; front jacks take patch cords.'}</p>
+              </>)}
               <Q label="How many sockets in each row?"><NumberInput value={g.channelCount} min={1} max={128} onCommit={(v) => setChannels(Math.max(1, v ?? 1))} /></Q>
               <Q label="Divide each designation strip into how many lines?"><NumberInput value={g.linesPerCell} min={1} max={4} onCommit={(v) => setG((x) => ({ ...x, linesPerCell: v ?? 2 }))} /></Q>
               <Q label="Patchbay layout:"><Select value={g.socketLayout ?? 'mono'} onChange={(v: 'mono' | 'paired') => setG((x) => ({ ...x, socketLayout: v }))} options={[{ value: 'mono', label: 'Mono Spaced' }, { value: 'paired', label: 'Paired (stereo)' }]} /></Q>
@@ -124,7 +162,7 @@ export function TemplateEditor({ initial }: { initial: PatchBayTemplate }) {
               </Q>
               <Q label="Rack units:"><NumberInput value={t.rackUnits} min={1} max={8} unit="RU" onCommit={(v) => edit((d) => { d.rackUnits = v ?? 1 })} /></Q>
               <Q label="Normalling:"><Select value={t.normalling} onChange={(v: Normalling) => edit((d) => { d.normalling = v })} options={(Object.keys(NORMALLING_NAMES) as Normalling[]).map((n) => ({ value: n, label: NORMALLING_NAMES[n] }))} /></Q>
-              <Q label="Rear connection:"><Select value={t.rearConnector} onChange={(v) => edit((d) => { d.rearConnector = v })} options={CONNECTOR_TYPES.filter((c) => !connectorIsPower(c)).map((c) => ({ value: c, label: connectorName(c) }))} /></Q>
+              {!isTwoSided(t) && <Q label="Rear connection:"><Select value={t.rearConnector} onChange={(v) => edit((d) => { d.rearConnector = v })} options={CONNECTOR_TYPES.filter((c) => !connectorIsPower(c)).map((c) => ({ value: c, label: connectorName(c) }))} /></Q>}
               {t.rows.length > 1 && <Q label="All rows share these sizes"><Toggle label="" checked={shared} onChange={setShared} /></Q>}
               {t.rows.length > 1 && !shared && <Q label="Editing row:"><Select value={row.id} onChange={setRowId} options={t.rows.map((r) => ({ value: r.id, label: r.name }))} /></Q>}
               <Q label={`Name of ${t.rows.length > 1 && !shared ? 'this' : 'the selected'} row:`}>

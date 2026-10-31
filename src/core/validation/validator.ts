@@ -93,6 +93,8 @@ function passiveView(a: ResolvedPort, b: ResolvedPort): { a: ResolvedPort; b: Re
   return { a, b, notes }
 }
 
+const CAT_NAME: Record<string, string> = { cat5e: 'Cat5e', cat6: 'Cat6', cat6a: 'Cat6A', cat8: 'Cat8' }
+
 /** The port-validation engine: full rule set. */
 export function validate(project: Project, a: PortAddress, b: PortAddress, opts: ValidateOptions = {}): ConnectionVerdict {
   const ra = resolve(project, a), rb = resolve(project, b)
@@ -119,6 +121,18 @@ export function validate(project: Project, a: PortAddress, b: PortAddress, opts:
     if (rule.gate && r.some((i) => i.severity === 'error')) break
   }
   found.push(...passive.notes)
+  // Category: a lower-category cable on a higher-rated panel (or the other way round) is worth flagging.
+  if (spec && /^cat(5e|6a?|8)/.test(spec.key)) {
+    const order = ['cat5e', 'cat6', 'cat6a', 'cat8']
+    const cableCat = order.find((c) => spec.key === c || spec.key.startsWith(`${c}.`)) ?? (spec.key.startsWith('cat6a') ? 'cat6a' : null)
+    const panelCats = [ra, rb].flatMap((r) => r.equipment.product.tags.filter((t) => order.includes(t)))
+    const top = panelCats.sort((x, y) => order.indexOf(y) - order.indexOf(x))[0]
+    if (cableCat && top && order.indexOf(cableCat) < order.indexOf(top)) {
+      found.push({ rule: 'cable-category', severity: 'warning', subject: { kind: 'ports', a, b },
+        message: `${spec.name} is a lower category than the ${CAT_NAME[top]} panel it connects to.`,
+        suggestion: `Use ${CAT_NAME[top]} cable so the link keeps its rating.` })
+    }
+  }
   const issues = sortIssues(found)
   const signal = match && isUsable(match.match) ? match.source : null
   return {

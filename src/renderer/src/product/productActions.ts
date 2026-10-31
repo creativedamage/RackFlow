@@ -40,7 +40,7 @@ export function deviceMenu(id: string): MenuItem[] {
   if (!eq) return []
   const lib = s.library.get(eq.product.key.split('@')[0])
   return [
-    { label: 'Edit Device…', hint: '⌘E', onClick: () => editPlacedDevice(id), disabled: eq.product.category === 'patchBay' },
+    { label: eq.product.category === 'patchBay' ? 'Change Panel Layout…' : 'Edit Device…', hint: '⌘E', onClick: () => editPlacedDevice(id) },
     ...(lib ? [{ label: 'Edit Library Product…', onClick: () => openProductEditor(lib) }] : []),
     { label: 'Duplicate as Custom Product…', onClick: () => duplicateProduct(eq.product), disabled: eq.product.category === 'patchBay' },
   ]

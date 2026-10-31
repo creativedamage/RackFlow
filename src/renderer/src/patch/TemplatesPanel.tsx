@@ -23,7 +23,7 @@ export function TemplatesPanel() {
     const s = q.toLowerCase()
     return templates
       .filter((t) => !type || t.format === type)
-      .filter((t) => !s || `${t.manufacturer} ${t.series} ${FORMATS[t.format].name}`.toLowerCase().includes(s))
+      .filter((t) => { const hay = `${t.manufacturer} ${t.series} ${FORMATS[t.format].name} ${t.cableCategory ?? ''} ${t.termination ?? ''}`.toLowerCase(); return !s || s.split(/\s+/).every((w) => hay.includes(w)) })
       .sort((a, b) => {
         const x = val(a, sort.key), y = val(b, sort.key)
         return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))) * sort.dir

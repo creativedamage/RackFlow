@@ -1,7 +1,8 @@
+import { editBayLayout } from '../product/openEditor'
 import { memo, useLayoutEffect, useRef, useState } from 'react'
 import {
   FORMATS, gapBefore, NORMAL_SYMBOLS, cycleNormal, findCell, titlesIn, totalChannels,
-  type CellStyle, type LabelStripGeometry, type LabelSpan, type PatchBay, type PatchRowTemplate,
+  type CellStyle, type LabelStripGeometry, type LabelSpan, type PatchBay, type PatchRowTemplate, isTwoSided, panelDescription,
 } from '@core/index'
 import { useStore } from '../store'
 import { TextInput } from '../components/ui'
@@ -46,7 +47,8 @@ export const BayGrid = memo(function BayGrid({ bay, index, count }: { bay: Patch
       <TextInput className="pb-loc" value={bay.location} placeholder="Location" onCommit={(v) => editBay(bay.id, 'Bay Location', (b) => { b.location = v })} />
       <span className="pb-meta">{t.manufacturer}</span>
       <span className="pb-meta">{t.series}</span>
-      <span className="pb-meta">{FORMATS[t.format].name}</span>
+      <span className="pb-meta">{FORMATS[t.format].name}{isTwoSided(t) || t.cableCategory ? ` · ${panelDescription(t)}` : ''}</span>
+      <button className="mini" onClick={() => editBayLayout(bay.id)} title="Rows, sockets, termination (punch-down / feed-through / keystone) and cable category">Layout…</button>
       <span className="pb-meta right">{totalChannels(t)} pts{!t.dimensionsVerified && <span className="badge warn" title="Nominal strip dimensions – verify before printing">nominal</span>}</span>
     </div>
   )

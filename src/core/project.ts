@@ -98,7 +98,13 @@ export function connect(p: Project, a: PortAddress, b: PortAddress, specKey: str
   const verdict = validate(p, a, b, { specKey })
   if (!verdict.allowed) return verdict
   const [from, to] = verdict.normalized ?? [a, b]
-  const spec = cableSpec(specKey) ?? verdict.suggestedCables[0]
+  // Twisted pair: use the category of the panel it lands on (else Cat6A).
+  const cats = ['cat5e', 'cat6', 'cat6a', 'cat8']
+  const tags = [a, b].flatMap((x) => findEquipment(p, x.equipment)?.product.tags ?? [])
+  const cat = cats.filter((c) => tags.includes(c)).sort((x, y) => cats.indexOf(y) - cats.indexOf(x))[0] ?? 'cat6a'
+  const preferred = verdict.suggestedCables.find((s) => s.key === cat || s.key.startsWith(`${cat}.`))
+  const tp = verdict.suggestedCables[0] && /^cat\d/.test(verdict.suggestedCables[0].key)
+  const spec = cableSpec(specKey) ?? (tp && preferred ? preferred : verdict.suggestedCables[0])
   const prefix = spec?.labelPrefix ?? (verdict.signal ? CABLE_PREFIX[SIGNALS[verdict.signal].domain] : 'X')
   const c: Cable = {
     id: newId(), label: nextCableLabel(p, prefix), from: { ...from }, to: { ...to },

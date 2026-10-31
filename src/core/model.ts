@@ -313,6 +313,11 @@ export interface LabelStripGeometry {
   socketOffsetMM?: number
 }
 
+/** How a panel's jacks are terminated. 'rearOnly': classic patch bay (front jacks take patch cords; only the rear is wired). */
+export type PatchTermination = 'rearOnly' | 'punchdown' | 'feedThrough' | 'keystonePunchdown' | 'keystoneFeedThrough'
+/** Twisted-pair category a network panel (and its cables) is rated for. */
+export type CableCategory = 'cat5e' | 'cat6' | 'cat6a' | 'cat8'
+
 export interface PatchRowTemplate { id: number; name: string; strip: LabelStripGeometry; rearDirection: PortDirection }
 
 export interface PatchBayTemplate {
@@ -330,6 +335,11 @@ export interface PatchBayTemplate {
   notes: string
   /** Label style applied to new bays made from this template. */
   defaultStyle?: Partial<LabelStyle>
+  /** Network / fiber / XLR panels: how jacks are terminated (front and rear are both wireable unless 'rearOnly'). */
+  termination?: PatchTermination
+  /** RJ45 panels: category rating. */
+  cableCategory?: CableCategory
+  shielded?: boolean
 }
 
 /** Per-cell / per-title formatting (PatchCAD-style). Undefined = inherit bay style. */

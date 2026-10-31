@@ -57,6 +57,8 @@ export const DIRECT_PLUG: CableSpec = {
   ratedSignals: [], maxLengthMeters: null, labelPrefix: 'P', direct: true,
 }
 
+const CAT5E: SignalType[] = ['ethernet100M', 'ethernet1G', 'dante', 'aes67', 'ndi', 'sacn', 'artNet', 'ipControl', 'hdbaseT', 'avbMilan']
+
 export const CABLE_CATALOG: CableSpec[] = [
   DIRECT_PLUG,
   cable('hdmi.uhs', 'HDMI Ultra High Speed', e('hdmi', 'male'), e('hdmi', 'male'), ['hdmi14', 'hdmi20', 'hdmi21', 'dviD'], 5, 'V'),
@@ -64,7 +66,18 @@ export const CABLE_CATALOG: CableSpec[] = [
   cable('dp.14', 'DisplayPort 1.4', e('displayPort', 'male'), e('displayPort', 'male'), ['displayPort12', 'displayPort14'], 3, 'V'),
   cable('sdi.12g', '12G-SDI Coax (RG6)', e('bnc', 'male'), e('bnc', 'male'), ['sdiHD', 'sdi3G', 'sdi6G', 'sdi12G'], 70, 'V'),
   cable('sdi.3g', '3G-SDI Coax (RG59)', e('bnc', 'male'), e('bnc', 'male'), ['sdiHD', 'sdi3G', 'analogComposite'], 100, 'V'),
-  cable('cat6a', 'Cat6A U/FTP', e('rj45', 'male'), e('rj45', 'male'), [], 100, 'N'),
+  cable('cat6a', 'Cat6A U/FTP Patch', e('rj45', 'male'), e('rj45', 'male'), [], 100, 'N'),
+  cable('cat5e', 'Cat5e UTP Patch', e('rj45', 'male'), e('rj45', 'male'), CAT5E, 100, 'N'),
+  cable('cat6', 'Cat6 UTP Patch', e('rj45', 'male'), e('rj45', 'male'), [], 100, 'N'),
+  cable('cat6.stp', 'Cat6 Shielded (F/UTP) Patch', e('rj45', 'male'), e('rj45', 'male'), [], 100, 'N'),
+  cable('cat6a.utp', 'Cat6A UTP Patch', e('rj45', 'male'), e('rj45', 'male'), [], 100, 'N'),
+  cable('cat8', 'Cat8 S/FTP Patch', e('rj45', 'male'), e('rj45', 'male'), [], 30, 'N'),
+  cable('cat5e.h', 'Cat5e Horizontal (punched down both ends)', e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), CAT5E, 90, 'N'),
+  cable('cat6.h', 'Cat6 Horizontal (punched down both ends)', e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), [], 90, 'N'),
+  cable('cat6a.h', 'Cat6A Horizontal (punched down both ends)', e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), [], 90, 'N'),
+  cable('cat6a.h.stp', 'Cat6A Shielded Horizontal (punched down both ends)', e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), [], 90, 'N'),
+  cable('cat6.plug', 'Cat6 Horizontal, punch-down to RJ45 plug', e('idcPunchdown', 'male'), e('rj45', 'male'), [], 90, 'N'),
+  cable('cat6a.plug', 'Cat6A Horizontal, punch-down to RJ45 plug', e('idcPunchdown', 'male'), e('rj45', 'male'), [], 90, 'N'),
   cable('cat6a.ethercon', 'Cat6A etherCON', e('etherCON', 'male'), e('etherCON', 'male'), [], 100, 'N'),
   cable('fiber.lc.sm', 'Singlemode Fiber LC-LC', e('lcDuplex', 'male'), e('lcDuplex', 'male'), [], 10000, 'F'),
   cable('xlr3.mic', 'XLR-3 Mic Cable', e('xlr3', 'female'), e('xlr3', 'male'), ['analogMic', 'analogLine', 'aes3'], 100, 'A'),

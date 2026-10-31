@@ -44,6 +44,8 @@ export interface AppState {
   /** Wall plate / floor box builder: product being edited and, if any, the placed device. */
   editingPlate: { product: ProductDefinition; instanceId: string | null } | null
   editingTemplate: PatchBayTemplate | null
+  /** When set, the template editor changes this placed bay's layout. */
+  editingTemplateBay: string | null
   /** Find Device dialog (search text it opened with). */
   finding: { query: string } | null
   toast: string | null
@@ -97,6 +99,7 @@ export const useStore = create<AppState>((set, get) => ({
   editingInstance: null,
   editingPlate: null,
   editingTemplate: null,
+  editingTemplateBay: null,
   finding: null,
   toast: null,
 

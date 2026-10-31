@@ -44,7 +44,7 @@ function EquipmentInspector({ eq }: { eq: EquipmentInstance }) {
       <p className="muted">{p.manufacturer} {p.model} · {CATEGORIES[p.category].name}</p>
       {p.verified === false && <p className="data-note">⚠︎ {p.dataNote ?? 'Specs not verified.'}</p>}
       {p.category === 'patchBay'
-        ? <p className="muted small">Edit this bay’s labels on the Patch Labels page.</p>
+        ? <div className="edit-device-row"><button className="primary" onClick={() => editPlacedDevice(eq.id)} title="Rows, sockets, termination and cable category">Change Layout…</button><span className="muted small">Labels are on the Patch Labels page.</span></div>
         : <div className="edit-device-row">
             <button className="primary" onClick={() => editPlacedDevice(eq.id)} title="Edit this device’s ports, specs and power (⌘E). Also: double-click it on the diagram.">✎ Edit Device…</button>
             {p.key.includes('@') && <span className="badge" title="This device has its own edited specs">Edited</span>}

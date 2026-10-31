@@ -13,7 +13,7 @@ export const headerHeight = (eq: EquipmentInstance) => (eq.room?.trim() ? HEADER
 
 export function splitPorts(eq: EquipmentInstance) {
   // Wall plates / floor boxes: room-side jacks on the left, tie lines and outlets on the right.
-  if (eq.product.category === 'wallPlate' || eq.product.category === 'floorBox') {
+  if (eq.product.category === 'wallPlate' || eq.product.category === 'floorBox' || (eq.product.category === 'patchBay' && eq.product.ports.some((p) => p.face === 'front'))) {
     const left = eq.product.ports.filter((p) => p.face === 'front' && p.group !== 'Power')
     return { left, right: eq.product.ports.filter((p) => !left.includes(p)) }
   }

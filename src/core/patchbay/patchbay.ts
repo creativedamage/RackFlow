@@ -80,3 +80,26 @@ export function moveBay(p: Project, bayId: string, delta: -1 | 1) {
   if (i < 0 || j < 0 || j >= p.patchBays.length) return
   ;[p.patchBays[i], p.patchBays[j]] = [p.patchBays[j], p.patchBays[i]]
 }
+
+/**
+ * Changes a placed bay's layout (rows, ports, termination, category…). Labels
+ * stay on cells that still exist; cables on ports that no longer exist are
+ * removed (returned count).
+ */
+export function retemplateBay(p: Project, bayId: string, t: PatchBayTemplate): number {
+  const bay = p.patchBays.find((b) => b.id === bayId)
+  const eq = bay && p.equipment.find((e) => e.id === bay.equipment)
+  if (!bay || !eq) return 0
+  const product = makePatchProduct(t)
+  eq.product = product
+  const ids = new Set(product.ports.map((x) => x.id))
+  const before = p.cables.length
+  p.cables = p.cables.filter((c) => !((c.from.equipment === eq.id && !ids.has(c.from.port)) || (c.to.equipment === eq.id && !ids.has(c.to.port))))
+  const sameRows = bay.template.rows.length === t.rows.length && bay.template.rows.every((r, i) => r.strip.channelCount === t.rows[i].strip.channelCount)
+  bay.template = structuredClone(t)
+  const old = new Map(bay.cells.map((c) => [`${c.row}/${c.channel}`, c]))
+  bay.cells = blankCells(t).map((c) => old.get(`${c.row}/${c.channel}`) ?? c)
+  bay.spans = bay.spans.filter((s) => { const r = t.rows.find((x) => x.id === s.row); return !!r && s.end <= r.strip.channelCount })
+  if (!sameRows) bay.normals = defaultNormals(t)
+  return before - p.cables.length
+}

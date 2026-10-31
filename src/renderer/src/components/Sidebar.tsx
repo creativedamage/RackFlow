@@ -2,8 +2,7 @@ import { useMemo, useState } from 'react'
 import type { AccessoryKind } from '@core/index'
 import {
   BUILT_IN_KEYS, makePlateProduct, newPlateSpec, CATEGORIES, CATEGORY_KEYS, DOMAINS, FORMATS, newCustomProduct, newCustomTemplate, productDomains, templateName, totalChannels,
-  type EquipmentCategory, type ProductDefinition, type SignalDomain,
-} from '@core/index'
+  type EquipmentCategory, type ProductDefinition, type SignalDomain, panelDescription } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
 import { Dot, Segmented, Select } from './ui'
@@ -45,7 +44,8 @@ export function Sidebar() {
     const q = query.toLowerCase()
     const m = new Map<string, typeof templates>()
     for (const t of templates) {
-      if (q && !`${templateName(t)} ${FORMATS[t.format].name}`.toLowerCase().includes(q)) continue
+      const hay = `${templateName(t)} ${FORMATS[t.format].name} ${t.cableCategory ?? ''} ${t.termination ?? ''} ${t.termination ? 'patch panel network ethernet' : ''}`.toLowerCase()
+      if (q && !q.split(/\s+/).every((w) => hay.includes(w))) continue
       m.set(t.manufacturer, [...(m.get(t.manufacturer) ?? []), t])
     }
     return [...m.entries()].sort((a, b) => (a[0] === 'Generic' ? -1 : b[0] === 'Generic' ? 1 : a[0].localeCompare(b[0])))
@@ -116,7 +116,7 @@ export function Sidebar() {
                 <div key={t.key} className="lib-item" draggable onDragStart={(e) => drag(e, { kind: 'patch', key: t.key })} onDoubleClick={() => addBayToProject(t)} title="Double-click to add to the project, or drag onto the diagram">
                   <div className="lib-main">
                     <div className="lib-title">{t.series}{!t.dimensionsVerified && <span className="badge warn" title="Nominal dimensions – verify before printing">nominal</span>}</div>
-                    <div className="lib-sub">{totalChannels(t)} pts · {FORMATS[t.format].name} · {t.rackUnits}RU</div>
+                    <div className="lib-sub">{totalChannels(t)} {t.termination && t.termination !== 'rearOnly' ? 'ports' : 'pts'} · {panelDescription(t) || FORMATS[t.format].name} · {t.rackUnits}RU</div>
                   </div>
                   <div className="lib-actions">
                     <button className="mini primary" onClick={() => addBayToProject(t)}>Add</button>
