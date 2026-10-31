@@ -121,7 +121,7 @@ function drawOccupant(svg: Svg, p: Project, rack: Rack, occ: RackOccupant, x: nu
     const label = logo && !a.label?.trim() ? '' : accessoryLabel(a)
     if (logo && a.kind !== 'logo') {
       if (a.kind === 'vent') for (let sy = inner.y + 6; sy < inner.y + inner.h - 4; sy += 6) { svg.rect(inner.x + 20, sy, inner.w * 0.3 - 20, 2.5, { lw: 0.25, rx: 1.2 }); svg.rect(inner.x + inner.w * 0.7, sy, inner.w * 0.3 - 20, 2.5, { lw: 0.25, rx: 1.2 }) }
-      svg.image(inner.x + inner.w * 0.32, inner.y + inner.h * 0.1, inner.w * 0.36, inner.h * 0.8, logo.dataUrl)
+      svg.image(inner.x + inner.w * 0.32, inner.y + inner.h * 0.1, inner.w * 0.36, inner.h * 0.8, logo.dataUrl, { black: logo.light })
       if (label) svg.text(inner.x + 8, midY, label, { size: 9 })
       return
     }
@@ -137,7 +137,7 @@ function drawOccupant(svg: Svg, p: Project, rack: Rack, occ: RackOccupant, x: nu
       return
     }
     if (a.kind === 'logo') {
-      if (logo) svg.image(inner.x + inner.w * 0.2, inner.y + inner.h * 0.08, inner.w * 0.6, inner.h * 0.84, logo.dataUrl)
+      if (logo) svg.image(inner.x + inner.w * 0.2, inner.y + inner.h * 0.08, inner.w * 0.6, inner.h * 0.84, logo.dataUrl, { black: logo.light })
       if (label) svg.text(x + w / 2, midY, label, { size: 10, anchor: 'middle' })
       return
     }

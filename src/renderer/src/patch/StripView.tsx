@@ -1,4 +1,4 @@
-import { cellSpanMM, channelCenterMM, fittedFontPt, PT_PER_MM, type LabelCell, type LabelStripGeometry, type LabelStyle } from '@core/index'
+import { cellSpanMM, channelCenterMM, fittedFontPt, PT_PER_MM, type LabelCell, type LabelStripGeometry, type LabelStyle, fmtLen, fmtLenPair } from '@core/index'
 import { DEFAULT_STYLE } from '@core/patchbay/patchbay'
 
 /**
@@ -53,7 +53,7 @@ export function StripView({ g, cells, style = DEFAULT_STYLE, pxPerMM = 2.5, dime
             return <line key={i} x1={x} y1={h + 0.5} x2={x} y2={h + 2.5} stroke="#3b82f6" strokeWidth={0.12} />
           })}
           <text x={0} y={h + 7.5} fontSize={3.4} fill="#3b82f6" fontFamily="ui-monospace, Menlo, monospace">
-            {g.cellWidthsMM ? `${g.channelCount} ch · ${w.toFixed(1)} × ${h.toFixed(1)} mm` : `first centre ${g.firstChannelCenterMM.toFixed(2)} mm · pitch ${g.channelPitchMM.toFixed(3)} mm · ${g.channelCount} ch · ${w.toFixed(1)} × ${h.toFixed(1)} mm`}
+            {g.cellWidthsMM ? `${g.channelCount} ch · ${fmtLenPair(w, h, 2)}` : `first centre ${fmtLen(g.firstChannelCenterMM, 3)} · pitch ${fmtLen(g.channelPitchMM, 4)} · ${g.channelCount} ch · ${fmtLenPair(w, h, 2)}`}
           </text>
         </g>
       )}

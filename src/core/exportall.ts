@@ -1,5 +1,6 @@
 // "Export Everything": every drawing and schedule in one go.
 
+import { lenUnit, toLen, toWt, wtUnit } from './units'
 import type { Project } from './model'
 import { schematicSheets, defaultSchematic } from './drawing/schematic'
 import { rackElevationSheets, defaultRackPrint } from './drawing/rackprint'
@@ -52,9 +53,9 @@ export function buildExport(p: Project, parts: ExportPart[], sheet = 'ansiB'): E
   if (parts.includes('equipment') && p.equipment.length) {
     const page = (id?: string) => p.groups?.find((g) => g.id === id)?.name ?? ''
     out.push({ name: name('equipment'), kind: 'text', count: p.equipment.length, content: csv([
-      ['Tag', 'Manufacturer', 'Model', 'Category', 'Room', 'Page', 'Rack', 'U', 'Max W', 'Notes'],
+      ['Tag', 'Manufacturer', 'Model', 'Category', 'Room', 'Page', 'Rack', 'U', 'Max W', `Weight (${wtUnit()})`, `Depth (${lenUnit()})`, 'Notes'],
       ...p.equipment.map((e) => [e.tag, e.product.manufacturer, e.product.model, CATEGORIES[e.product.category].name, e.room, page(e.groupId),
-        p.racks.find((r) => r.id === e.rackPlacement?.rack)?.name ?? '', e.rackPlacement ? String(e.rackPlacement.startUnit) : '', String(e.product.power.maxWatts), e.notes]),
+        p.racks.find((r) => r.id === e.rackPlacement?.rack)?.name ?? '', e.rackPlacement ? String(e.rackPlacement.startUnit) : '', String(e.product.power.maxWatts), String(Number(toWt(e.product.physical.weightKG).toFixed(1))), String(Number(toLen(e.product.physical.depthMM).toFixed(1))), e.notes]),
     ]) })
   }
   if (parts.includes('network')) {

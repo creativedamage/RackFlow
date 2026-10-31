@@ -29,3 +29,15 @@ describe('modular fiber enclosures', () => {
     expect(sheet).toMatch(/STAGE LEFT/)
   })
 })
+
+describe('white logos on rack elevations', () => {
+  it('prints light logos black', async () => {
+    const { newProject, addRack, rackElevationSheets, defaultRackPrint, addAccessory } = await import('./index')
+    const p = newProject(); const r = addRack(p)
+    p.logos = [{ id: 'L1', name: 'w', dataUrl: 'data:image/png;base64,AAAA', light: true }]
+    addAccessory(p, r.id, 'logo', 1, 10, 'front')
+    const acc = p.racks[0].accessories[0]; acc.logoId = 'L1'
+    const sheet = rackElevationSheets(p, defaultRackPrint())[0]
+    expect(sheet).toMatch(/filter="url\(#rf-black\)"/)
+  })
+})

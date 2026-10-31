@@ -198,6 +198,7 @@ function buildMenu() {
         { type: 'separator' },
         cmd('Zoom to Fit', 'zoomFit', 'CmdOrCtrl+0'),
         cmd('Toggle Inspector', 'toggleInspector', 'Alt+CmdOrCtrl+I'),
+        { label: 'Units', submenu: [cmd('Imperial (in, ft, lb)', 'units:imperial'), cmd('Metric (mm, m, kg)', 'units:metric')] },
         {
           label: 'Appearance',
           submenu: (['system', 'light', 'dark'] as const).map((t): MenuItemConstructorOptions => ({

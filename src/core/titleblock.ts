@@ -39,7 +39,7 @@ export interface TitleBlockTemplate {
   name: string
   /** Height in mm. */
   height: number
-  logo?: { name: string; dataUrl: string }
+  logo?: { name: string; dataUrl: string; light?: boolean }
   logoSide: 'left' | 'right'
   /** Logo box width in mm. */
   logoWidth: number

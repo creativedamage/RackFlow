@@ -1,10 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
-import {
-  LED_PANELS, PROCESSOR_PRESETS, derivePanel, defaultLedPrint, ledMapSVG, ledSheets, newLedPanel, newLedWall, nodeGeom, placeInFreeSpace,
-  syncLedWallDevice, wallStats, chains, chainColor, type ChainSettings, type Corner, type LedPanel, type LedPrintOptions, type LedView as View, type LedWall,
-} from '@core/index'
+import { LED_PANELS, PROCESSOR_PRESETS, derivePanel, defaultLedPrint, ledMapSVG, ledSheets, newLedPanel, newLedWall, nodeGeom, placeInFreeSpace, syncLedWallDevice, wallStats, chains, chainColor, type ChainSettings, type Corner, type LedPanel, type LedPrintOptions, type LedView as View, type LedWall, fmtFtIn, fmtWt, fmtLenPair } from '@core/index'
 import { useStore } from '../store'
-import { Empty, Field, Modal, NumberInput, Segmented, Select, TextInput, Toggle } from '../components/ui'
+import { Empty, Field, Modal, NumberInput, Segmented, Select, TextInput, Toggle, LenInput, WtInput } from '../components/ui'
 import { DrawingDialog } from '../print/DrawingDialog'
 import { viewCenterNow } from '../diagram/placement'
 
@@ -155,8 +152,8 @@ function Settings({ wall, view, update }: { wall: LedWall; view: View; update: (
         <dt>Panels</dt><dd>{st.panels}</dd>
         <dt>Resolution</dt><dd>{st.pxW} × {st.pxH} px</dd>
         <dt>Aspect</dt><dd>{st.aspect}</dd>
-        <dt>Size</dt><dd>{st.widthM.toFixed(2)} × {st.heightM.toFixed(2)} m ({(st.widthM * 3.2808).toFixed(1)} × {(st.heightM * 3.2808).toFixed(1)} ft)</dd>
-        <dt>Weight</dt><dd>{st.weightKG.toFixed(0)} kg ({(st.weightKG * 2.2046).toFixed(0)} lb)</dd>
+        <dt>Size</dt><dd>{fmtFtIn(st.widthM)} × {fmtFtIn(st.heightM)}</dd>
+        <dt>Weight</dt><dd>{fmtWt(st.weightKG, 0)}</dd>
         <dt>Power</dt><dd>{(st.maxWatts / 1000).toFixed(1)} kW max · {st.maxAmps.toFixed(1)} A</dd>
         <dt>Data ports</dt><dd>{st.dataPorts}</dd>
         <dt>Circuits</dt><dd>{st.circuits}</dd>
@@ -244,7 +241,7 @@ export function PanelPicker({ current, onPick, onClose }: { current?: LedPanel; 
         <span>Grid</span>
         <NumberInput value={cols} min={1} max={200} width={56} onCommit={(v) => setCols(v ?? cols)} unit="wide" />
         <NumberInput value={rows} min={1} max={200} width={56} onCommit={(v) => setRows(v ?? rows)} unit="high" />
-        <span className="muted small">{((cols * chosen.widthMM) / 1000).toFixed(2)} × {((rows * chosen.heightMM) / 1000).toFixed(2)} m · {cols * chosen.pxW}×{rows * chosen.pxH} px</span>
+        <span className="muted small">{fmtFtIn((cols * chosen.widthMM) / 1000)} × {fmtFtIn((rows * chosen.heightMM) / 1000)} · {cols * chosen.pxW}×{rows * chosen.pxH} px</span>
       </>)}
       <span className="spacer" />
       <button onClick={onClose}>Cancel</button>
@@ -264,7 +261,7 @@ export function PanelPicker({ current, onPick, onClose }: { current?: LedPanel; 
               {list.filter((p) => p.manufacturer === m).map((p) => (
                 <button key={p.key} className={`led-panel-row ${chosen?.key === p.key && !draft ? 'on' : ''}`} onClick={() => pick(p)} onDoubleClick={() => onPick(p, cols, rows)}>
                   <span>{p.model}{p.source === 'user' && <span className="badge">custom</span>}</span>
-                  <span className="muted small">{p.pitchMM} mm · {p.widthMM}×{p.heightMM} · {p.pxW}×{p.pxH} px · {p.maxWatts} W</span>
+                  <span className="muted small">{p.pitchMM} mm · {fmtLenPair(p.widthMM, p.heightMM, 1)} · {p.pxW}×{p.pxH} px · {p.maxWatts} W</span>
                 </button>
               ))}
             </div>
@@ -277,9 +274,9 @@ export function PanelPicker({ current, onPick, onClose }: { current?: LedPanel; 
               <h4>{chosen.manufacturer} {chosen.model}</h4>
               <dl className="kv">
                 <dt>Pitch</dt><dd>{chosen.pitchMM} mm</dd>
-                <dt>Cabinet</dt><dd>{chosen.widthMM} × {chosen.heightMM} mm</dd>
+                <dt>Cabinet</dt><dd>{fmtLenPair(chosen.widthMM, chosen.heightMM, 2)}</dd>
                 <dt>Pixels</dt><dd>{chosen.pxW} × {chosen.pxH}</dd>
-                <dt>Weight</dt><dd>{chosen.weightKG} kg</dd>
+                <dt>Weight</dt><dd>{fmtWt(chosen.weightKG)}</dd>
                 <dt>Power</dt><dd>{chosen.maxWatts} W max · {chosen.typWatts} W typ</dd>
                 <dt>Data</dt><dd>{chosen.dataConnector === 'rj45' ? 'RJ45' : 'etherCON'}</dd>
                 <dt>Power in</dt><dd>{chosen.powerConnector === 'powerCON' ? 'powerCON' : 'powerCON TRUE1'}</dd>
@@ -305,15 +302,15 @@ function PanelForm({ p, onChange }: { p: LedPanel; onChange: (p: LedPanel) => vo
     <Field label="Manufacturer"><TextInput value={p.manufacturer} onCommit={(manufacturer) => set({ manufacturer })} /></Field>
     <Field label="Model"><TextInput value={p.model} onCommit={(model) => set({ model })} /></Field>
     <Field label="Pixel pitch"><NumberInput value={p.pitchMM} step={0.01} min={0.5} max={50} unit="mm" onCommit={(v) => set({ pitchMM: v ?? p.pitchMM })} /></Field>
-    <Field label="Width"><NumberInput value={p.widthMM} min={50} max={3000} unit="mm" onCommit={(v) => set({ widthMM: v ?? p.widthMM })} /></Field>
-    <Field label="Height"><NumberInput value={p.heightMM} min={50} max={3000} unit="mm" onCommit={(v) => set({ heightMM: v ?? p.heightMM })} /></Field>
+    <Field label="Width"><LenInput value={p.widthMM} min={50} max={3000} onCommit={(v) => set({ widthMM: v ?? p.widthMM })} /></Field>
+    <Field label="Height"><LenInput value={p.heightMM} min={50} max={3000} onCommit={(v) => set({ heightMM: v ?? p.heightMM })} /></Field>
     <Field label="Pixels" hint="Calculated from size ÷ pitch – override if the sheet differs">
       <span className="row-gap">
         <NumberInput value={p.pxW} min={1} width={60} onCommit={(v) => onChange({ ...p, pxW: v ?? p.pxW })} />×
         <NumberInput value={p.pxH} min={1} width={60} onCommit={(v) => onChange({ ...p, pxH: v ?? p.pxH })} />
       </span>
     </Field>
-    <Field label="Weight"><NumberInput value={p.weightKG} step={0.1} min={0} unit="kg" onCommit={(v) => onChange({ ...p, weightKG: v ?? p.weightKG })} /></Field>
+    <Field label="Weight"><WtInput value={p.weightKG} step={0.1} min={0} onCommit={(v) => onChange({ ...p, weightKG: v ?? p.weightKG })} /></Field>
     <Field label="Max power"><NumberInput value={p.maxWatts} min={1} unit="W" onCommit={(v) => onChange({ ...p, maxWatts: v ?? p.maxWatts })} /></Field>
     <Field label="Typical power"><NumberInput value={p.typWatts} min={0} unit="W" onCommit={(v) => onChange({ ...p, typWatts: v ?? p.typWatts })} /></Field>
     <Field label="Data"><Select value={p.dataConnector} onChange={(dataConnector) => onChange({ ...p, dataConnector })} options={[{ value: 'etherCON', label: 'etherCON' }, { value: 'rj45', label: 'RJ45' }]} /></Field>

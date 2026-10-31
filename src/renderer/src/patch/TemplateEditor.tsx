@@ -1,15 +1,10 @@
 import { useMemo, useState } from 'react'
 import { produce } from 'immer'
-import {
-  applyMeasured, cellSpanMM, CONNECTOR_TYPES, connectorIsPower, connectorName, finishPerCell, fitToWidth, FORMAT_KEYS, FORMATS, geometryProblems,
-  newId, NORMALLING_NAMES, repeatPattern, rowsFor, templateName, toPerCell, totalChannels,
-  CABLE_CATEGORIES, CABLE_CATEGORY_KEYS, isTwoSided, retemplateBay, TERMINATIONS, TERMINATION_KEYS, TWO_SIDED_FORMATS,
-  type CableCategory, type LabelStripGeometry, type Normalling, type PatchBayTemplate, type PatchTermination, type PortDirection,
-} from '@core/index'
+import { applyMeasured, cellSpanMM, CONNECTOR_TYPES, connectorIsPower, connectorName, finishPerCell, fitToWidth, FORMAT_KEYS, FORMATS, geometryProblems, newId, NORMALLING_NAMES, repeatPattern, rowsFor, templateName, toPerCell, totalChannels, CABLE_CATEGORIES, CABLE_CATEGORY_KEYS, isTwoSided, retemplateBay, TERMINATIONS, TERMINATION_KEYS, TWO_SIDED_FORMATS, type CableCategory, type LabelStripGeometry, type Normalling, type PatchBayTemplate, type PatchTermination, type PortDirection, fmtLen, lenUnit } from '@core/index'
 import { DEFAULT_STYLE } from '@core/patchbay/patchbay'
 import { api } from '../platform'
 import { useStore } from '../store'
-import { Modal, NumberInput, Select, TextInput, Toggle } from '../components/ui'
+import { Modal, NumberInput, Select, TextInput, Toggle, LenInput } from '../components/ui'
 import { StripView } from './StripView'
 
 type Tab = 'layout' | 'fonts' | 'notes'
@@ -158,7 +153,7 @@ export function TemplateEditor({ initial }: { initial: PatchBayTemplate }) {
               <Q label="Divide each designation strip into how many lines?"><NumberInput value={g.linesPerCell} min={1} max={4} onCommit={(v) => setG((x) => ({ ...x, linesPerCell: v ?? 2 }))} /></Q>
               <Q label="Patchbay layout:"><Select value={g.socketLayout ?? 'mono'} onChange={(v: 'mono' | 'paired') => setG((x) => ({ ...x, socketLayout: v }))} options={[{ value: 'mono', label: 'Mono Spaced' }, { value: 'paired', label: 'Paired (stereo)' }]} /></Q>
               <Q label="Distance between two sockets in a pair:" disabled={(g.socketLayout ?? 'mono') !== 'paired'}>
-                <NumberInput value={g.pairSpacingMM ?? 0} min={0} step={0.1} unit="mm" onCommit={(v) => setG((x) => ({ ...x, pairSpacingMM: v ?? 0 }))} />
+                <LenInput value={g.pairSpacingMM ?? 0} min={0} step={0.1} onCommit={(v) => setG((x) => ({ ...x, pairSpacingMM: v ?? 0 }))} />
               </Q>
               <Q label="Rack units:"><NumberInput value={t.rackUnits} min={1} max={8} unit="RU" onCommit={(v) => edit((d) => { d.rackUnits = v ?? 1 })} /></Q>
               <Q label="Normalling:"><Select value={t.normalling} onChange={(v: Normalling) => edit((d) => { d.normalling = v })} options={(Object.keys(NORMALLING_NAMES) as Normalling[]).map((n) => ({ value: n, label: NORMALLING_NAMES[n] }))} /></Q>
@@ -177,20 +172,20 @@ export function TemplateEditor({ initial }: { initial: PatchBayTemplate }) {
               </Q>
             </div>
             <div className="tpl-col">
-              <Q label="Designation strip left padding:"><NumberInput value={g.padLeftMM ?? 0} min={0} step={0.1} unit="mm" onCommit={(v) => setG((x) => ({ ...x, padLeftMM: v ?? 0 }))} /></Q>
-              <Q label="Designation strip right padding:"><NumberInput value={g.padRightMM ?? 0} min={0} step={0.1} unit="mm" onCommit={(v) => setG((x) => ({ ...x, padRightMM: v ?? 0 }))} /></Q>
-              <Q label="Designation strip top padding:"><NumberInput value={g.padTopMM ?? 0} min={0} step={0.1} unit="mm" onCommit={(v) => setG((x) => ({ ...x, padTopMM: v ?? 0 }))} /></Q>
-              <Q label="Designation strip bottom padding:"><NumberInput value={g.padBottomMM ?? 0} min={0} step={0.1} unit="mm" onCommit={(v) => setG((x) => ({ ...x, padBottomMM: v ?? 0 }))} /></Q>
-              <Q label="Distance from the designation strip to the socket:"><NumberInput value={g.socketOffsetMM ?? 2} min={0} step={0.1} unit="mm" onCommit={(v) => setG((x) => ({ ...x, socketOffsetMM: v ?? 0 }))} /></Q>
-              <Q label="Socket diameter:"><NumberInput value={g.socketDiameterMM ?? 4.4} min={0.5} step={0.1} unit="mm" onCommit={(v) => setG((x) => ({ ...x, socketDiameterMM: v ?? 4.4 }))} /></Q>
-              <Q label="Designation strip height:"><NumberInput value={g.stripHeightMM} min={2} step={0.1} unit="mm" onCommit={(v) => setG((x) => ({ ...x, stripHeightMM: v ?? x.stripHeightMM }))} /></Q>
+              <Q label="Designation strip left padding:"><LenInput value={g.padLeftMM ?? 0} min={0} step={0.1} onCommit={(v) => setG((x) => ({ ...x, padLeftMM: v ?? 0 }))} /></Q>
+              <Q label="Designation strip right padding:"><LenInput value={g.padRightMM ?? 0} min={0} step={0.1} onCommit={(v) => setG((x) => ({ ...x, padRightMM: v ?? 0 }))} /></Q>
+              <Q label="Designation strip top padding:"><LenInput value={g.padTopMM ?? 0} min={0} step={0.1} onCommit={(v) => setG((x) => ({ ...x, padTopMM: v ?? 0 }))} /></Q>
+              <Q label="Designation strip bottom padding:"><LenInput value={g.padBottomMM ?? 0} min={0} step={0.1} onCommit={(v) => setG((x) => ({ ...x, padBottomMM: v ?? 0 }))} /></Q>
+              <Q label="Distance from the designation strip to the socket:"><LenInput value={g.socketOffsetMM ?? 2} min={0} step={0.1} onCommit={(v) => setG((x) => ({ ...x, socketOffsetMM: v ?? 0 }))} /></Q>
+              <Q label="Socket diameter:"><LenInput value={g.socketDiameterMM ?? 4.4} min={0.5} step={0.1} onCommit={(v) => setG((x) => ({ ...x, socketDiameterMM: v ?? 4.4 }))} /></Q>
+              <Q label="Designation strip height:"><LenInput value={g.stripHeightMM} min={2} step={0.1} onCommit={(v) => setG((x) => ({ ...x, stripHeightMM: v ?? x.stripHeightMM }))} /></Q>
               <Q label="Dimensions verified against the panel:"><Toggle label="" checked={t.dimensionsVerified} onChange={(v) => edit((d) => { d.dimensionsVerified = v })} /></Q>
               <details className="tpl-measure">
                 <summary>Measure a physical panel</summary>
                 <p className="muted small">With calipers, measure the first and last channel centres from the strip’s left edge. Widths are spread evenly between them.</p>
                 <div className="tpl-inline">
-                  <NumberInput value={measure.first} allowEmpty step={0.01} unit="mm" onCommit={(v) => setMeasure((m) => ({ ...m, first: v }))} />
-                  <NumberInput value={measure.last} allowEmpty step={0.01} unit="mm" onCommit={(v) => setMeasure((m) => ({ ...m, last: v }))} />
+                  <LenInput value={measure.first} allowEmpty step={0.01} onCommit={(v) => setMeasure((m) => ({ ...m, first: v }))} />
+                  <LenInput value={measure.last} allowEmpty step={0.01} onCommit={(v) => setMeasure((m) => ({ ...m, last: v }))} />
                   <button disabled={measure.first == null || measure.last == null || measure.last! <= measure.first!}
                     onClick={() => setG((x) => {
                       const uniform = applyMeasured({ ...x, cellWidthsMM: undefined, gapsAfterMM: undefined, groupSize: null, groupGapMM: 0 }, measure.first!, measure.last!)
@@ -227,15 +222,15 @@ export function TemplateEditor({ initial }: { initial: PatchBayTemplate }) {
 
         {tab === 'layout' && <>
           <div className="tpl-cells-head">
-            <span>Please enter the width of each designation strip cell{t.rows.length > 1 && !shared ? ` (${row.name})` : ''}:</span>
+            <span>Please enter the width of each designation strip cell{t.rows.length > 1 && !shared ? ` (${row.name})` : ''}, in {lenUnit() === 'in' ? 'inches' : 'mm'}:</span>
             <span className="spacer" />
-            <label className="tpl-inline">Set all to <NumberInput value={null} allowEmpty min={0.5} step={0.1} unit="mm" width={70} onCommit={setAll} /></label>
-            <label className="tpl-inline">Fit total to <NumberInput value={null} allowEmpty min={10} step={0.1} unit="mm" width={80} onCommit={(v) => v && setG((x) => fitToWidth(x, v))} /></label>
+            <label className="tpl-inline">Set all to <LenInput value={null} allowEmpty min={0.5} step={0.1} width={70} onCommit={setAll} /></label>
+            <label className="tpl-inline">Fit total to <LenInput value={null} allowEmpty min={10} step={0.1} width={80} onCommit={(v) => v && setG((x) => fitToWidth(x, v))} /></label>
           </div>
           <div className="tpl-cells">
             <div className={`tpl-pad ${cursor.kind === 'padLeft' ? 'sel' : ''}`} onClick={() => setCursor({ kind: 'padLeft' })}>
               <div className="hdr">Left<br />Padding</div>
-              <NumberInput value={g.padLeftMM ?? 0} min={0} step={0.1} width={64} onCommit={(v) => setG((x) => ({ ...x, padLeftMM: v ?? 0 }))} />
+              <LenInput noUnit value={g.padLeftMM ?? 0} min={0} step={0.1} width={64} onCommit={(v) => setG((x) => ({ ...x, padLeftMM: v ?? 0 }))} />
             </div>
             <div className="tpl-scroll">
               <div className="tpl-track">
@@ -245,7 +240,7 @@ export function TemplateEditor({ initial }: { initial: PatchBayTemplate }) {
                   return [
                     <div key={`c${n}`} className={`tpl-cell ${cursor.kind === 'cell' && cursor.n === n ? 'sel' : ''}`} style={{ width: Math.max(56, w * zoom * 3) }} onClick={() => setCursor({ kind: 'cell', n })}>
                       <div className="hdr">{n}</div>
-                      <NumberInput value={w} min={0.5} step={0.1} width={58} onCommit={(v) => setWidth(n, v)} />
+                      <LenInput noUnit value={w} min={0.5} step={0.1} width={58} onCommit={(v) => setWidth(n, v)} />
                       <div className="sock">
                         {(g.socketLayout ?? 'mono') === 'paired'
                           ? <><i style={{ width: sockR * 4.5, height: sockR * 4.5 }} /><i style={{ width: sockR * 4.5, height: sockR * 4.5 }} /></>
@@ -255,7 +250,7 @@ export function TemplateEditor({ initial }: { initial: PatchBayTemplate }) {
                     gap ? (
                       <div key={`g${n}`} className={`tpl-gap ${cursor.kind === 'gap' && cursor.n === n ? 'sel' : ''}`} onClick={() => setCursor({ kind: 'gap', n })}>
                         <div className="hdr">Gap</div>
-                        <NumberInput value={gap} min={0} step={0.1} width={52} onCommit={(v) => setG((x) => ({ ...x, gapsAfterMM: { ...x.gapsAfterMM, [String(n)]: v ?? 0 } }))} />
+                        <LenInput noUnit value={gap} min={0} step={0.1} width={52} onCommit={(v) => setG((x) => ({ ...x, gapsAfterMM: { ...x.gapsAfterMM, [String(n)]: v ?? 0 } }))} />
                         <div className="sock" />
                       </div>
                     ) : null,
@@ -265,7 +260,7 @@ export function TemplateEditor({ initial }: { initial: PatchBayTemplate }) {
             </div>
             <div className={`tpl-pad ${cursor.kind === 'padRight' ? 'sel' : ''}`} onClick={() => setCursor({ kind: 'padRight' })}>
               <div className="hdr">Right<br />Padding</div>
-              <NumberInput value={g.padRightMM ?? 0} min={0} step={0.1} width={64} onCommit={(v) => setG((x) => ({ ...x, padRightMM: v ?? 0 }))} />
+              <LenInput noUnit value={g.padRightMM ?? 0} min={0} step={0.1} width={64} onCommit={(v) => setG((x) => ({ ...x, padRightMM: v ?? 0 }))} />
             </div>
           </div>
           <div className="tpl-actions">
@@ -276,7 +271,7 @@ export function TemplateEditor({ initial }: { initial: PatchBayTemplate }) {
               title="Repeat the widths and gaps of cells 1 … selected across the rest of the strip">Repeat Till End</button>
             <span className="spacer" />
             <label className="zoom">Zoom <input type="range" min={1} max={4} step={0.25} value={zoom} onChange={(e) => setZoom(+e.target.value)} /></label>
-            <span>Total label width: <b>{g.stripWidthMM.toFixed(3)}</b> mm</span>
+            <span>Total label width: <b>{fmtLen(g.stripWidthMM, 3)}</b></span>
           </div>
           <div className="tpl-preview">
             <svg width={g.stripWidthMM * zoom} height={(g.stripHeightMM + (g.socketOffsetMM ?? 2) + (g.socketDiameterMM ?? 4.4) + 2) * zoom}

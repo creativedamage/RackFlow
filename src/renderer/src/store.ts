@@ -20,6 +20,15 @@ interface HistoryEntry { project: Project; label: string }
 let savedRef: unknown = null
 let savedJson = ''
 function rememberSaved(p: Project) { savedRef = p; savedJson = JSON.stringify(p) }
+/** Updates derived data in the project without an undo step or marking it changed (e.g. logo analysis). */
+export function patchQuietly(fn: (p: Project) => Project) {
+  const s = useStore.getState()
+  const wasClean = !changedSinceSave(s.project)
+  const next = fn(s.project)
+  if (next === s.project) return
+  if (wasClean) rememberSaved(next)
+  useStore.setState({ project: next, dirty: changedSinceSave(next) })
+}
 export function changedSinceSave(p: Project): boolean {
   if (p === savedRef) return false
   return JSON.stringify(p) !== savedJson
@@ -52,6 +61,8 @@ export interface AppState {
   editingNumbering: boolean
   /** Appearance: follow macOS, or force light / dark. */
   theme: 'system' | 'light' | 'dark'
+  /** Display units (data is always stored metric). */
+  units: 'imperial' | 'metric'
   showInspector: boolean
   issues: ValidationIssue[]
   /** Bumped to ask the diagram to fit view. */
@@ -119,6 +130,7 @@ export const useStore = create<AppState>((set, get) => ({
   editingNumbers: false,
   editingNumbering: false,
   theme: 'system',
+  units: 'imperial',
   showInspector: true,
   issues: [],
   fitRequest: 0,

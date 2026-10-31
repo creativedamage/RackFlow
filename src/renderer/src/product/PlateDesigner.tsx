@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { produce } from 'immer'
-import {
-  BUILT_IN_KEYS, footprint, makePlateProduct, newPlateText, nextPid, PLATE_MODULE_KEYS, PLATE_MODULES, PLATE_SIZES, PLATE_STYLE_LIST, plateInner, withLayout, autoArrange,
-  type PlateInsert, type PlateKind, type PlateLayout, type PlateSpec, type ProductDefinition,
-} from '@core/index'
+import { BUILT_IN_KEYS, footprint, makePlateProduct, newPlateText, nextPid, PLATE_MODULE_KEYS, PLATE_MODULES, PLATE_SIZES, PLATE_STYLE_LIST, plateInner, withLayout, autoArrange, type PlateInsert, type PlateKind, type PlateLayout, type PlateSpec, type ProductDefinition, imperial, fmtLen, fmtLenPair } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
 import { addProductToDiagram } from '../diagram/placement'
-import { Modal, NumberInput, Segmented, Select } from '../components/ui'
+import { Modal, NumberInput, Segmented, Select, LenInput } from '../components/ui'
 
 const REAR_OPTIONS: { value: PlateInsert['rear']; label: string }[] = [
   { value: 'same', label: 'Pass-through (same jack)' },
@@ -295,8 +292,8 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
           <Segmented<PlateKind> value={spec.kind} onChange={setKind} options={[{ value: 'wallBox', label: 'Wall Box' }, { value: 'wallPlate', label: 'Gang Plate' }, { value: 'floorBox', label: 'Floor Box / Pocket' }, { value: 'rackPanel', label: 'Rack Panel' }]} />
           <Select value={spec.style} onChange={(v) => setStyle(spec.kind, v)} options={PLATE_STYLE_LIST[spec.kind].map((s) => ({ value: s, label: s }))} />
           {spec.style === 'Custom' && (<>
-            <NumberInput value={L.w} min={20} max={1000} unit="W mm" width={60} onCommit={(v) => editL((l) => { l.w = v ?? l.w })} />
-            <NumberInput value={L.h} min={20} max={1000} unit="H mm" width={60} onCommit={(v) => editL((l) => { l.h = v ?? l.h })} />
+            <LenInput value={L.w} min={20} max={1000} label="W" width={60} onCommit={(v) => editL((l) => { l.w = v ?? l.w })} />
+            <LenInput value={L.h} min={20} max={1000} label="H" width={60} onCommit={(v) => editL((l) => { l.h = v ?? l.h })} />
             <Select value={L.shape ?? 'rect'} onChange={(v) => editL((l) => { l.shape = v === 'round' ? 'round' : undefined })} options={[{ value: 'rect', label: 'Rectangle' }, { value: 'round', label: 'Round' }]} />
           </>)}
           <span className="spacer" />
@@ -340,7 +337,7 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
                 <button disabled={!sel.size} onClick={() => align('pm')} title="Centre vertically on the face">⊞</button>
               </span>
               <label className="pd-snap"><input type="checkbox" checked={snap} onChange={(e) => setSnap(e.target.checked)} /> Snap</label>
-              <Select value={L.grid} width={80} onChange={(v) => editL((l) => { l.grid = v })} options={[0.5, 1, 2, 2.5, 5, 10].map((g) => ({ value: g, label: `${g} mm` }))} />
+              <Select value={L.grid} width={80} onChange={(v) => editL((l) => { l.grid = v })} options={((g0) => (g0.includes(L.grid) ? g0 : [...g0, L.grid].sort((a, b) => a - b)))(imperial() ? [0.79375, 1.5875, 3.175, 6.35, 12.7] : [0.5, 1, 2, 2.5, 5, 10]).map((g) => ({ value: g, label: imperial() ? `${{ 0.79375: '1/32', 1.5875: '1/16', 3.175: '1/8', 6.35: '1/4', 12.7: '1/2' }[g] ?? fmtLen(g, 3)}"` : `${g} mm` }))} />
               <span className="pd-group">
                 <button onClick={() => edit((d) => { d.layout!.jacks = { ...d.layout!.jacks, ...autoArrange(d, { w: d.layout!.w, h: d.layout!.h, ru: spec.kind === 'rackPanel' ? 1 : undefined }) } })} title="Arrange all connectors in neat rows">Auto-arrange</button>
                 <button disabled={!sel.size} onClick={duplicate} title="Duplicate (⌘D)">Duplicate</button>
@@ -358,7 +355,7 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
                 {marquee && <rect x={Math.min(marquee.x0, marquee.x1)} y={Math.min(marquee.y0, marquee.y1)} width={Math.abs(marquee.x1 - marquee.x0)} height={Math.abs(marquee.y1 - marquee.y0)} fill="rgba(10,132,255,0.1)" stroke="#0a84ff" strokeWidth={0.4} />}
               </svg>
             </div>
-            <p className="muted small pd-hint">Drag to move (snaps to the grid) · Shift-click or drag a box to select several · arrows nudge (⌥ for 0.5 mm) · ⌘D duplicates · ⌫ deletes · {L.w} × {L.h} mm</p>
+            <p className="muted small pd-hint">Drag to move (snaps to the grid) · Shift-click or drag a box to select several · arrows nudge (⌥ for a finer step) · ⌘D duplicates · ⌫ deletes · {fmtLenPair(L.w, L.h, 2)}</p>
           </div>
           <div className="pd-inspector form">
             {oneJack ? (<>
@@ -371,23 +368,23 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
                 <label className="field-label">Back of plate</label>
                 <Select value={oneJack.rear} onChange={(v) => edit((d) => { const x = d.inserts.find((q) => q.pid === one); if (x) x.rear = v })} options={REAR_OPTIONS} />
               </>)}
-              <label className="field-label">Position (mm, centre)</label>
+              <label className="field-label">Position (centre, from top-left)</label>
               <span className="row-gap">
-                X <NumberInput value={L.jacks[one!].x} step={0.5} width={60} onCommit={(v) => setPos(one!, v ?? 0, L.jacks[one!].y)} />
-                Y <NumberInput value={L.jacks[one!].y} step={0.5} width={60} onCommit={(v) => setPos(one!, L.jacks[one!].x, v ?? 0)} />
+                X <LenInput value={L.jacks[one!].x} width={60} onCommit={(v) => setPos(one!, v ?? 0, L.jacks[one!].y)} />
+                Y <LenInput value={L.jacks[one!].y} width={60} onCommit={(v) => setPos(one!, L.jacks[one!].x, v ?? 0)} />
               </span>
             </>) : oneText ? (<>
               <h4>Text</h4>
               <textarea rows={3} value={oneText.text} onChange={(e) => editL((l) => { const t = l.texts.find((q) => q.id === one); if (t) t.text = e.target.value }, false)} onBlur={() => setPast((p) => [...p, spec])} />
               <span className="row-gap">
-                Size <NumberInput value={oneText.size} min={1} max={30} step={0.5} unit="mm" width={56} onCommit={(v) => editL((l) => { const t = l.texts.find((q) => q.id === one); if (t) t.size = v ?? t.size })} />
+                Size <LenInput value={oneText.size} min={1} max={30} width={56} onCommit={(v) => editL((l) => { const t = l.texts.find((q) => q.id === one); if (t) t.size = v ?? t.size })} />
                 <label className="toggle"><input type="checkbox" checked={!!oneText.bold} onChange={(e) => editL((l) => { const t = l.texts.find((q) => q.id === one); if (t) t.bold = e.target.checked })} /> Bold</label>
               </span>
               <Segmented value={oneText.align ?? 'middle'} onChange={(v) => editL((l) => { const t = l.texts.find((q) => q.id === one); if (t) t.align = v })} options={[{ value: 'start', label: 'Left' }, { value: 'middle', label: 'Centre' }, { value: 'end', label: 'Right' }]} />
-              <label className="field-label">Position (mm)</label>
+              <label className="field-label">Position (from top-left)</label>
               <span className="row-gap">
-                X <NumberInput value={oneText.x} step={0.5} width={60} onCommit={(v) => setPos(one!, v ?? 0, oneText.y)} />
-                Y <NumberInput value={oneText.y} step={0.5} width={60} onCommit={(v) => setPos(one!, oneText.x, v ?? 0)} />
+                X <LenInput value={oneText.x} width={60} onCommit={(v) => setPos(one!, v ?? 0, oneText.y)} />
+                Y <LenInput value={oneText.y} width={60} onCommit={(v) => setPos(one!, oneText.x, v ?? 0)} />
               </span>
             </>) : sel.size > 1 ? (<>
               <h4>{sel.size} selected</h4>

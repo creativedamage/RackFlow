@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { fromLen, fromLong, fromWt, lenUnit, longUnit, toLen, toLong, toWt, wtUnit } from '@core/index'
 
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
@@ -110,3 +111,20 @@ export const Dot = ({ color, square }: { color: string; square?: boolean }) =>
 export function Empty({ title, children }: { title: string; children?: ReactNode }) {
   return <div className="empty"><h3>{title}</h3>{children}</div>
 }
+
+type UnitInputProps = { value: number | null; onCommit: (v: number | null) => void; min?: number; max?: number; step?: number; allowEmpty?: boolean; width?: number; label?: string; noUnit?: boolean }
+/** NumberInput for a stored metric value shown in the current units (inches / feet / pounds, or mm / m / kg). */
+function unitInput(to: (v: number) => number, from: (v: number) => number, unit: () => string, defStep: () => number) {
+  return function UnitInput({ value, onCommit, min, max, step, allowEmpty, width, label, noUnit }: UnitInputProps) {
+    const conv = (v: number | undefined) => (v == null ? undefined : to(v))
+    const st = step != null ? Math.max(0.001, Math.round(to(step) * 1000) / 1000) : defStep()
+    return <NumberInput value={value == null ? null : to(value)} min={conv(min)} max={conv(max)} step={st} allowEmpty={allowEmpty} width={width}
+      unit={noUnit ? undefined : label ? `${label} ${unit()}` : unit()} onCommit={(v) => onCommit(v == null ? null : from(v))} />
+  }
+}
+/** Short lengths: inches (or mm). Value in mm. */
+export const LenInput = unitInput(toLen, fromLen, lenUnit, () => (lenUnit() === 'in' ? 0.125 : 1))
+/** Long lengths: feet (or m). Value in metres. */
+export const LongInput = unitInput(toLong, fromLong, longUnit, () => (longUnit() === 'ft' ? 1 : 0.5))
+/** Weight: pounds (or kg). Value in kg. */
+export const WtInput = unitInput(toWt, fromWt, wtUnit, () => (wtUnit() === 'lb' ? 0.5 : 0.1))

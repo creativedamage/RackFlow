@@ -50,8 +50,10 @@ export class Svg {
     this.parts.push(`<text x="${n(x)}" y="${n(y)}" font-family="${esc(CAD_FONT)}" font-size="${n(o.size)}"${o.weight === 'bold' ? ' font-weight="bold"' : ''}${o.italic ? ' font-style="italic"' : ''} text-anchor="${o.anchor ?? 'start'}" dominant-baseline="${o.baseline ?? 'middle'}" fill="${o.fill ?? '#000'}"${fit}>${esc(s)}</text>`)
     return this
   }
-  image(x: number, y: number, w: number, h: number, href: string) {
-    this.parts.push(`<image x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" preserveAspectRatio="xMidYMid meet" href="${esc(href)}"/>`)
+  /** `black`: print the artwork solid black (keeps its shape / transparency) – for white logos on white paper. */
+  image(x: number, y: number, w: number, h: number, href: string, o: { black?: boolean } = {}) {
+    if (o.black && !this.parts.some((p) => p.includes('id="rf-black"'))) this.parts.push('<defs><filter id="rf-black" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"/></filter></defs>')
+    this.parts.push(`<image x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" preserveAspectRatio="xMidYMid meet" href="${esc(href)}"${o.black ? ' filter="url(#rf-black)"' : ''}/>`)
     return this
   }
   group(transform: string, fn: (s: Svg) => void) {

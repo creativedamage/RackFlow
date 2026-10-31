@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
-  addToGroup, createGroup, groupColor, groupsOf, removeFromGroup, CABLE_CATALOG, cableRows, cablesToCSV, cableSpec, CATEGORIES, defaultSchemes, DOMAINS, findRack, fittingCables, renumberCables, resolve,
-  type CableId, type CableRow, type EquipmentInstance, type NumberScheme, type RenumberOrder, type SignalDomain,
+  addToGroup, createGroup, groupColor, groupsOf, removeFromGroup, CABLE_CATALOG, cableRows, cablesToCSV, cableSpec, CATEGORIES, defaultSchemes, DOMAINS, findRack, fittingCables, renumberCables, resolve, type CableId, type CableRow, type EquipmentInstance, type NumberScheme, type RenumberOrder, type SignalDomain, longUnit, toLong, fromLong,
 } from '@core/index'
 import { useStore } from '../store'
 import { Modal, NumberInput, Select } from '../components/ui'
@@ -78,8 +77,8 @@ function CableSheet() {
         const hit = CABLE_CATALOG.find((c) => c.key === t || c.name.toLowerCase() === t.toLowerCase()) ?? cableSpec(t)
         if (hit) r.cable.specKey = hit.key
       } },
-    { key: 'length', title: 'Length (m)', width: 90, numeric: true, get: (r) => (r.cable.lengthMeters == null ? '' : String(r.cable.lengthMeters)),
-      set: (r, v) => { const n = parseFloat(v.replace(',', '.')); r.cable.lengthMeters = v.trim() === '' || isNaN(n) ? null : Math.max(0, n) } },
+    { key: 'length', title: `Length (${longUnit()})`, width: 90, numeric: true, get: (r) => (r.cable.lengthMeters == null ? '' : String(Number(toLong(r.cable.lengthMeters).toFixed(1)))),
+      set: (r, v) => { const n = parseFloat(v.replace(',', '.')); r.cable.lengthMeters = v.trim() === '' || isNaN(n) ? null : Math.max(0, fromLong(n)) } },
     { key: 'notes', title: 'Notes', width: 220, get: (r) => r.cable.notes, set: (r, v) => { r.cable.notes = v } },
     { key: 'status', title: 'Status', width: 260, get: (r) => r.message || 'OK',
       render: (r) => <span className={`status ${r.severity ?? 'ok'}`}>{r.severity === 'error' ? '✕ ' : r.severity === 'warning' ? '! ' : r.severity ? 'ⓘ ' : '✓ '}{r.message || 'OK'}</span> },

@@ -6,7 +6,35 @@ const MAX_LOGO_BYTES = 2_000_000
 const NO_LOGOS: LogoAsset[] = []
 
 /** Reads an image file as a data: URL, refusing very large files. */
-export function pickImage(): Promise<{ name: string; dataUrl: string } | null> {
+/**
+ * Is this light / white artwork on a transparent background? (Such logos are
+ * printed black on drawings so they don't vanish on white paper.)
+ */
+export function isLightLogo(dataUrl: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas'); c.width = 64; c.height = 64
+        const g = c.getContext('2d', { willReadFrequently: true })
+        if (!g) return resolve(false)
+        const k = Math.min(64 / (img.width || 64), 64 / (img.height || 64))
+        g.drawImage(img, 0, 0, (img.width || 64) * k, (img.height || 64) * k)
+        const d = g.getImageData(0, 0, 64, 64).data
+        let ink = 0, lum = 0, clear = 0
+        for (let i = 0; i < d.length; i += 4) {
+          if (d[i + 3] < 40) { clear++; continue }
+          ink++; lum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255
+        }
+        resolve(ink > 0 && clear / (d.length / 4) > 0.08 && lum / ink > 0.78)
+      } catch { resolve(false) }
+    }
+    img.onerror = () => resolve(false)
+    img.src = dataUrl
+  })
+}
+
+export function pickImage(): Promise<{ name: string; dataUrl: string; light?: boolean } | null> {
   return new Promise((resolve) => {
     const input = document.createElement('input')
     input.type = 'file'
@@ -16,7 +44,7 @@ export function pickImage(): Promise<{ name: string; dataUrl: string } | null> {
       if (!f) return resolve(null)
       if (f.size > MAX_LOGO_BYTES) { useStore.getState().notify('That image is over 2 MB – use a smaller PNG or SVG', { kind: 'warning' }); return resolve(null) }
       const r = new FileReader()
-      r.onload = () => resolve({ name: f.name.replace(/\.[^.]+$/, ''), dataUrl: String(r.result) })
+      r.onload = () => { const dataUrl = String(r.result); void isLightLogo(dataUrl).then((light) => resolve({ name: f.name.replace(/\.[^.]+$/, ''), dataUrl, light: light || undefined })) }
       r.onerror = () => resolve(null)
       r.readAsDataURL(f)
     }
@@ -28,7 +56,7 @@ export function pickImage(): Promise<{ name: string; dataUrl: string } | null> {
 export async function uploadLogo(): Promise<string | null> {
   const img = await pickImage()
   if (!img) return null
-  const asset: LogoAsset = { id: newId(), name: img.name, dataUrl: img.dataUrl }
+  const asset: LogoAsset = { id: newId(), name: img.name, dataUrl: img.dataUrl, light: img.light }
   useStore.getState().apply('Add Logo', (d) => { d.logos = [...(d.logos ?? []), asset] })
   return asset.id
 }

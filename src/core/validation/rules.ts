@@ -1,4 +1,5 @@
 import { carries, endMates, orientation, type CableSpec, plugsInto } from '../cables'
+import { fmtLong } from '../units'
 import { isUsable, type BestMatch } from '../compatibility'
 import type { CableId, Project } from '../model'
 import { cablesAt, isPowerPort, portDomain, type ResolvedPort } from '../project'
@@ -132,7 +133,7 @@ export const cableLengthRule: ConnectionRule = {
     const spec = c.cableSpec, len = c.lengthMeters
     if (!spec || spec.maxLengthMeters == null || len == null || len <= spec.maxLengthMeters) return []
     const ethernet = spec.key.startsWith('cat')
-    return [issue(c, this.id, ethernet ? 'error' : 'warning', `${len} m exceeds the ${spec.maxLengthMeters} m limit for ${spec.name}.`,
+    return [issue(c, this.id, ethernet ? 'error' : 'warning', `${fmtLong(len)} exceeds the ${fmtLong(spec.maxLengthMeters, 0)} limit for ${spec.name}.`,
       ethernet ? 'Add a switch or use fiber.' : 'Use an active cable, fiber, or an extender.')]
   },
 }

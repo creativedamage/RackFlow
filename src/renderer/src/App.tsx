@@ -9,7 +9,7 @@ import { useEffect } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
 import { newCustomProduct, newCustomTemplate, setInView } from '@core/index'
 import { api, isMac } from './platform'
-import { confirmDiscard, loadFile, newDocument, openDocument, saveDocument, useStore } from './store'
+import { confirmDiscard, loadFile, newDocument, openDocument, saveDocument, useStore, patchQuietly } from './store'
 import { Toolbar } from './components/Toolbar'
 import { Sidebar } from './components/Sidebar'
 import { DiagramView } from './diagram/DiagramView'
@@ -25,6 +25,8 @@ import { ViewEditor } from './diagram/ViewEditor'
 import { SheetNumbersDialog } from './diagram/SheetNumbers'
 import { NumberingDialog } from './components/NumberingDialog'
 import { initTheme, showTheme } from './theme'
+import { applyUnits } from './units'
+import { isLightLogo } from './rack/AccessoryInspector'
 import { usePatchUI } from './patch/patchState'
 import { Inspector } from './inspector/Inspector'
 import { ProductEditor } from './product/ProductEditor'
@@ -60,6 +62,8 @@ export function App() {
   const editingView = useStore((s) => s.editingView)
   const editingNumbers = useStore((s) => s.editingNumbers)
   const editingNumbering = useStore((s) => s.editingNumbering)
+  // Switching units re-draws everything with the new labels.
+  const units = useStore((s) => s.units)
   const editingTemplate = useStore((s) => s.editingTemplate)
   const title = useStore((s) => s.project.info.name)
   const dirty = useStore((s) => s.dirty)
@@ -69,6 +73,23 @@ export function App() {
   useEffect(() => { api.setDocumentState({ title, dirty, path }) }, [title, dirty, path])
 
   useEffect(() => { void initTheme() }, [])
+
+  // Logos from older projects: work out once whether they're white artwork (printed black on drawings).
+  const logos = useStore((s) => s.project.logos)
+  const tbLogo = useStore((s) => s.project.titleBlock?.logo)
+  useEffect(() => {
+    const todo = (logos ?? []).filter((l) => l.light === undefined)
+    const tb = tbLogo && tbLogo.light === undefined ? tbLogo : null
+    if (!todo.length && !tb) return
+    void Promise.all([...todo.map((l) => isLightLogo(l.dataUrl)), tb ? isLightLogo(tb.dataUrl) : Promise.resolve(false)]).then((res) => {
+      const map = new Map(todo.map((l, i) => [l.id, res[i]]))
+      patchQuietly((p) => ({
+        ...p,
+        logos: p.logos?.map((l) => (map.has(l.id) ? { ...l, light: map.get(l.id) } : l)),
+        titleBlock: tb && p.titleBlock?.logo ? { ...p.titleBlock, logo: { ...p.titleBlock.logo, light: res[res.length - 1] } } : p.titleBlock,
+      }))
+    })
+  }, [logos, tbLogo])
 
   // Native menu → app commands.
   useEffect(() => api.onMenu(async (cmd) => {
@@ -116,6 +137,7 @@ export function App() {
       case 'tidy': s.set({ mode: 'diagram' }); setTimeout(() => { const n = tidyDiagram({ selectionOnly: s.selection.length > 1 }); if (n) useStore.getState().notify(`Tidied ${n} devices`, { undo: true, kind: 'success' }) }, 0); break
       case 'exportAll': s.set({ exportingAll: true }); break
       case 'numbering': s.set({ editingNumbering: true }); break
+      case 'units:imperial': case 'units:metric': applyUnits(cmd === 'units:metric' ? 'metric' : 'imperial'); break
       case 'findDevice': s.set({ finding: { query: '' } }); break
       case 'newTemplate': s.set({ editingTemplate: newCustomTemplate() }); break
     }
@@ -133,7 +155,7 @@ export function App() {
 
   return (
     <ReactFlowProvider>
-      <div className={`app ${isMac ? 'mac' : ''} ${rightPanel ? '' : 'no-inspector'} mode-${mode}`} style={{ ['--insp-w' as string]: `${inspW}px`, ['--tp-w' as string]: `${tpW}px` }}>
+      <div key={units} className={`app ${isMac ? 'mac' : ''} ${rightPanel ? '' : 'no-inspector'} mode-${mode}`} style={{ ['--insp-w' as string]: `${inspW}px`, ['--tp-w' as string]: `${tpW}px` }}>
         <Toolbar />
         {mode !== 'sheet' && mode !== 'led' && <Sidebar />}
         <main className="canvas-area">

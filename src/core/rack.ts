@@ -1,4 +1,5 @@
 import type { EquipmentId, Project, Rack, RackFace, RackId } from './model'
+import { fmtLen, fmtWt } from './units'
 import { findRack, heatBTU } from './project'
 import { ACCESSORY_KINDS, accessoryLabel } from './rackpanels'
 import type { ValidationIssue } from './validation/issues'
@@ -132,7 +133,7 @@ export class RackLayout {
       if (o.low < 1 || o.high > rackUnits)
         out.push({ rule: 'rack-bounds', severity: 'error', message: `${o.name} extends outside ${this.rack.name} (U${o.low}–U${o.high}).`, subject })
       if (o.depthMM > depth)
-        out.push({ rule: 'rack-depth', severity: 'error', message: `${o.name} is ${o.depthMM} mm deep; ${this.rack.name} mounting depth is ${depth} mm.`, subject })
+        out.push({ rule: 'rack-depth', severity: 'error', message: `${o.name} is ${fmtLen(o.depthMM, 1)} deep; ${this.rack.name} mounting depth is ${fmtLen(depth, 1)}.`, subject })
     }
     this.occupants.forEach((x, i) => {
       for (const y of this.occupants.slice(i + 1)) {
@@ -142,7 +143,7 @@ export class RackLayout {
       }
     })
     if (this.totalWeightKG > maxLoadKG)
-      out.push({ rule: 'rack-weight', severity: 'error', message: `Load ${this.totalWeightKG.toFixed(0)} kg exceeds the ${maxLoadKG} kg rating.`, subject })
+      out.push({ rule: 'rack-weight', severity: 'error', message: `Load ${fmtWt(this.totalWeightKG, 0)} exceeds the ${fmtWt(maxLoadKG, 0)} rating.`, subject })
     const cog = this.centerOfGravityU
     if (cog != null && cog / rackUnits > 0.5)
       out.push({ rule: 'rack-cog', severity: 'warning', message: `Top-heavy: centre of gravity at U${cog.toFixed(1)}.`, suggestion: 'Move heavy items (amplifiers, UPS) toward the bottom.', subject })

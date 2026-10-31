@@ -306,7 +306,7 @@ export interface DiagramSettings {
   /** Custom number for the sheet of devices that aren't on a page. */
   generalNumber?: string
 }
-export interface LogoAsset { id: string; name: string; /** data: URL (PNG / JPEG / SVG). */ dataUrl: string }
+export interface LogoAsset { id: string; name: string; /** data: URL (PNG / JPEG / SVG). */ dataUrl: string; /** Light / white artwork on a transparent background – printed in black on drawings. */ light?: boolean }
 
 export type AnnotationKind = 'callout' | 'note' | 'revision'
 /** A note placed anywhere on the wiring diagram (and printed on its page). */

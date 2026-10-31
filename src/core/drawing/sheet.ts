@@ -86,10 +86,11 @@ function titleBlock(svg: Svg, p: Project, o: SheetOptions, r: { x: number; y: nu
   // Logo: the title block's own (saved with it), else one picked in the print dialog (older projects).
   const legacy: LogoAsset | undefined = (p.logos ?? []).find((l) => l.id === o.logoId)
   const logo = tb.logo?.dataUrl ?? legacy?.dataUrl
+  const logoBlack = tb.logo ? !!tb.logo.light : !!legacy?.light
   const logoW = logo ? Math.min(tb.logoWidth, r.w * 0.25) : 0
   if (logo) {
     const lx = tb.logoSide === 'right' ? r.x + r.w - logoW : r.x
-    svg.image(lx + 2, r.y + 2, logoW - 4, r.h - 4, logo)
+    svg.image(lx + 2, r.y + 2, logoW - 4, r.h - 4, logo, { black: logoBlack })
     svg.line(tb.logoSide === 'right' ? lx : lx + logoW, r.y, tb.logoSide === 'right' ? lx : lx + logoW, r.y + r.h, { lw: 0.35 })
   }
   const ctx: TBContext = {

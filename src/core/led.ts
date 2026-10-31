@@ -6,6 +6,7 @@
 // every built-in ships with verified=false. Check pitch, cabinet size, weight
 // and power against the manufacturer's sheet before relying on the numbers.
 
+import { fmtFtIn } from './units'
 import { newId, type EquipmentInstance, type ProductDefinition, type PortTemplate, type Project } from './model'
 
 export interface LedPanel {
@@ -227,7 +228,7 @@ export function ledWallProduct(w: LedWall): ProductDefinition {
   ]
   return {
     key: `ledwall.${w.id}`, manufacturer: w.panel.manufacturer, model: `${w.name} (${w.cols}×${w.rows} ${w.panel.model})`,
-    summary: `${st.pxW}×${st.pxH} px LED wall, ${st.widthM.toFixed(2)}×${st.heightM.toFixed(2)} m`, category: 'display', tags: ['led', 'ledwall'],
+    summary: `${st.pxW}×${st.pxH} px LED wall, ${fmtFtIn(st.widthM)} × ${fmtFtIn(st.heightM)}`, category: 'display', tags: ['led', 'ledwall'],
     physical: { rackUnits: null, halfWidth: false, widthMM: w.cols * w.panel.widthMM, heightMM: w.rows * w.panel.heightMM, depthMM: 100, weightKG: st.weightKG, mounting: 'truss' },
     power: { acceptedVoltages: w.power.voltage > 150 ? ['ac230V'] : ['ac120V'], typicalWatts: st.typWatts, maxWatts: Math.max(st.maxWatts, st.typWatts), publishedBTU: null, efficiency: null, poweredByPoE: false },
     ports, source: 'user', revision: 1, verified: w.panel.verified, dataNote: w.panel.verified ? undefined : 'LED panel specs are nominal – check against the manufacturer’s sheet.',

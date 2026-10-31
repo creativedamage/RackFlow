@@ -1,5 +1,6 @@
 // Cable schedule: one row per cable, bulk renumbering by system, CSV export.
 
+import { longUnit, toLong } from './units'
 import { cableRule } from './numbering'
 import { cableSpec } from './cables'
 import { addrKey, type Cable, type CableId, type Project } from './model'
@@ -115,9 +116,9 @@ export function renumberCables(p: Project, opts: {
 const csvCell = (v: unknown) => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
 
 export function cablesToCSV(p: Project): string {
-  const head = ['Label', 'System', 'From', 'From Port', 'To', 'To Port', 'Signal', 'Cable Type', 'Length (m)', 'Notes', 'Status']
+  const head = ['Label', 'System', 'From', 'From Port', 'To', 'To Port', 'Signal', 'Cable Type', `Length (${longUnit()})`, 'Notes', 'Status']
   const lines = cableRows(p).map((r) => [r.cable.label, r.system ? DOMAINS[r.system].name : '', r.fromTag, r.fromPort, r.toTag, r.toPort, r.signal, r.cableType,
-    r.cable.lengthMeters ?? '', r.cable.notes, r.message].map(csvCell).join(','))
+    r.cable.lengthMeters == null ? '' : Number(toLong(r.cable.lengthMeters).toFixed(1)), r.cable.notes, r.message].map(csvCell).join(','))
   return [head.join(','), ...lines].join('\n')
 }
 

@@ -7,7 +7,7 @@ import {
 } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
-import { Dot, Field, Modal, NumberInput, Select, TextInput, Toggle } from '../components/ui'
+import { Dot, Field, Modal, NumberInput, Select, TextInput, Toggle, LenInput, WtInput } from '../components/ui'
 import { ManufacturerPicker } from '../components/ManufacturerPicker'
 import { removeUserProduct } from './productActions'
 
@@ -129,11 +129,11 @@ export function ProductEditor({ initial }: { initial: ProductDefinition }) {
             <Toggle label="Half-rack width" checked={p.physical.halfWidth} onChange={(v) => edit((d) => { d.physical.halfWidth = v })} />
           </>) : (<>
             <Field label="Mounting"><Select value={p.physical.mounting} onChange={(v) => edit((d) => { d.physical.mounting = v })} options={MOUNT_TYPES.map((m) => ({ value: m, label: m[0].toUpperCase() + m.slice(1) }))} /></Field>
-            <Field label="Height"><NumberInput value={p.physical.heightMM} min={0} unit="mm" onCommit={(v) => edit((d) => { d.physical.heightMM = v ?? 0 })} /></Field>
+            <Field label="Height"><LenInput value={p.physical.heightMM} min={0} onCommit={(v) => edit((d) => { d.physical.heightMM = v ?? 0 })} /></Field>
           </>)}
-          <Field label="Width"><NumberInput value={p.physical.widthMM} min={0} unit="mm" onCommit={(v) => edit((d) => { d.physical.widthMM = v ?? 0 })} /></Field>
-          <Field label="Depth"><NumberInput value={p.physical.depthMM} min={0} unit="mm" onCommit={(v) => edit((d) => { d.physical.depthMM = v ?? 0 })} /></Field>
-          <Field label="Weight"><NumberInput value={p.physical.weightKG} min={0} step={0.1} unit="kg" onCommit={(v) => edit((d) => { d.physical.weightKG = v ?? 0 })} /></Field>
+          <Field label="Width"><LenInput value={p.physical.widthMM} min={0} onCommit={(v) => edit((d) => { d.physical.widthMM = v ?? 0 })} /></Field>
+          <Field label="Depth"><LenInput value={p.physical.depthMM} min={0} onCommit={(v) => edit((d) => { d.physical.depthMM = v ?? 0 })} /></Field>
+          <Field label="Weight"><WtInput value={p.physical.weightKG} min={0} step={0.1} onCommit={(v) => edit((d) => { d.physical.weightKG = v ?? 0 })} /></Field>
 
           <h4>Power</h4>
           <Toggle label="Powered by PoE" checked={p.power.poweredByPoE} onChange={(v) => edit((d) => { d.power.poweredByPoE = v })} />

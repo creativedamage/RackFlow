@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { cloneTemplate, defaultTitleBlock, newId, newSheet, TB_SOURCES, titleBlockOf, twoRowTitleBlock, type TBField, type TitleBlockTemplate } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
-import { Modal, NumberInput, Select } from '../components/ui'
+import { Modal, NumberInput, Select, LenInput } from '../components/ui'
 import { pickImage } from '../rack/AccessoryInspector'
 
 /** Saved title block templates (app-wide, shared by every project). */
@@ -72,7 +72,7 @@ export function TitleBlockEditor({ onClose }: { onClose: () => void }) {
               ))}
             </div>
             <h4>Size</h4>
-            <label className="tb-inline">Height <NumberInput value={t.height} min={14} max={80} unit="mm" width={60} onCommit={(v) => upd({ height: v ?? t.height })} /></label>
+            <label className="tb-inline">Height <LenInput value={t.height} min={14} max={80} width={60} onCommit={(v) => upd({ height: v ?? t.height })} /></label>
             <h4>Logo</h4>
             {t.logo ? <div className="logo-preview finish-white"><img src={t.logo.dataUrl} alt={t.logo.name} /></div> : <p className="muted small">No logo.</p>}
             <div className="row-gap">
@@ -85,7 +85,7 @@ export function TitleBlockEditor({ onClose }: { onClose: () => void }) {
             </div>
             {t.logo && (<>
               <label className="tb-inline">Side <Select value={t.logoSide} onChange={(v) => upd({ logoSide: v })} options={[{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }]} /></label>
-              <label className="tb-inline">Width <NumberInput value={t.logoWidth} min={15} max={120} unit="mm" width={60} onCommit={(v) => upd({ logoWidth: v ?? t.logoWidth })} /></label>
+              <label className="tb-inline">Width <LenInput value={t.logoWidth} min={15} max={120} width={60} onCommit={(v) => upd({ logoWidth: v ?? t.logoWidth })} /></label>
             </>)}
             <p className="muted small">The logo is saved with the project (and inside any template you save), so it’s there next time.</p>
           </div>

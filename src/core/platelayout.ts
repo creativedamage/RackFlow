@@ -169,7 +169,7 @@ function layoutOf(spec0: PlateSpec): PlateSpec {
   const size = PLATE_SIZES[spec.style] ?? { w: spec.layout?.w ?? 120, h: spec.layout?.h ?? 120 }
   const layout: PlateLayout = spec.layout
     ? { ...spec.layout, jacks: { ...spec.layout.jacks } }
-    : { w: size.w, h: size.h, shape: size.shape, finish: spec.kind === 'rackPanel' ? 'black' : 'white', grid: spec.kind === 'rackPanel' ? 2.5 : 2, labelPos: 'below', jacks: {}, texts: [] }
+    : { w: size.w, h: size.h, shape: size.shape, finish: spec.kind === 'rackPanel' ? 'black' : 'white', grid: 1.5875 /* 1/16 in */, labelPos: 'below', jacks: {}, texts: [] }
   const missing = spec.inserts.filter((x) => x.pid && !layout.jacks[x.pid])
   if (missing.length) {
     const auto = autoArrange(spec, { ...size, w: layout.w, h: layout.h })

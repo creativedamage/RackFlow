@@ -1,13 +1,13 @@
 import { deviceMenu } from '../product/productActions'
 import { showContextMenu } from '../components/ContextMenu'
 import { useMemo, useState } from 'react'
-import { faceSVG, productFace } from '@core/index'
+import { faceSVG, productFace, fmtWt } from '@core/index'
 import { ACCESSORY_KINDS, accessoryLabel, canHaveLogo, addAccessory, addRack, fillWithBlanks, RackLayout, type AccessoryKind, type EquipmentId, type Rack, type RackAccessory, type RackFace } from '@core/index'
 import { RackPrintDialog } from './RackPrint'
 import { uploadLogo } from './AccessoryInspector'
 import { useStore } from '../store'
 import { DRAG_MIME, type DragPayload } from '../components/Sidebar'
-import { Empty, NumberInput, Segmented, TextInput, Toggle } from '../components/ui'
+import { Empty, NumberInput, Segmented, TextInput, Toggle, LenInput, WtInput } from '../components/ui'
 
 /**
  * Rack elevations. Bounded size (≤ 60U), so plain DOM is simplest and fastest.
@@ -198,7 +198,7 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
               {(() => { const eq = id ? project.equipment.find((e) => e.id === id) : undefined; const f = eq && !o.halfSlot ? productFace(eq.product) : null
                 return f?.rack ? <div className="rack-face" dangerouslySetInnerHTML={{ __html: faceSVG(eq!.product, { pad: 0, stretch: true, bare: true }) }} /> : null })()}
               <b>{o.name}</b>{id && <span className="rack-model ellipsis">{project.equipment.find((e) => e.id === id)?.product.model}</span>}
-              {height > 16 && <span className="muted">{o.typicalWatts.toFixed(0)} W · {o.weightKG.toFixed(1)} kg</span>}
+              {height > 16 && <span className="muted">{o.typicalWatts.toFixed(0)} W · {fmtWt(o.weightKG)}</span>}
               {other && <span className="face-tag">{o.face}</span>}
             </div>
           )
@@ -207,7 +207,7 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
         {cog != null && <div className="cog" style={{ top: (total - cog) * unitPx }} title={`Centre of gravity U${cog.toFixed(1)}`}>◆</div>}
       </div>
       <dl className="rack-stats">
-        <dt>Weight</dt><dd>{layout.totalWeightKG.toFixed(1)} / {rack.spec.maxLoadKG} kg</dd>
+        <dt>Weight</dt><dd>{fmtWt(layout.totalWeightKG)} / {fmtWt(rack.spec.maxLoadKG, 0)}</dd>
         <dt>Power</dt><dd>{layout.totalTypicalWatts.toFixed(0)} W typ · {layout.totalMaxWatts.toFixed(0)} W max · {layout.amps(120).toFixed(1)} A @120V</dd>
         <dt>Heat</dt><dd>{layout.totalHeatBTU.toFixed(0)} BTU/hr</dd>
         {cog != null && <><dt>CoG</dt><dd>U{cog.toFixed(1)}</dd></>}
@@ -259,8 +259,8 @@ export function RackSettings({ rack }: { rack: Rack }) {
       <h3>Rack</h3>
       <label className="field"><span className="field-label">Name</span><TextInput value={rack.name} onCommit={(v) => upd('Rename Rack', (r) => { r.name = v })} /></label>
       <label className="field"><span className="field-label">Height</span><NumberInput value={rack.spec.rackUnits} min={4} max={60} unit="U" onCommit={(v) => upd('Rack Height', (r) => { r.spec.rackUnits = v ?? 42 })} /></label>
-      <label className="field"><span className="field-label">Mounting depth</span><NumberInput value={rack.spec.mountingDepthMM} min={100} unit="mm" onCommit={(v) => upd('Rack Depth', (r) => { r.spec.mountingDepthMM = v ?? 600 })} /></label>
-      <label className="field"><span className="field-label">Load rating</span><NumberInput value={rack.spec.maxLoadKG} min={1} unit="kg" onCommit={(v) => upd('Rack Load', (r) => { r.spec.maxLoadKG = v ?? 900 })} /></label>
+      <label className="field"><span className="field-label">Mounting depth</span><LenInput value={rack.spec.mountingDepthMM} min={100} onCommit={(v) => upd('Rack Depth', (r) => { r.spec.mountingDepthMM = v ?? 600 })} /></label>
+      <label className="field"><span className="field-label">Load rating</span><WtInput value={rack.spec.maxLoadKG} min={1} onCommit={(v) => upd('Rack Load', (r) => { r.spec.maxLoadKG = v ?? 900 })} /></label>
       <label className="field"><span className="field-label">Cooling capacity</span><NumberInput value={rack.spec.coolingCapacityBTU} allowEmpty unit="BTU/hr" onCommit={(v) => upd('Rack Cooling', (r) => { r.spec.coolingCapacityBTU = v })} /></label>
       <button className="danger" onClick={() => { if (confirm(`Delete ${rack.name}? Devices in it become unracked.`)) apply('Delete Rack', (d) => {
         d.racks = d.racks.filter((r) => r.id !== rack.id)

@@ -1,14 +1,11 @@
 import { editPlacedDevice } from '../product/openEditor'
 import { useState } from 'react'
-import {
-  CABLE_CATALOG, cableSpec, CATEGORIES, CONNECTOR_TYPES, connectorIsPower, exactFitCable, fittingCables, cablesAt, connectorName, DOMAINS, heatBTU, orientation, portDomain, resolve, SIGNALS,
-  validateCable, findRack, addToGroup, groupsOf, removeFromGroup, groupColor, circuitLoads, circuitName, isPowerSource, sourceRating, sourcesFor, type Cable, type EquipmentId, type EquipmentInstance,
-} from '@core/index'
+import { CABLE_CATALOG, cableSpec, CATEGORIES, CONNECTOR_TYPES, connectorIsPower, exactFitCable, fittingCables, cablesAt, connectorName, DOMAINS, heatBTU, orientation, portDomain, resolve, SIGNALS, validateCable, findRack, addToGroup, groupsOf, removeFromGroup, groupColor, circuitLoads, circuitName, isPowerSource, sourceRating, sourcesFor, type Cable, type EquipmentId, type EquipmentInstance, fmtLen, fmtLenPair, fmtWt } from '@core/index'
 import { useStore } from '../store'
 import { RackSettings } from '../rack/RackView'
 import { AccessoryInspector } from '../rack/AccessoryInspector'
 import { groupSelection, SYSTEM_OPTIONS } from '../diagram/GroupsPanel'
-import { Dot, Field, NumberInput, Select, SeverityIcon, TextInput } from '../components/ui'
+import { Dot, Field, NumberInput, Select, SeverityIcon, TextInput, LongInput } from '../components/ui'
 
 export function Inspector() {
   const project = useStore((s) => s.project)
@@ -63,9 +60,9 @@ function EquipmentInspector({ eq }: { eq: EquipmentInstance }) {
       {!isPowerSource(eq) && <>
       <h4>Physical & power</h4>
       <dl className="kv">
-        <dt>Size</dt><dd>{p.physical.rackUnits ? `${p.physical.rackUnits}U${p.physical.halfWidth ? ' (half)' : ''}` : p.physical.mounting}</dd>
-        <dt>Depth</dt><dd>{p.physical.depthMM} mm</dd>
-        <dt>Weight</dt><dd>{p.physical.weightKG} kg</dd>
+        <dt>Size</dt><dd>{p.physical.rackUnits ? `${p.physical.rackUnits}U${p.physical.halfWidth ? ' (half)' : ''}` : `${p.physical.mounting}${p.physical.widthMM && p.physical.heightMM ? ` · ${fmtLenPair(p.physical.widthMM, p.physical.heightMM, 1)}` : ''}`}</dd>
+        <dt>Depth</dt><dd>{fmtLen(p.physical.depthMM, 1)}</dd>
+        <dt>Weight</dt><dd>{fmtWt(p.physical.weightKG)}</dd>
         <dt>Power</dt><dd>{p.power.poweredByPoE ? 'PoE' : `${p.power.typicalWatts} W typ / ${p.power.maxWatts} W max`}</dd>
         <dt>Heat</dt><dd>{heatBTU(p.power).toFixed(0)} BTU/hr</dd>
         {eq.rackPlacement && <><dt>Rack</dt><dd>{findRack(project, eq.rackPlacement.rack)?.name} · U{eq.rackPlacement.startUnit} {eq.rackPlacement.face}</dd></>}
@@ -138,7 +135,7 @@ function CableInspector({ cable }: { cable: Cable }) {
       {!currentFits && best && (
         <button className="primary fix-cable" onClick={() => upd('Set Cable Type', (c) => { c.specKey = best.key })}>Use {best.name}</button>
       )}
-      <Field label="Length"><NumberInput value={cable.lengthMeters} allowEmpty step={0.5} min={0} unit="m" onCommit={(n) => upd('Set Length', (c) => { c.lengthMeters = n })} /></Field>
+      <Field label="Length"><LongInput value={cable.lengthMeters} allowEmpty step={0.5} min={0} onCommit={(n) => upd('Set Length', (c) => { c.lengthMeters = n })} /></Field>
       <Field label="Notes"><TextInput multiline value={cable.notes} onCommit={(val) => upd('Cable Notes', (c) => { c.notes = val })} /></Field>
       <h4>Checks</h4>
       {v.issues.length === 0 ? <p className="ok-line">✓ Connection is valid</p> : (

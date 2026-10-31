@@ -3,6 +3,7 @@
 // order numbers, arrows along the path, and a home-run line from the wall edge
 // to the first panel. Power view: the same for circuits.
 
+import { fmtFtIn, fmtWt } from '../units'
 import { cellKey, chains, wallStats, type Cell, type Corner, type LedWall } from '../led'
 import { newSheet, sheetSize, type SheetOptions } from './sheet'
 import { Svg, textWidth } from './svg'
@@ -105,8 +106,8 @@ export function ledSheets(p: Project, o: LedPrintOptions): string[] {
     const rows: [string, string][] = [
       ['PANEL', `${w.panel.manufacturer} ${w.panel.model}`], ['PITCH', `${w.panel.pitchMM} mm`],
       ['GRID', `${w.cols} × ${w.rows} (${st.panels} panels)`], ['RESOLUTION', `${st.pxW} × ${st.pxH} px`],
-      ['SIZE', `${st.widthM.toFixed(2)} × ${st.heightM.toFixed(2)} m`], ['ASPECT', st.aspect],
-      ['WEIGHT', `${st.weightKG.toFixed(0)} kg`], ['POWER', `${(st.maxWatts / 1000).toFixed(1)} kW max · ${st.maxAmps.toFixed(1)} A @ ${w.power.voltage} V`],
+      ['SIZE', `${fmtFtIn(st.widthM)} × ${fmtFtIn(st.heightM)}`], ['ASPECT', st.aspect],
+      ['WEIGHT', fmtWt(st.weightKG, 0)], ['POWER', `${(st.maxWatts / 1000).toFixed(1)} kW max · ${st.maxAmps.toFixed(1)} A @ ${w.power.voltage} V`],
       ['DATA PORTS', `${st.dataPorts} (≤ ${st.dataLimit} panels each)`], ['CIRCUITS', `${st.circuits} × ${w.power.circuitAmps} A (≤ ${st.powerLimit} panels each)`],
     ]
     const sx = area.x + area.w - colW
