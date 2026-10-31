@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Panel } from '@xyflow/react'
 import { create } from 'zustand'
-import { autoGroupBySystem, createGroup, DOMAINS, groupColor, groupsOf, membersOf, moveToPage, nodeGeom, ungroup, type DeviceGroup, type SignalDomain } from '@core/index'
+import { autoGroupBySystem, createGroup, deleteView, DOMAINS, groupColor, groupsOf, membersOf, moveToPage, nodeGeom, setInView, ungroup, viewMembers, viewsOf, type DeviceGroup, type SignalDomain } from '@core/index'
+import { showContextMenu } from '../components/ContextMenu'
+import { tidyDiagram } from './tidy'
 import type { MenuItem } from '../components/ContextMenu'
 import { useStore } from '../store'
 
@@ -40,6 +42,30 @@ export function moveDevicesToPage(ids: string[], pageId: string | null | 'new') 
   if (st.diagramPage && st.diagramPage !== target) st.set({ diagramPage: target })
 }
 
+/** Signal-view items for a device's context menu on the normal diagram: "Add to View ▸ Audio". */
+export function addToViewItems(ids: string[]): MenuItem[] {
+  const s = useStore.getState()
+  const views = viewsOf(s.project)
+  if (!views.length) return []
+  const n = ids.length > 1 ? ` (${ids.length})` : ''
+  return ['sep', ...views.filter((v) => { const m = new Set(viewMembers(s.project, v).map((e) => e.id as string)); return ids.some((id) => !m.has(id)) })
+    .map((v): MenuItem => ({ label: `Add${n} to View ▸ ${v.name}`, onClick: () => {
+      s.apply('Add to View', (d) => setInView(d, v.id, ids, true))
+      s.notify(`Added to “${v.name}”`, { undo: true, kind: 'success' })
+    } }))]
+}
+
+/** Context menu items inside a signal view. */
+export function viewMenuItems(ids: string[], viewId: string): MenuItem[] {
+  const n = ids.length > 1 ? ` ${ids.length} Devices` : ''
+  return ['sep',
+    { label: `Remove${n} from This View`, hint: '⌫', onClick: () => { useStore.getState().apply('Remove from View', (d) => setInView(d, viewId, ids, false)) } },
+    { label: 'Show on Main Diagram', onClick: () => { useStore.getState().set({ diagramView: null, diagramPage: null }); setTimeout(() => window.dispatchEvent(new CustomEvent('diagram:locate', { detail: ids[0] })), 50) } },
+  ]
+}
+
+export const openView = (id: string | null) => useStore.getState().set({ diagramView: id, diagramPage: null, selection: [], selectedCable: null })
+
 /** "Move to Page" items for a device context menu. */
 export function pageMenuItems(ids: string[]): MenuItem[] {
   const s = useStore.getState()
@@ -62,20 +88,23 @@ export function PageTabs() {
   const page = useStore((s) => s.diagramPage)
   const counts = useStore((s) => s.project.equipment)
   const set = useStore((s) => s.set)
+  const views = useStore((s) => s.project.views)
+  const viewId = useStore((s) => s.diagramView)
   const list = groups ?? []
+  useEffect(() => { if (viewId && !(views ?? []).some((v) => v.id === viewId)) set({ diagramView: null }) }, [views, viewId, set])
   useEffect(() => { if (page && !list.some((g) => g.id === page)) set({ diagramPage: null }) }, [list, page, set])
   const n = (id: string | null) => counts.filter((e) => (id ? e.groupId === id : true)).length
   const unassigned = counts.filter((e) => !e.groupId || !list.some((g) => g.id === e.groupId)).length
   return (
     <div className="page-tabs" role="tablist">
-      <button data-page="" className={page === null ? 'on' : ''} onClick={() => set({ diagramPage: null })} title="Show every page together">All pages <span>{n(null)}</span></button>
+      <button data-page="" className={page === null && !viewId ? 'on' : ''} onClick={() => set({ diagramPage: null, diagramView: null })} title="Show every page together">All pages <span>{n(null)}</span></button>
       {list.map((g) => (
-        <button key={g.id} data-page={g.id} className={page === g.id ? 'on' : ''} onClick={() => set({ diagramPage: g.id })} title={`Show only “${g.name}”. Drop devices here to move them to this page.`}>
+        <button key={g.id} data-page={g.id} className={page === g.id && !viewId ? 'on' : ''} onClick={() => set({ diagramPage: g.id, diagramView: null })} title={`Show only “${g.name}”. Drop devices here to move them to this page.`}>
           <i style={{ background: groupColor(g) }} />{g.name} <span>{n(g.id)}</span>
         </button>
       ))}
       {list.length > 0 && unassigned > 0 && <span className="muted small pt-hint">{unassigned} not on a page</span>}
-      {list.length === 0 && <span className="muted small pt-hint">Split a big diagram into sheets – ＋ Page, then drag devices onto a tab</span>}
+      {list.length === 0 && !(views ?? []).length && <span className="muted small pt-hint">Split a big diagram into sheets – ＋ Page, then drag devices onto a tab</span>}
       <button className="pt-add" onClick={() => {
         const s = useStore.getState()
         if (s.selection.length) { groupSelection(); return }
@@ -88,6 +117,21 @@ export function PageTabs() {
         })
         if (g) { s.set({ diagramPage: g!.id }); s.notify(`New page “${g!.name}” – anything you add now goes on it`, { kind: 'success' }) }
       }} title="New page (from the selected devices, or empty)">＋ Page</button>
+      {(views ?? []).length > 0 && <span className="pt-sep" />}
+      {(views ?? []).map((v) => (
+        <button key={v.id} className={`pt-view ${viewId === v.id ? 'on' : ''}`} onClick={() => openView(v.id)}
+          onDoubleClick={() => set({ editingView: v.id })}
+          onContextMenu={(e) => showContextMenu(e, [
+            { label: 'Edit View…', onClick: () => set({ editingView: v.id }) },
+            { label: 'Tidy This View', onClick: () => { openView(v.id); tidyDiagram() } },
+            'sep',
+            { label: 'Delete View', danger: true, onClick: () => { useStore.getState().apply('Delete View', (d) => deleteView(d, v.id)); useStore.getState().notify(`Deleted view “${v.name}” – the devices are still on the diagram`, { undo: true }) } },
+          ])}
+          title={`Signal view: only ${v.domains.map((d) => DOMAINS[d].name).join(', ')} ports. Double-click or right-click to edit.`}>
+          <span className="pt-doms">{v.domains.map((d) => <i key={d} style={{ background: DOMAINS[d].color }} />)}</span>{v.name} <span>{viewMembers(useStore.getState().project, v).length}</span>
+        </button>
+      ))}
+      <button className="pt-add" onClick={() => set({ editingView: 'new' })} title="New signal view: chosen devices with only some signal types (e.g. audio tie lines), with its own layout. The main diagram keeps every port.">＋ View</button>
     </div>
   )
 }

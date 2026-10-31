@@ -44,6 +44,10 @@ export interface AppState {
   exportingAll: boolean
   selectedLedWall: string | null
   ledPicking: boolean
+  /** Signal view shown on the diagram (null = normal pages). */
+  diagramView: string | null
+  /** View being created / edited ('new' or an id). */
+  editingView: string | null
   showInspector: boolean
   issues: ValidationIssue[]
   /** Bumped to ask the diagram to fit view. */
@@ -106,6 +110,8 @@ export const useStore = create<AppState>((set, get) => ({
   exportingAll: false,
   selectedLedWall: null,
   ledPicking: false,
+  diagramView: null,
+  editingView: null,
   showInspector: true,
   issues: [],
   fitRequest: 0,

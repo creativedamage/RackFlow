@@ -7,7 +7,7 @@ import {
   type Connection, type Edge, type EdgeChange, type NodeChange, type OnConnectStart,
 } from '@xyflow/react'
 import {
-  addEquipment, addPatchBay, addToGroup, nodeGeom, placeInFreeSpace, connectMany, groupColor, groupsOf, type BulkResult, candidates as findCandidates, connect, DOMAINS, portDomain, resolve, SIGNALS, validate,
+  addEquipment, addPatchBay, addToGroup, layoutView, setInView, viewOffFlags, viewProject, viewsOf, nodeGeom, placeInFreeSpace, connectMany, groupColor, groupsOf, type BulkResult, candidates as findCandidates, connect, DOMAINS, portDomain, resolve, SIGNALS, validate,
   type CableId, type EquipmentId, type PortAddress,
 } from '@core/index'
 import { useStore } from '../store'
@@ -17,7 +17,7 @@ import { pickIndex } from './wiring'
 import { DeviceNode, headerHeight, NODE_WIDTH, ROW_H, splitPorts, type DeviceNodeType } from './DeviceNode'
 import { GroupFrame, type GroupFrameType } from './GroupFrame'
 import { CableEdge, type CableEdgeType } from './CableEdge'
-import { GroupsPanel, PageTabs, moveDevicesToPage, pageMenuItems, useGroupFocus } from './GroupsPanel'
+import { GroupsPanel, PageTabs, addToViewItems, moveDevicesToPage, pageMenuItems, useGroupFocus, viewMenuItems } from './GroupsPanel'
 import { NoteNode, type NoteNodeType } from './NoteNode'
 import { useWiring } from './wiring'
 import { tidyDiagram } from './tidy'
@@ -46,6 +46,12 @@ export function DiagramView() {
   const { screenToFlowPosition, fitView } = useReactFlow()
   const focusGroup = useGroupFocus((s) => s.focus)
   const page = useStore((s) => s.diagramPage)
+  const viewId = useStore((s) => s.diagramView)
+  const view = useMemo(() => (viewId ? viewsOf(project).find((v) => v.id === viewId) : undefined), [project, viewId])
+  // What's drawn: the whole project, or a signal view's members with only its ports.
+  const shown = useMemo(() => (view ? viewProject(project, view) : project), [project, view])
+  const scope = view?.id ?? page
+  const viewIds = useMemo(() => new Set(viewsOf(project).map((v) => v.id)), [project])
   // Let click-to-add (Makers / library) drop new gear in the middle of what's on screen.
   useEffect(() => {
     setViewCenterProvider(() => {
@@ -60,7 +66,7 @@ export function DiagramView() {
   const [nodes, setNodes] = useState<DeviceNodeType[]>([])
   useEffect(() => {
     const connected = new Map<string, Set<string>>()
-    for (const c of project.cables) for (const a of [c.from, c.to]) {
+    for (const c of shown.cables) for (const a of [c.from, c.to]) {
       if (!connected.has(a.equipment)) connected.set(a.equipment, new Set())
       connected.get(a.equipment)!.add(a.port)
     }
@@ -69,8 +75,8 @@ export function DiagramView() {
     // Page view: devices on other pages are hidden; their wires become flags on the visible port.
     const onPage = (e: { groupId?: string }) => !page || e.groupId === page
     const eqById = new Map(project.equipment.map((e) => [e.id as string, e]))
-    const offPage = new Map<string, Record<string, string>>()
-    if (page) for (const c of project.cables) {
+    const offPage = view ? viewOffFlags(project, view) : new Map<string, Record<string, string>>()
+    if (page && !view) for (const c of project.cables) {
       const a = eqById.get(c.from.equipment), b = eqById.get(c.to.equipment)
       if (!a || !b || onPage(a) === onPage(b)) continue
       const [here, hereAddr, there, thereAddr] = onPage(a) ? [a, c.from, b, c.to] : [b, c.to, a, c.from]
@@ -80,18 +86,18 @@ export function DiagramView() {
     }
     setNodes((prev) => {
       const byId = new Map(prev.map((n) => [n.id, n]))
-      return project.equipment.map((eq) => {
+      return shown.equipment.map((eq) => {
         const old = byId.get(eq.id)
         const g = eq.groupId ? groups.get(eq.groupId) : undefined
         const dim = !!focusGroup && eq.groupId !== focusGroup
-        return { ...(old ?? {}), id: eq.id, type: 'device' as const, position: { ...eq.position }, selected: sel.has(eq.id), hidden: !onPage(eq),
+        return { ...(old ?? {}), id: eq.id, type: 'device' as const, position: { ...eq.position }, selected: sel.has(eq.id), hidden: !view && !onPage(eq),
           data: { eq, connected: connected.get(eq.id) ?? new Set(), group: g ? { name: g.name, color: groupColor(g) } : undefined, dim, offPage: offPage.get(eq.id) } }
       })
     })
-  }, [project.equipment, project.cables, project.groups, selection, focusGroup, page])
+  }, [project.equipment, project.cables, project.groups, shown, view, selection, focusGroup, page])
 
   // Group frames follow their devices live (including mid-drag).
-  const frames = useMemo<GroupFrameType[]>(() => (page ? [] : groupsOf(project)).flatMap((g) => {
+  const frames = useMemo<GroupFrameType[]>(() => (page || view ? [] : groupsOf(project)).flatMap((g) => {
     const members = nodes.filter((n) => n.data.eq.groupId === g.id)
     if (!members.length) return []
     const x0 = Math.min(...members.map((n) => n.position.x)) - FRAME_PAD
@@ -103,7 +109,7 @@ export function DiagramView() {
       width: x1 - x0, height: y1 - y0, style: { width: x1 - x0, height: y1 - y0, pointerEvents: 'none' as const },
       data: { id: g.id, name: g.name, color: groupColor(g), count: members.length, system: g.system, active: focusGroup === g.id },
     }]
-  }), [project, nodes, focusGroup, page])
+  }), [project, nodes, focusGroup, page, view])
   const framesRef = useRef(frames); framesRef.current = frames
   const nodesRef = useRef(nodes); nodesRef.current = nodes
   // Notes / callouts / revision notes: local state for smooth dragging and resizing.
@@ -114,10 +120,10 @@ export function DiagramView() {
       return (project.annotations ?? []).map((a) => {
         const id = `note:${a.id}`, old = byId.get(id)
         return { ...(old ?? {}), id, type: 'note' as const, position: { x: a.x, y: a.y }, width: a.w, height: a.h, zIndex: 5,
-          hidden: !!page && a.page !== page, data: { a } }
+          hidden: scope ? a.page !== scope : !!a.page && viewIds.has(a.page), data: { a } }
       })
     })
-  }, [project.annotations, page])
+  }, [project.annotations, scope, viewIds])
   const notesRef = useRef(notes); notesRef.current = notes
   const allNodes = useMemo<AnyNode[]>(() => [...frames, ...nodes, ...notes], [frames, nodes, notes])
 
@@ -136,8 +142,18 @@ export function DiagramView() {
   useEffect(() => {
     const fresh = project.equipment.filter((e) => !knownIds.current.has(e.id) && !e.groupId).map((e) => e.id)
     knownIds.current = new Set(project.equipment.map((e) => e.id as string))
-    if (page && fresh.length) useStore.getState().amend((d) => addToGroup(d, fresh, page))
-  }, [project.equipment, page])
+    if (!fresh.length) return
+    if (view) useStore.getState().amend((d) => {
+      setInView(d, view.id, fresh, true)
+      const v = viewsOf(d).find((x) => x.id === view.id)
+      if (v) for (const e of d.equipment) if (fresh.includes(e.id)) v.positions[e.id] = { ...e.position }
+    })
+    else if (page) useStore.getState().amend((d) => addToGroup(d, fresh, page))
+  }, [project.equipment, page, view])
+  // Devices that joined an auto view (e.g. added on the main diagram) get a spot in the view's layout.
+  useEffect(() => {
+    if (view && shown.equipment.some((e) => !view.positions[e.id])) useStore.getState().amend((d) => { layoutView(d, view.id, nodeGeom, { onlyNew: true }) })
+  }, [view, shown])
 
   // Auto-tidy: when devices or cables are added, re-arrange in the same undo step.
   const counts = useRef({ e: project.equipment.length, c: project.cables.length })
@@ -150,9 +166,9 @@ export function DiagramView() {
   const edges: CableEdgeType[] = useMemo(() => {
     const sel = new Set(selection)
     const lanes = new Map<string, number>()
-    return project.cables.map((c) => {
-      const from = resolve(project, c.from)
-      const to = resolve(project, c.to)
+    return shown.cables.map((c) => {
+      const from = resolve(shown, c.from)
+      const to = resolve(shown, c.to)
       const d = from ? portDomain(from.port) : null
       const sev = cableSeverity.get(c.id)
       const color = sev === 'error' ? '#e03131' : d ? DOMAINS[d].color : '#888'
@@ -165,11 +181,11 @@ export function DiagramView() {
       return {
         id: c.id, source: c.from.equipment, sourceHandle: c.from.port, target: c.to.equipment, targetHandle: c.to.port,
         type: 'cable' as const, selected: isSel, zIndex: lifted ? 1000 : 0,
-        data: { label: c.label, color, dashed: sev === 'error', lane: lane + project.cables.indexOf(c), onSelect: () => select([], c.id),
+        data: { label: c.label, color, dashed: sev === 'error', lane: lane + shown.cables.indexOf(c), onSelect: () => select([], c.id),
           mode: wireMode, toText: to ? `${to.equipment.tag} · ${to.port.label}` : undefined, fromText: from ? `${from.equipment.tag} · ${from.port.label}` : undefined },
       }
     })
-  }, [project, cableSeverity, selectedCable, selection, select, wireMode])
+  }, [shown, cableSeverity, selectedCable, selection, select, wireMode])
 
   useEffect(() => { if (fitRequest) void fitView({ padding: 0.15, duration: 250 }) }, [fitRequest, fitView])
   // Library ▸ Inventory → frame one device (after any page switch has rendered).
@@ -179,7 +195,7 @@ export function DiagramView() {
     return () => window.removeEventListener('diagram:locate', on)
   }, [fitView])
   // Switching page frames what's on it.
-  useEffect(() => { const t = setTimeout(() => void fitView({ padding: 0.15, duration: 250 }), 60); return () => clearTimeout(t) }, [page, fitView])
+  useEffect(() => { const t = setTimeout(() => void fitView({ padding: 0.15, duration: 250 }), 60); return () => clearTimeout(t) }, [page, viewId, fitView])
 
   const onNodesChange = useCallback((all: NodeChange<AnyNode>[]) => {
     // Dragging a group frame moves its members by the same amount.
@@ -218,7 +234,16 @@ export function DiagramView() {
     const tab = (document.elementsFromPoint(pt.x, pt.y).find((el) => el instanceof HTMLElement && el.dataset.page !== undefined) as HTMLElement | undefined)
     const devs = draggedAll.filter((n) => n.type === 'device').map((n) => n.id)
     document.querySelectorAll('.page-tabs .drop').forEach((el) => el.classList.remove('drop'))
-    if (tab && devs.length) {
+    const vid = useStore.getState().diagramView
+    if (vid) {
+      // In a signal view, moving only changes the view's own layout.
+      const moved = draggedAll.filter((n) => n.type === 'device')
+      if (moved.length) apply(moved.length > 1 ? 'Move Devices in View' : 'Move Device in View', (d) => {
+        const v = viewsOf(d).find((x) => x.id === vid)
+        if (v) for (const n of moved) v.positions[n.id] = { x: Math.round(n.position.x), y: Math.round(n.position.y) }
+      })
+    }
+    if (tab && devs.length && !vid) {
       const target = tab.dataset.page || null
       const s = useStore.getState()
       // Undo the visual drag first (positions weren't committed), then move.
@@ -239,6 +264,7 @@ export function DiagramView() {
         }
       })
     }
+    if (vid) return
     const dragged = [
       ...draggedAll.filter((n): n is DeviceNodeType => n.type === 'device'),
       ...nodesRef.current.filter((n) => n.data.eq.groupId && groupIds.has(n.data.eq.groupId)),
@@ -256,6 +282,20 @@ export function DiagramView() {
     if (!ns.length && !es.length) return
     const ids = new Set(ns.map((n) => n.id))
     const cids = new Set(es.map((e) => e.id))
+    const vid = useStore.getState().diagramView
+    if (vid) {
+      // In a view, Delete takes devices out of the view; the devices stay in the project.
+      const devs = [...ids].filter((x) => !x.startsWith('note:'))
+      apply(devs.length ? 'Remove from View' : 'Delete', (d) => {
+        setInView(d, vid, devs, false)
+        if (d.annotations) d.annotations = d.annotations.filter((a) => !ids.has(`note:${a.id}`))
+        // React Flow also hands over the wires attached to removed devices – those stay; only wires picked on their own are deleted.
+        d.cables = d.cables.filter((c) => !cids.has(c.id) || devs.includes(c.from.equipment) || devs.includes(c.to.equipment))
+      })
+      if (devs.length) useStore.getState().notify(`Removed ${devs.length} device${devs.length === 1 ? '' : 's'} from this view – still on the main diagram`, { undo: true })
+      select([], null)
+      return
+    }
     apply('Delete', (d) => {
       if (d.annotations) d.annotations = d.annotations.filter((a) => !ids.has(`note:${a.id}`))
       d.equipment = d.equipment.filter((e) => !ids.has(e.id))
@@ -358,7 +398,7 @@ export function DiagramView() {
           const cur = useStore.getState().selection
           const ids = cur.includes(n.id as EquipmentId) ? cur : [n.id as EquipmentId]
           if (ids !== cur) select(ids)
-          showContextMenu(ev, [...deviceMenu(n.id), ...pageMenuItems(ids)])
+          showContextMenu(ev, [...deviceMenu(n.id), ...(view ? viewMenuItems(ids, view.id) : [...pageMenuItems(ids), ...addToViewItems(ids)])])
         }}
         onConnectStart={onConnectStart}
         onConnectEnd={endWiring}
@@ -389,7 +429,10 @@ export function DiagramView() {
         <WiringHint />
         <PickedPanel />
         <DiagramTools />
-        <GroupsPanel />
+        {!view && <GroupsPanel />}
+        {view && shown.equipment.length === 0 && (
+          <Panel position="top-center" className="hint-panel">Nothing in this view yet – right-click the view's tab → Edit View… to pick devices.</Panel>
+        )}
         {project.equipment.length === 0 && (
           <Panel position="top-center" className="hint-panel">
             Drag gear from the library to start. Drag from a port to wire it — only valid targets light up.
@@ -459,7 +502,7 @@ function DiagramTools() {
     const revs = s.project.revisions ?? []
     const a: Annotation = {
       id: newId(), kind, x: Math.round(c.x - 110), y: Math.round(c.y - 40), w: kind === 'note' ? 240 : 220, h: kind === 'revision' ? 70 : 80,
-      text: kind === 'revision' ? (revs[revs.length - 1]?.description ?? '') : '', page: s.diagramPage ?? undefined,
+      text: kind === 'revision' ? (revs[revs.length - 1]?.description ?? '') : '', page: s.diagramView ?? s.diagramPage ?? undefined,
       leader: kind === 'callout' ? { x: Math.round(c.x - 200), y: Math.round(c.y + 120) } : undefined,
       rev: kind === 'revision' ? (revs[revs.length - 1]?.rev ?? s.project.info.revision ?? 'A') : undefined,
     }

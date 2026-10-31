@@ -3,6 +3,7 @@
 // cable number and FROM-TO tags at both ends, off-sheet arrows for long or
 // cross-sheet runs, and dashed room zones.
 
+import { viewPrintProject, viewsOf } from '../views'
 import { CATEGORIES, type Annotation, type Cable, type EquipmentInstance, type PortTemplate, type Project, type WireMode } from '../model'
 import { DOMAINS } from '../signals'
 import { portDomain } from '../project'
@@ -19,6 +20,8 @@ export interface SchematicOptions extends SheetOptions {
   split: 'none' | 'group' | 'room'
   rooms: boolean
   color: boolean
+  /** Signal views to add as extra sheets (undefined = all of them). */
+  views?: string[]
 }
 
 export const defaultSchematic = (p?: Project): SchematicOptions => ({
@@ -45,8 +48,12 @@ const portRef = (eq: EquipmentInstance, port: PortTemplate) => `${eq.tag} ${port
 
 interface Page { title: string; ids: Set<string>; pageId?: string | null }
 
-export function schematicSheets(p: Project, o: SchematicOptions): string[] {
-  if (!p.equipment.length) return []
+export function schematicSheets(p0: Project, o: SchematicOptions): string[] {
+  if (!p0.equipment.length) return []
+  // Notes placed on signal views print on those views' sheets only.
+  const views = viewsOf(p0).filter((v) => !o.views || o.views.includes(v.id))
+  const viewIds = new Set(viewsOf(p0).map((v) => v.id))
+  const p: Project = { ...p0, annotations: (p0.annotations ?? []).filter((a) => !a.page || !viewIds.has(a.page)) }
   // Pages
   let pages: Page[]
   if (o.split === 'group') {
@@ -61,7 +68,13 @@ export function schematicSheets(p: Project, o: SchematicOptions): string[] {
   pages = pages.filter((pg) => pg.ids.size || notesFor(p, o, pg).length)
   const sheetOf = new Map<string, number>()
   pages.forEach((pg, i) => pg.ids.forEach((id) => sheetOf.set(id, i + 1)))
-  return pages.map((pg, i) => drawPage(p, o, pg, i + 1, pages.length, sheetOf))
+  const extra = views.map((v) => ({ v, ...viewPrintProject(p0, v) })).filter((x) => x.ids.size)
+  const total = pages.length + extra.length
+  return [
+    ...pages.map((pg, i) => drawPage(p, o, pg, i + 1, total, sheetOf)),
+    // Wires leaving a view end in arrows naming the device and the main sheet it's on.
+    ...extra.map(({ v, project: vp, ids }, i) => drawPage(vp, { ...o, split: 'group' }, { title: v.name.toUpperCase(), pageId: v.id, ids }, pages.length + i + 1, total, sheetOf)),
+  ]
 }
 
 /** How far wires, labels and off-sheet flags reach out of each side of a block (diagram units). */

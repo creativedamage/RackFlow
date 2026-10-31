@@ -6,7 +6,7 @@ import { ContextMenu } from './components/ContextMenu'
 import { editSelection } from './product/openEditor'
 import { useEffect } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
-import { newCustomProduct, newCustomTemplate } from '@core/index'
+import { newCustomProduct, newCustomTemplate, setInView } from '@core/index'
 import { api, isMac } from './platform'
 import { confirmDiscard, loadFile, newDocument, openDocument, saveDocument, useStore } from './store'
 import { Toolbar } from './components/Toolbar'
@@ -19,6 +19,7 @@ import { PlateBuilder } from './product/PlateBuilder'
 import { Toasts } from './components/Toasts'
 import { ScheduleView } from './sheet/ScheduleView'
 import { LedView } from './led/LedView'
+import { ViewEditor } from './diagram/ViewEditor'
 import { usePatchUI } from './patch/patchState'
 import { Inspector } from './inspector/Inspector'
 import { ProductEditor } from './product/ProductEditor'
@@ -51,6 +52,7 @@ export function App() {
   const editingProduct = useStore((s) => s.editingProduct)
   const finding = useStore((s) => s.finding)
   const exportingAll = useStore((s) => s.exportingAll)
+  const editingView = useStore((s) => s.editingView)
   const editingTemplate = useStore((s) => s.editingTemplate)
   const title = useStore((s) => s.project.info.name)
   const dirty = useStore((s) => s.dirty)
@@ -83,6 +85,7 @@ export function App() {
         break
       case 'delete':
         if (s.mode === 'sheet') { window.dispatchEvent(new Event('sheet:delete')); break }
+        if (!inTextField() && s.selection.length && s.diagramView && s.mode === 'diagram') { const vid = s.diagramView; s.apply('Remove from View', (d) => setInView(d, vid, s.selection, false)); break }
         if (!inTextField() && s.selection.length) s.apply('Delete', (d) => {
           const ids = new Set(s.selection)
           d.equipment = d.equipment.filter((e) => !ids.has(e.id))
@@ -134,6 +137,7 @@ export function App() {
         {editingPlate && <PlateBuilder key={editingPlate.product.key + (editingPlate.instanceId ?? '')} initial={editingPlate.product} instanceId={editingPlate.instanceId} />}
         {editingTemplate && <TemplateEditor key={editingTemplate.key} initial={editingTemplate} />}
         {finding && <DeviceFinder initialQuery={finding.query} />}
+        {editingView && <ViewEditor key={editingView} id={editingView} onClose={() => useStore.getState().set({ editingView: null })} />}
         {exportingAll && <ExportAllDialog onClose={() => useStore.getState().set({ exportingAll: false })} />}
         <Toasts />
         <ContextMenu />

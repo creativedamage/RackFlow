@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { AccessoryKind, EquipmentId, EquipmentInstance } from '@core/index'
 import {
-  BUILT_IN_KEYS, makePlateProduct, newPlateSpec, CATEGORIES, CATEGORY_KEYS, DOMAINS, FORMATS, addRack, groupsOf, newCustomProduct, newCustomTemplate, productDomains, templateName, totalChannels,
+  BUILT_IN_KEYS, viewMembers, viewsOf, makePlateProduct, newPlateSpec, CATEGORIES, CATEGORY_KEYS, DOMAINS, FORMATS, addRack, groupsOf, newCustomProduct, newCustomTemplate, productDomains, templateName, totalChannels,
   type EquipmentCategory, type ProductDefinition, type SignalDomain, panelDescription } from '@core/index'
 import { useStore } from '../store'
 import { Select } from './ui'
@@ -163,6 +163,8 @@ function Inventory({ query }: { query: string }) {
     const s = useStore.getState()
     const patch: Partial<typeof s> = { selection: [e.id as EquipmentId], selectedCable: null, selectedAccessory: null }
     if (s.mode === 'diagram' && s.diagramPage && s.diagramPage !== e.groupId) patch.diagramPage = e.groupId ?? null
+    const view = s.diagramView ? viewsOf(s.project).find((v) => v.id === s.diagramView) : undefined
+    if (view && !viewMembers(s.project, view).some((x) => x.id === e.id)) patch.diagramView = null
     s.set(patch)
     if (s.mode === 'diagram') window.dispatchEvent(new CustomEvent('diagram:locate', { detail: e.id }))
   }

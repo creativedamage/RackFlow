@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { defaultSchematic, schematicSheets, type SchematicOptions, type WireMode } from '@core/index'
+import { defaultSchematic, schematicSheets, viewsOf, type SchematicOptions, type WireMode } from '@core/index'
 import { useStore } from '../store'
 import { DrawingDialog } from './DrawingDialog'
 import { Field, Segmented, Select, Toggle } from '../components/ui'
@@ -29,6 +29,16 @@ export function SchematicPrintDialog({ onClose }: { onClose: () => void }) {
             { value: 'room', label: 'One sheet per room' },
           ]} />
         </Field>
+        {viewsOf(project).length > 0 && (<>
+          <h4>Signal views</h4>
+          {viewsOf(project).map((v) => {
+            const on = !o.views || o.views.includes(v.id)
+            return <Toggle key={v.id} label={`${v.name} (own sheet)`} checked={on} onChange={(x) => {
+              const all = viewsOf(project).map((y) => y.id), cur = o.views ?? all
+              set({ ...o, views: x ? [...cur, v.id] : cur.filter((y) => y !== v.id) })
+            }} />
+          })}
+        </>)}
         <Toggle label="Room zones (dashed)" checked={o.rooms} onChange={(rooms) => set({ ...o, rooms })} />
         <Toggle label="Colour by signal" checked={o.color} onChange={(color) => set({ ...o, color })} />
         <p className="muted small">Tip: ✨ Tidy Up the diagram first. Wires that leave a sheet end in an arrow naming the device, port and sheet they go to.</p>

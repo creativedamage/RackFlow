@@ -314,6 +314,8 @@ export interface Project {
   ledWalls?: import('./led').LedWall[]
   /** Custom LED panels made in this project. */
   ledPanels?: import('./led').LedPanel[]
+  /** Signal views: pages showing chosen devices with only some signal types. */
+  views?: import('./views').SignalView[]
 }
 
 // --- Patch bays (types here to keep the document schema in one file) ---
