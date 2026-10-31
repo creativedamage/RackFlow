@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { FORMAT_KEYS, FORMATS, newCustomTemplate, totalChannels, type PatchBayTemplate, type PatchFormat } from '@core/index'
+import { FORMAT_KEYS, FORMATS, isTwoSided, newCustomTemplate, panelDescription, TERMINATIONS, totalChannels, type PatchBayTemplate, type PatchFormat } from '@core/index'
 import { useStore } from '../store'
 import { api } from '../platform'
 import { Select } from '../components/ui'
@@ -49,14 +49,15 @@ export function TemplatesPanel() {
       </div>
       <div className="tp-table-wrap">
         <table className="tp-table">
-          <thead><tr>{head('make', 'Make')}{head('model', 'Model')}{head('type', 'Type')}{head('rows', 'Rows')}{head('holes', 'Holes')}<th /></tr></thead>
+          <thead><tr>{head('make', 'Make')}{head('model', 'Model / Type')}{head('holes', 'Ports')}<th /></tr></thead>
           <tbody>
             {rows.map((t) => (
               <tr key={t.key} className={picked === t.key ? 'sel' : ''} onClick={() => setPicked(t.key)} onDoubleClick={() => add(t)} title="Double-click to add to the project">
-                <td>{t.manufacturer}{!t.dimensionsVerified && <span className="nominal" title="Nominal dimensions">*</span>}</td>
-                <td className="ellipsis">{t.series}</td>
-                <td className="ellipsis">{FORMATS[t.format].name}</td>
-                <td className="num">{t.rows.length}</td>
+                <td className="tp-make">{t.manufacturer}{!t.dimensionsVerified && <span className="nominal" title="Nominal dimensions">*</span>}</td>
+                <td className="tp-model">
+                  <div className="tp-series">{t.series}</div>
+                  <div className="tp-type">{FORMATS[t.format].name}{panelDescription(t) ? ` · ${panelDescription(t)}` : ''} · {t.rackUnits}RU · {t.rows.length} row{t.rows.length === 1 ? '' : 's'}</div>
+                </td>
                 <td className="num">{totalChannels(t)}</td>
                 <td><button className="mini tp-add" title="Add to project" onClick={(e) => { e.stopPropagation(); add(t) }}>Add</button></td>
               </tr>
@@ -64,6 +65,14 @@ export function TemplatesPanel() {
           </tbody>
         </table>
       </div>
+      {current && (
+        <div className="tp-detail">
+          <b>{current.manufacturer} {current.series}</b>
+          <span>{FORMATS[current.format].name} · {totalChannels(current)} {isTwoSided(current) ? 'ports' : 'points'} · {current.rows.length} × {current.rows[0]?.strip.channelCount} · {current.rackUnits}RU</span>
+          {isTwoSided(current) && <span>{TERMINATIONS[current.termination!].name}{current.cableCategory ? ` · ${current.cableCategory.replace('cat', 'Cat').replace('6a', '6A')}${current.shielded ? ' shielded' : ''}` : ''} · wired front and rear</span>}
+          {current.notes && <span className="muted">{current.notes}</span>}
+        </div>
+      )}
       <div className="tp-foot">
         <button className="primary" disabled={!current} onClick={() => current && add(current)}>Add to Project</button>
         <button disabled={!current} onClick={() => current && set({ editingTemplate: { ...structuredClone(current), key: current.source === 'user' ? current.key : `user.${current.key}.${Date.now().toString(36)}`, source: 'user', manufacturer: current.manufacturer === 'Generic' ? 'Custom' : current.manufacturer } })}>

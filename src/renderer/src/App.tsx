@@ -1,3 +1,4 @@
+import { PanelResizer, usePanelWidth } from './components/PanelResizer'
 import { tidyDiagram } from './diagram/tidy'
 import { DeviceFinder } from './product/DeviceFinder'
 import { ContextMenu } from './components/ContextMenu'
@@ -105,9 +106,15 @@ export function App() {
     loadFile(f.path, f.data)
   }), [])
 
+  // The right panel shows only when there's something to inspect (design checks live in the ⚠︎ notifications).
+  const hasSubject = useStore((s) => s.selection.length > 0 || !!s.selectedCable || (s.mode === 'rack' && (!!s.selectedRack || !!s.selectedAccessory)))
+  const rightPanel = showInspector && mode !== 'sheet' && (mode === 'patch' || hasSubject)
+  const inspW = usePanelWidth('insp')
+  const tpW = usePanelWidth('tp')
+
   return (
     <ReactFlowProvider>
-      <div className={`app ${isMac ? 'mac' : ''} ${showInspector ? '' : 'no-inspector'} mode-${mode}`}>
+      <div className={`app ${isMac ? 'mac' : ''} ${rightPanel ? '' : 'no-inspector'} mode-${mode}`} style={{ ['--insp-w' as string]: `${inspW}px`, ['--tp-w' as string]: `${tpW}px` }}>
         <Toolbar />
         {mode !== 'sheet' && <Sidebar />}
         <main className="canvas-area">
@@ -116,7 +123,8 @@ export function App() {
           {mode === 'patch' && <PatchEditor />}
           {mode === 'sheet' && <ScheduleView />}
         </main>
-        {showInspector && mode !== 'sheet' && (mode === 'patch' ? <TemplatesPanel /> : <Inspector />)}
+        {rightPanel && (mode === 'patch' ? <TemplatesPanel /> : <Inspector />)}
+        {rightPanel && <PanelResizer which={mode === 'patch' ? 'tp' : 'insp'} />}
         {editingProduct && <ProductEditor key={editingProduct.key} initial={editingProduct} />}
         {editingPlate && <PlateBuilder key={editingPlate.product.key + (editingPlate.instanceId ?? '')} initial={editingPlate.product} instanceId={editingPlate.instanceId} />}
         {editingTemplate && <TemplateEditor key={editingTemplate.key} initial={editingTemplate} />}

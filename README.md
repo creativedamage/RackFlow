@@ -68,7 +68,7 @@ Keep RackFlow in **Applications** so it can update itself. If it can't write the
 | Undo / redo | ⌘Z / ⇧⌘Z or the toolbar arrows; hover them to see what will be undone. In a text field you're typing in, ⌘Z undoes the typing; once you've stopped editing it undoes the document. Bulk changes (renumber, patch multiples, grouping, adding gear) show a notification with an **Undo** button. |
 | Groups | Select devices and press **⌘G** (or **Group** in the Inspector or in the Groups panel at the top left of the diagram). The system (Audio, Video, Lighting, Network…) is detected for you and can be changed, including a custom colour. Groups draw a coloured, labelled frame. Drag the label to move the whole group, double-click it to select its members, and use ◉ to spotlight one group and dim the rest. **Auto-group by system** sorts every ungrouped device. **⇧⌘G** ungroups. The Inspector and the Schedule's Devices sheet have a Group column. |
 | Locations | A device's **Room** now shows on its card under the tag. With several devices selected, the Inspector sets the room for all of them at once. |
-| Design check | The toolbar pill shows error and warning counts. Click it for a list you can filter (All, Errors, Warnings, Notes); click an issue to jump to it. |
+| Design check | The toolbar pill shows error and warning counts. Click it for a list you can filter (All, Errors, Warnings, Notes); click an issue to jump to it. The right-hand panel only opens when something is selected, and you can drag its left edge to make it wider (double-click the edge to reset). |
 
 Your custom products, manufacturers and templates are kept in `~/Library/Application Support/RackFlow/`, so updating the app never touches them.
 
