@@ -49,6 +49,7 @@ export interface AppState {
   /** View being created / edited ('new' or an id). */
   editingView: string | null
   editingNumbers: boolean
+  editingNumbering: boolean
   /** Appearance: follow macOS, or force light / dark. */
   theme: 'system' | 'light' | 'dark'
   showInspector: boolean
@@ -116,6 +117,7 @@ export const useStore = create<AppState>((set, get) => ({
   diagramView: null,
   editingView: null,
   editingNumbers: false,
+  editingNumbering: false,
   theme: 'system',
   showInspector: true,
   issues: [],

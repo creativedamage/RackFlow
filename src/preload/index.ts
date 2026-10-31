@@ -40,6 +40,8 @@ const api: RackflowAPI = {
   aiLookup: (req) => ipcRenderer.invoke('ai:lookup', req),
 
   exportAll: (files, folder) => ipcRenderer.invoke('export:all', files, folder),
+  storeGet: (name) => ipcRenderer.invoke('store:get', name),
+  storeSet: (name, data) => ipcRenderer.invoke('store:set', name, data),
   getTheme: () => ipcRenderer.invoke('theme:get'),
   setTheme: (t) => ipcRenderer.invoke('theme:set', t),
   askSaveChanges: (name) => ipcRenderer.invoke('dialog:saveChanges', name),

@@ -39,7 +39,7 @@ export type EquipmentCategory =
   | 'networkSwitch' | 'controlProcessor' | 'touchPanel'
   | 'lightingConsole' | 'lightingFixture' | 'dimmer' | 'dmxNode'
   | 'intercom' | 'conferencing' | 'recorder' | 'converter'
-  | 'patchBay' | 'wallPlate' | 'floorBox' | 'powerSource' | 'pdu' | 'ups' | 'computer' | 'rackAccessory' | 'other'
+  | 'patchBay' | 'wallPlate' | 'floorBox' | 'connectorPanel' | 'powerSource' | 'pdu' | 'ups' | 'computer' | 'rackAccessory' | 'other'
 
 export const CATEGORIES: Record<EquipmentCategory, { name: string; tag: string }> = {
   projector: { name: 'Projector', tag: 'PJ' },
@@ -74,6 +74,7 @@ export const CATEGORIES: Record<EquipmentCategory, { name: string; tag: string }
   patchBay: { name: 'Patch Bay', tag: 'PB' },
   wallPlate: { name: 'Wall Plate', tag: 'WP' },
   floorBox: { name: 'Floor Box / Stage Pocket', tag: 'FB' },
+  connectorPanel: { name: 'Connector Panel (rack)', tag: 'CNP' },
   powerSource: { name: 'Building Power', tag: 'PWR' },
   pdu: { name: 'PDU', tag: 'PDU' },
   ups: { name: 'UPS', tag: 'UPS' },
@@ -133,7 +134,7 @@ export interface ProductDefinition {
   plate?: PlateSpec
 }
 
-export type PlateKind = 'wallPlate' | 'floorBox'
+export type PlateKind = 'wallPlate' | 'floorBox' | 'rackPanel'
 /** How the back of an insert is terminated. */
 export type PlateRear = 'same' | 'idcPunchdown' | 'euroblock' | 'none'
 export interface PlateInsert {
@@ -143,6 +144,25 @@ export interface PlateInsert {
   /** Optional label prefix, e.g. "Podium Mic". */
   label?: string
   rear: PlateRear
+  /** Fixed port id base for a single placed jack (designer); keeps cables attached when others are removed. */
+  pid?: string
+}
+
+/** Free text placed on a plate face (mm, centre / start / end anchored). */
+export interface PlateText { id: string; x: number; y: number; text: string; size: number; bold?: boolean; align?: 'start' | 'middle' | 'end' }
+
+/** The designed face of a plate / box / panel (mm). */
+export interface PlateLayout {
+  w: number
+  h: number
+  shape?: 'rect' | 'round'
+  finish: 'white' | 'ivory' | 'black' | 'stainless' | 'aluminum'
+  /** Snap grid (mm); 0 = off. */
+  grid: number
+  labelPos: 'below' | 'above' | 'none'
+  /** Jack centre per insert pid. */
+  jacks: Record<string, { x: number; y: number }>
+  texts: PlateText[]
 }
 export interface PlateSpec {
   kind: PlateKind
@@ -151,6 +171,8 @@ export interface PlateSpec {
   inserts: PlateInsert[]
   /** If the box has receptacles: the circuit feeding them. */
   power?: { volts: number; amps: number }
+  /** Designer layout (where each jack sits, text, finish). */
+  layout?: PlateLayout
 }
 
 /** What a building receptacle, panel feed or generator can deliver. */
@@ -188,6 +210,8 @@ export interface EquipmentInstance {
   id: EquipmentId
   tag: string
   product: ProductDefinition
+  /** Card size on a signal view (set by the view, not saved on the device). */
+  nodeSize?: 'small' | 'medium' | 'full'
   position: CanvasPoint
   rackPlacement: RackPlacement | null
   room: string
@@ -325,6 +349,10 @@ export interface Project {
   ledPanels?: import('./led').LedPanel[]
   /** Signal views: pages showing chosen devices with only some signal types. */
   views?: import('./views').SignalView[]
+  /** This project's title block (layout + logo); unset = the standard one. */
+  titleBlock?: import('./titleblock').TitleBlockTemplate
+  /** Tag / cable label numbering standard; unset = RackFlow's default. */
+  numbering?: import('./numbering').NumberingStandard
 }
 
 // --- Patch bays (types here to keep the document schema in one file) ---

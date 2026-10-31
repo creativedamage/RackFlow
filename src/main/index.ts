@@ -181,6 +181,8 @@ function buildMenu() {
         cmd('Select All Devices', 'selectAll', 'CmdOrCtrl+A'),
         { type: 'separator' },
         cmd('Edit Selected Device…', 'editDevice', 'CmdOrCtrl+E'),
+        { type: 'separator' },
+        cmd('Numbering Standards…', 'numbering'),
       ],
     },
     {
@@ -309,6 +311,20 @@ function registerIPC() {
     return r.response === 0 ? 'save' : r.response === 1 ? 'discard' : 'cancel'
   })
 
+  // Small app-wide JSON stores (title block templates, numbering standards) – shared across projects.
+  const STORES = new Set(['TitleBlocks', 'NumberingStandards'])
+  const storeFile = (name: string) => join(app.getPath('userData'), `${name}.json`)
+  ipcMain.handle('store:get', async (_e, name: string) => {
+    if (!STORES.has(name)) return null
+    try { return JSON.parse(await readFile(storeFile(name), 'utf8')) } catch { return null }
+  })
+  ipcMain.handle('store:set', async (_e, name: string, data: unknown) => {
+    if (!STORES.has(name)) return
+    await mkdir(app.getPath('userData'), { recursive: true })
+    const tmp = `${storeFile(name)}.tmp`
+    await writeFile(tmp, JSON.stringify(data, null, 1), 'utf8')
+    await rename(tmp, storeFile(name))
+  })
   ipcMain.handle('library:products', () => readAll(libDir('Products')))
   ipcMain.handle('library:saveProduct', (_e, p: { key: string }) => writeItem(libDir('Products'), p.key, p))
   ipcMain.handle('library:deleteProduct', (_e, key: string) => rm(join(libDir('Products'), `${safe(key)}.json`), { force: true }))

@@ -1,9 +1,11 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react'
-import { SHEETS, sheetsToHTML, sheetSize, type SheetOptions } from '@core/index'
+import { SHEETS, sheetsToHTML, sheetSize, titleBlockOf, type SheetOptions } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
 import { Field, Modal, Select, TextInput, Toggle } from '../components/ui'
-import { uploadLogo } from '../rack/AccessoryInspector'
+import { pickImage } from '../rack/AccessoryInspector'
+import { TitleBlockEditor } from './TitleBlockEditor'
+import { createPortal } from 'react-dom'
 import { RevisionsEditor } from './RevisionsEditor'
 
 /**
@@ -25,12 +27,16 @@ export function DrawingDialog<O extends SheetOptions>({ title, name, options, se
   const pages = useMemo(() => render(options), [render, options, project]) // eslint-disable-line react-hooks/exhaustive-deps
   const size = sheetSize(options)
   const [zoom, setZoom] = useState(1)
+  const [editingTB, setEditingTB] = useState(false)
+  // The logo lives in the project's title block (saved with the project); older projects picked one per print.
+  const tbLogo = titleBlockOf(project).logo?.dataUrl ?? (project.logos ?? []).find((l) => l.id === options.logoId)?.dataUrl
   const pagesRef = useRef<HTMLDivElement>(null)
   const info = (k: keyof typeof project.info, label: string) => (
     <Field label={label}><TextInput value={String(project.info[k] ?? '')} onCommit={(v) => apply('Title Block', (d) => { (d.info as unknown as Record<string, string>)[k] = v })} /></Field>
   )
   const set = (patch: Partial<SheetOptions>) => setOptions({ ...options, ...patch })
-  return (
+  return (<>
+    {editingTB && createPortal(<TitleBlockEditor onClose={() => setEditingTB(false)} />, document.body)}
     <Modal title={title} onClose={onClose} wide footer={<>
       <span className="muted">{pages.length} sheet{pages.length === 1 ? '' : 's'} · {SHEETS.find((s) => s.key === options.sheet)?.name}</span>
       <span className="spacer" />
@@ -54,10 +60,19 @@ export function DrawingDialog<O extends SheetOptions>({ title, name, options, se
             {info('location', 'Location')}
             {info('designer', 'Designer')}
             {!project.revisions?.length && info('revision', 'Revision')}
-            <Field label="Logo">
-              <Select value={options.logoId ?? ''} onChange={(v) => set({ logoId: v || undefined })} options={[{ value: '', label: 'None' }, ...(project.logos ?? []).map((l) => ({ value: l.id, label: l.name }))]} />
+            <Field label="Layout">
+              <span className="row-gap"><span className="small">{titleBlockOf(project).name}</span><button className="mini" onClick={() => setEditingTB(true)}>Edit Title Block…</button></span>
             </Field>
-            <button className="mini" onClick={async () => { const id = await uploadLogo(); if (id) set({ logoId: id }) }}>Upload Logo…</button>
+            <Field label="Logo">
+              <span className="row-gap">
+                {tbLogo ? <img className="tb-logo-thumb" src={tbLogo} alt="" /> : <span className="muted small">None</span>}
+                <button className="mini" onClick={async () => {
+                  const img = await pickImage()
+                  if (img) apply('Title Block Logo', (d) => { d.titleBlock = { ...structuredClone(titleBlockOf(d)), logo: img } })
+                }}>{tbLogo ? 'Replace…' : 'Upload…'}</button>
+                {tbLogo && <button className="mini danger" onClick={() => { apply('Title Block Logo', (d) => { d.titleBlock = { ...structuredClone(titleBlockOf(d)), logo: undefined } }); if (options.logoId) set({ logoId: undefined }) }}>Remove</button>}
+              </span>
+            </Field>
           </>)}
           <h4>Revisions</h4>
           <RevisionsEditor />
@@ -100,5 +115,5 @@ export function DrawingDialog<O extends SheetOptions>({ title, name, options, se
         </div>
       </div>
     </Modal>
-  )
+  </>)
 }

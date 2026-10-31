@@ -114,6 +114,7 @@ function CableSheet() {
         <span className="spacer" />
         <button disabled={!picked.length} onClick={showInDiagram}>Show in Diagram</button>
         <button className="primary" disabled={!all.length} onClick={() => setRenumber(true)}>Renumber…</button>
+        <button onClick={() => useStore.getState().set({ editingNumbering: true })} title="Tag and cable label formats (PB-001, A-0001) – saved as a reusable standard">Numbering Standards…</button>
         <button disabled={!all.length} onClick={() => download(`${project.info.name || 'Project'} cable schedule.csv`, cablesToCSV(project))}>Export CSV</button>
       </div>
       <Sheet rows={rows} columns={columns} rowKey={(r) => r.cable.id} commit={commit} onSelectionChange={setPicked}
@@ -136,10 +137,10 @@ function RenumberDialog({ selected, filtered, filterActive, counts, onClose }: {
 }) {
   const apply = useStore((s) => s.apply)
   const [scope, setScope] = useState<'all' | 'selected' | 'filtered'>(selected.length ? 'selected' : filterActive ? 'filtered' : 'all')
-  const [schemes, setSchemes] = useState<Record<SignalDomain, NumberScheme>>(defaultSchemes)
+  const [schemes, setSchemes] = useState<Record<SignalDomain, NumberScheme>>(() => defaultSchemes(useStore.getState().project))
   const [other, setOther] = useState<NumberScheme>({ prefix: 'X', start: 1, digits: 4 })
   const [order, setOrder] = useState<RenumberOrder>('from')
-  const [sep, setSep] = useState('-')
+  const [sep, setSep] = useState(() => useStore.getState().project.numbering?.cableDefaults.separator ?? '-')
   const [on, setOn] = useState<Set<string>>(() => new Set([...counts.keys()]))
   const systems = [...(Object.keys(DOMAINS) as SignalDomain[]).filter((d) => counts.get(d)), ...(counts.get('other') ? ['other' as const] : [])]
   const sample = (s: NumberScheme) => `${s.prefix}${s.prefix ? sep : ''}${String(s.start).padStart(s.digits, '0')}`

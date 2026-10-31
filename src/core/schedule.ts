@@ -1,5 +1,6 @@
 // Cable schedule: one row per cable, bulk renumbering by system, CSV export.
 
+import { cableRule } from './numbering'
 import { cableSpec } from './cables'
 import { addrKey, type Cable, type CableId, type Project } from './model'
 import { CABLE_PREFIX, portDomain, resolve } from './project'
@@ -48,8 +49,12 @@ export function cableRows(p: Project): CableRow[] {
 export interface NumberScheme { prefix: string; start: number; digits: number }
 export type RenumberOrder = 'diagram' | 'from' | 'to' | 'label'
 
-export const defaultSchemes = (): Record<SignalDomain, NumberScheme> =>
-  Object.fromEntries((Object.keys(DOMAINS) as SignalDomain[]).map((d) => [d, { prefix: CABLE_PREFIX[d], start: 1, digits: 4 }])) as Record<SignalDomain, NumberScheme>
+/** Renumber schemes per system – from the project's numbering standard when given. */
+export const defaultSchemes = (p?: Project): Record<SignalDomain, NumberScheme> =>
+  Object.fromEntries((Object.keys(DOMAINS) as SignalDomain[]).map((d) => {
+    const r = p ? cableRule(p, d) : { prefix: CABLE_PREFIX[d], start: 1, digits: 4 }
+    return [d, { prefix: r.prefix, start: r.start, digits: r.digits }]
+  })) as Record<SignalDomain, NumberScheme>
 
 const nat = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
 

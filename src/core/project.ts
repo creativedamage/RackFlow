@@ -1,6 +1,7 @@
 // Project helpers. Mutating functions are designed to run on Immer drafts
 // (store) or on plain objects (tests); read helpers are pure.
 
+import { cableRule, nextNumber, tagRule, type CableSystem } from './numbering'
 import { cableSpec } from './cables'
 import {
   addrKey, CATEGORIES, CURRENT_SCHEMA, newId,
@@ -49,21 +50,14 @@ export function heatBTU(power: PowerSpec): number {
 
 // MARK: Naming
 
+/** Next free device tag for a category, following the project's numbering standard (PB-001…). */
 export function nextTag(p: Project, category: EquipmentCategory): string {
-  const prefix = CATEGORIES[category].tag
-  const used = new Set(p.equipment.map((e) => e.tag))
-  for (let n = 1; ; n++) {
-    const t = `${prefix}-${String(n).padStart(2, '0')}`
-    if (!used.has(t)) return t
-  }
+  return nextNumber(tagRule(p, category), new Set(p.equipment.map((e) => e.tag)))
 }
 
-export function nextCableLabel(p: Project, prefix: string): string {
-  const used = new Set(p.cables.map((c) => c.label))
-  for (let n = 1; ; n++) {
-    const l = `${prefix}-${String(n).padStart(4, '0')}`
-    if (!used.has(l)) return l
-  }
+/** Next free cable label for a system (A-0001…); `prefix` is the default from the cable type. */
+export function nextCableLabel(p: Project, prefix: string, system?: CableSystem): string {
+  return nextNumber(cableRule(p, system ?? 'other', prefix), new Set(p.cables.map((c) => c.label)))
 }
 
 export const CABLE_PREFIX: Record<SignalDomain, string> = { video: 'V', audio: 'A', network: 'N', control: 'C', lighting: 'L', rf: 'RF', usb: 'U', power: 'P' }
@@ -107,7 +101,7 @@ export function connect(p: Project, a: PortAddress, b: PortAddress, specKey: str
   const spec = cableSpec(specKey) ?? (tp && preferred ? preferred : verdict.suggestedCables[0])
   const prefix = spec?.labelPrefix ?? (verdict.signal ? CABLE_PREFIX[SIGNALS[verdict.signal].domain] : 'X')
   const c: Cable = {
-    id: newId(), label: nextCableLabel(p, prefix), from: { ...from }, to: { ...to },
+    id: newId(), label: nextCableLabel(p, prefix, verdict.signal ? SIGNALS[verdict.signal].domain : 'other'), from: { ...from }, to: { ...to },
     specKey: spec?.key ?? null, lengthMeters: null, notes: '',
   }
   p.cables.push(c)

@@ -23,13 +23,37 @@ export interface SignalView {
   hideUnused?: boolean
   /** Custom sheet number; empty = automatic. */
   number?: string
+  /** Exact ports shown per device (device id → port ids); devices not listed use the signal match. */
+  ports?: Record<string, string[]>
+  /** Card size per device in this view (small = drawing only, full = large drawing). */
+  sizes?: Record<string, 'small' | 'medium' | 'full'>
 }
 
 export const viewsOf = (p: Project): SignalView[] => p.views ?? []
 export const isViewId = (p: Project, id: string | undefined | null) => !!id && viewsOf(p).some((v) => v.id === id)
 
-/** A port shows in the view when any of its signals is one of the view's types. */
-export const portInView = (port: PortTemplate, domains: SignalDomain[]) => port.signals.some((s) => domains.includes(SIGNALS[s]?.domain))
+/**
+ * A port matches the view when its main (first) signal is one of the view's
+ * types – so a Dante / AES67 network port or a combo jack doesn't slip into an
+ * Audio view just because it can also carry audio.
+ */
+export const portInView = (port: PortTemplate, domains: SignalDomain[]) => !!port.signals[0] && domains.includes(SIGNALS[port.signals[0]]?.domain)
+
+/** Ports of a device shown in the view: its exact pick, else the signal match. */
+export function viewPortIds(v: Pick<SignalView, 'domains' | 'ports'>, e: EquipmentInstance): Set<string> {
+  const pick = v.ports?.[e.id]
+  return new Set(pick ? pick.filter((id) => e.product.ports.some((x) => x.id === id)) : e.product.ports.filter((x) => portInView(x, v.domains)).map((x) => x.id))
+}
+
+/** Hide / show single ports of a device in a view (turns the device into an exact pick). */
+export function setPortsInView(p: Project, viewId: string, eqId: string, portIds: string[], on: boolean) {
+  const v = viewsOf(p).find((x) => x.id === viewId)
+  const e = p.equipment.find((x) => x.id === eqId)
+  if (!v || !e) return
+  const cur = viewPortIds(v, e)
+  for (const id of portIds) { if (on) cur.add(id); else cur.delete(id) }
+  v.ports = { ...(v.ports ?? {}), [eqId]: e.product.ports.filter((x) => cur.has(x.id)).map((x) => x.id) }
+}
 
 /** Devices that have at least one port of the view's signal types. */
 export const viewCandidates = (p: Project, v: Pick<SignalView, 'domains'>) =>
@@ -66,8 +90,9 @@ export function viewProject(p: Project, v: SignalView): Project {
   const equipment = members.map((e): EquipmentInstance => ({
     ...e,
     groupId: undefined,
+    nodeSize: v.sizes?.[e.id],
     position: v.positions[e.id] ?? e.position,
-    product: { ...e.product, ports: e.product.ports.filter((x) => portInView(x, v.domains) && (!v.hideUnused || wired.has(`${e.id}/${x.id}`))) },
+    product: { ...e.product, ports: ((ids) => e.product.ports.filter((x) => ids.has(x.id) && (!v.hideUnused || wired.has(`${e.id}/${x.id}`))))(viewPortIds(v, e)) },
   }))
   const ports = new Map(equipment.map((e) => [e.id as string, new Set(e.product.ports.map((x) => x.id))]))
   const visible = (a: { equipment: string; port: string }) => !!ports.get(a.equipment)?.has(a.port)
@@ -160,7 +185,9 @@ export function pruneViews(p: Project) {
  * outside the view, kept off the sheet) so those wires end in off-sheet arrows.
  */
 export function viewPrintProject(p: Project, v: SignalView): { project: Project; ids: Set<string> } {
-  const vp = viewProject(p, v)
+  // Printed blocks are always the standard size.
+  const vp0 = viewProject(p, v)
+  const vp = { ...vp0, equipment: vp0.equipment.map((e) => ({ ...e, nodeSize: undefined })) }
   const ids = new Set(vp.equipment.map((e) => e.id as string))
   const shown = new Map(vp.equipment.map((e) => [e.id as string, new Set(e.product.ports.map((x) => x.id))]))
   const vis = (a: { equipment: string; port: string }) => !!shown.get(a.equipment)?.has(a.port)

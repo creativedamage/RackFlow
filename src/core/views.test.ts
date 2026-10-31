@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addEquipment, BUILT_IN_PRODUCTS, connect, createView, defaultSchematic, layoutView, newProject, nodeGeom, schematicSheets, setInView, viewMembers, viewOffFlags, viewProject } from './index'
+import { addEquipment, BUILT_IN_PRODUCTS, connect, createView, defaultSchematic, layoutView, newProject, nodeGeom, schematicSheets, setInView, setPortsInView, viewMembers, viewOffFlags, viewProject } from './index'
 
 const product = (k: string) => BUILT_IN_PRODUCTS.find((x) => x.key === k)!
 
@@ -61,5 +61,22 @@ describe('signal views – hide unused', () => {
     const v = createView(p, { name: 'A', domains: ['audio'], hideUnused: true })
     const vp = viewProject(p, v)
     expect(vp.equipment.map((e) => e.product.ports.length)).toEqual([1, 1])
+  })
+})
+
+describe('signal views – exact ports', () => {
+  it('shows only picked ports; main signal decides the default', () => {
+    const p = newProject()
+    const dsp = addEquipment(p, product('generic.dsp.12x8'), { x: 0, y: 0 })
+    const v = createView(p, { name: 'A', domains: ['audio'] })
+    const vp0 = viewProject(p, v).equipment[0]
+    // Dante (network-first) ports don't slip into an Audio view.
+    expect(vp0.product.ports.some((x) => /Dante/.test(x.label))).toBe(false)
+    const lo1 = dsp.product.ports.find((x) => x.label === 'Line Out 1')!.id
+    setPortsInView(p, v.id, dsp.id, vp0.product.ports.map((x) => x.id).filter((x) => x !== lo1), false)
+    expect(viewProject(p, v).equipment[0].product.ports.map((x) => x.id)).toEqual([lo1])
+    const dante = dsp.product.ports.find((x) => /Dante Primary/.test(x.label))!.id
+    setPortsInView(p, v.id, dsp.id, [dante], true)
+    expect(viewProject(p, v).equipment[0].product.ports.map((x) => x.id).sort()).toEqual([lo1, dante].sort())
   })
 })

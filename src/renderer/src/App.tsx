@@ -16,12 +16,13 @@ import { DiagramView } from './diagram/DiagramView'
 import { RackView } from './rack/RackView'
 import { PatchEditor } from './patch/PatchEditor'
 import { TemplatesPanel } from './patch/TemplatesPanel'
-import { PlateBuilder } from './product/PlateBuilder'
+import { PlateDesigner } from './product/PlateDesigner'
 import { Toasts } from './components/Toasts'
 import { ScheduleView } from './sheet/ScheduleView'
 import { LedView } from './led/LedView'
 import { ViewEditor } from './diagram/ViewEditor'
 import { SheetNumbersDialog } from './diagram/SheetNumbers'
+import { NumberingDialog } from './components/NumberingDialog'
 import { initTheme, showTheme } from './theme'
 import { usePatchUI } from './patch/patchState'
 import { Inspector } from './inspector/Inspector'
@@ -57,6 +58,7 @@ export function App() {
   const exportingAll = useStore((s) => s.exportingAll)
   const editingView = useStore((s) => s.editingView)
   const editingNumbers = useStore((s) => s.editingNumbers)
+  const editingNumbering = useStore((s) => s.editingNumbering)
   const editingTemplate = useStore((s) => s.editingTemplate)
   const title = useStore((s) => s.project.info.name)
   const dirty = useStore((s) => s.dirty)
@@ -77,9 +79,10 @@ export function App() {
       case 'saveAs': await saveDocument(true); break
       case 'save-and-close': if (await saveDocument()) api.closeWindow(); break
       // ⌘Z inside a text field is the field's own undo, not the document's.
-      case 'undo': if (fieldHasEdits()) document.execCommand('undo'); else docUndo(false); break
+      case 'undo': if (s.editingPlate && !inTextField()) { window.dispatchEvent(new Event('designer:undo')); break } if (fieldHasEdits()) document.execCommand('undo'); else docUndo(false); break
       case 'redo': if (fieldHasEdits()) document.execCommand('redo'); else docUndo(true); break
       case 'selectAll':
+        if (s.editingPlate && !inTextField()) { window.dispatchEvent(new Event('designer:selectAll')); break }
         if (inTextField()) document.execCommand('selectAll')
         else if (s.mode === 'sheet') window.dispatchEvent(new Event('sheet:selectAll'))
         else if (s.mode === 'patch') {
@@ -111,6 +114,7 @@ export function App() {
       case 'editDevice': editSelection(); break
       case 'tidy': s.set({ mode: 'diagram' }); setTimeout(() => { const n = tidyDiagram({ selectionOnly: s.selection.length > 1 }); if (n) useStore.getState().notify(`Tidied ${n} devices`, { undo: true, kind: 'success' }) }, 0); break
       case 'exportAll': s.set({ exportingAll: true }); break
+      case 'numbering': s.set({ editingNumbering: true }); break
       case 'findDevice': s.set({ finding: { query: '' } }); break
       case 'newTemplate': s.set({ editingTemplate: newCustomTemplate() }); break
     }
@@ -141,11 +145,12 @@ export function App() {
         {rightPanel && (mode === 'patch' ? <TemplatesPanel /> : <Inspector />)}
         {rightPanel && <PanelResizer which={mode === 'patch' ? 'tp' : 'insp'} />}
         {editingProduct && <ProductEditor key={editingProduct.key} initial={editingProduct} />}
-        {editingPlate && <PlateBuilder key={editingPlate.product.key + (editingPlate.instanceId ?? '')} initial={editingPlate.product} instanceId={editingPlate.instanceId} />}
+        {editingPlate && <PlateDesigner key={editingPlate.product.key + (editingPlate.instanceId ?? '')} initial={editingPlate.product} instanceId={editingPlate.instanceId} />}
         {editingTemplate && <TemplateEditor key={editingTemplate.key} initial={editingTemplate} />}
         {finding && <DeviceFinder initialQuery={finding.query} />}
         {editingView && <ViewEditor key={editingView} id={editingView} onClose={() => useStore.getState().set({ editingView: null })} />}
         {editingNumbers && createPortal(<SheetNumbersDialog onClose={() => useStore.getState().set({ editingNumbers: false })} />, document.body)}
+        {editingNumbering && createPortal(<NumberingDialog onClose={() => useStore.getState().set({ editingNumbering: false })} />, document.body)}
         {exportingAll && <ExportAllDialog onClose={() => useStore.getState().set({ exportingAll: false })} />}
         <Toasts />
         <ContextMenu />

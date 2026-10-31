@@ -1,7 +1,6 @@
 import { memo } from 'react'
 import { BaseEdge, EdgeLabelRenderer, Position, useStore as useFlowStore, type Edge, type EdgeProps, type ReactFlowState } from '@xyflow/react'
-import { crossings, labelPoint, planChannels, roundedPath, route, WIRE_CLEAR, WIRE_GAP, type ChannelWire, type Pt, type Rect, type WireMode } from '@core/index'
-import { useStore } from '../store'
+import { crossings, labelPoint, planChannels, roundedPath, route, WIRE_CLEAR, type ChannelWire, type EquipmentInstance, type Pt, type Rect, type WireMode } from '@core/index'
 import { nodeGeom } from './tidy'
 
 export type CableEdgeData = {
@@ -9,17 +8,20 @@ export type CableEdgeData = {
   mode?: WireMode
   /** Stub labels: where the far end goes ("VSW-001 · Input 3"). */
   toText?: string; fromText?: string
+  /** Far-end parts for grouped stubs: port label, and "TAG · Maker Model" for the group tag. */
+  toPort?: string; fromPort?: string; toName?: string; fromName?: string
 }
 export type CableEdgeType = Edge<CableEdgeData, 'cable'>
 
-const GAP = WIRE_GAP
 const CLEAR = WIRE_CLEAR
+const STUB = 34
+const SMART_LEN = 1400
 
 /** Device rectangles (not group frames) from React Flow's live, mid-drag positions. */
 const obstaclesOf = (s: ReactFlowState): Rect[] => {
   const out: Rect[] = []
   for (const n of s.nodeLookup.values()) {
-    if (n.type !== 'device') continue
+    if (n.type !== 'device' || n.hidden) continue
     const p = n.internals.positionAbsolute
     const w = n.measured?.width ?? 0, h = n.measured?.height ?? 0
     out.push({ id: n.id, x0: p.x - CLEAR, y0: p.y - CLEAR, x1: p.x + w + CLEAR, y1: p.y + h + CLEAR })
@@ -29,71 +31,153 @@ const obstaclesOf = (s: ReactFlowState): Rect[] => {
 // Shallow-equal so edges only re-route when a device actually moves or resizes.
 const sameRects = (a: Rect[], b: Rect[]) => a.length === b.length && a.every((r, i) => r.id === b[i].id && r.x0 === b[i].x0 && r.y0 === b[i].y0 && r.x1 === b[i].x1 && r.y1 === b[i].y1)
 
-// One channel plan shared by every edge, rebuilt when a device moves or the wiring changes.
-let planCache: { rects: Rect[]; cables: unknown; plan: Map<string, number> } | null = null
-function channelPlan(rects: Rect[]): Map<string, number> {
-  const project = useStore.getState().project
-  if (planCache && planCache.cables === project.cables && (planCache.rects === rects || sameRects(planCache.rects, rects))) return planCache.plan
-  const at = new Map(rects.map((r) => [r.id, r]))
-  const eqs = new Map(project.equipment.map((e) => [e.id as string, e]))
-  const wires: ChannelWire[] = []
-  for (const c of project.cables) {
-    const ra = at.get(c.from.equipment), rb = at.get(c.to.equipment)
-    const ea = eqs.get(c.from.equipment), eb = eqs.get(c.to.equipment)
-    if (!ra || !rb || !ea || !eb) continue
-    const pa = nodeGeom(ea).port(c.from.port), pb = nodeGeom(eb).port(c.to.port)
-    if (!pa || !pb) continue
-    const A = { x: ra.x0 + CLEAR + pa.x, y: ra.y0 + CLEAR + pa.y, side: pa.side, right: ra.x1 - CLEAR }
-    const B = { x: rb.x0 + CLEAR + pb.x, y: rb.y0 + CLEAR + pb.y, side: pb.side, right: rb.x1 - CLEAR }
-    // Normalise to "leaves a right side, enters a left side, going right".
-    if (A.side === 'right' && B.side === 'left' && B.x > A.x) wires.push({ id: c.id, sx: A.x, sy: A.y, tx: B.x, ty: B.y, sourceRight: A.right })
-    else if (B.side === 'right' && A.side === 'left' && A.x > B.x) wires.push({ id: c.id, sx: B.x, sy: B.y, tx: A.x, ty: A.y, sourceRight: B.right })
+interface EndInfo { x: number; y: number; dir: number; device: string; far: string }
+/** A bundle of stubs from one device side to the same far device. */
+export interface StubGroup { key: string; ids: string[]; ys: number[]; x: number; dir: number; leader: string; /** Bracket x. */ bx: number }
+interface Plan { channel: Map<string, number>; stub: Map<string, boolean>; groups: Map<string, StubGroup> }
+
+/**
+ * One plan for every wire, rebuilt when a device moves or the wiring changes:
+ * channel tracks, which wires become stubs, and stub bundles. Uses the cards
+ * as drawn (so signal views with filtered ports line up).
+ */
+let cache: { rects: Rect[]; edges: unknown; sel: string; plan: Plan } | null = null
+function planFor(s: ReactFlowState, rects: Rect[]): Plan {
+  const edges = s.edges as CableEdgeType[]
+  const sel = edges.filter((e) => e.selected).map((e) => e.id).join()
+  if (cache && cache.edges === edges && cache.sel === sel && (cache.rects === rects || sameRects(cache.rects, rects))) return cache.plan
+  const geo = new Map<string, { eq: EquipmentInstance; x: number; y: number }>()
+  for (const n of s.nodeLookup.values()) {
+    if (n.type !== 'device' || n.hidden) continue
+    const eq = (n.data as { eq: EquipmentInstance }).eq
+    geo.set(n.id, { eq, x: n.internals.positionAbsolute.x, y: n.internals.positionAbsolute.y })
   }
-  const plan = planChannels(wires, GAP, 7)
-  planCache = { rects, cables: project.cables, plan }
+  const endOf = (dev: string, port: string | null | undefined, far: string): EndInfo | null => {
+    const g = geo.get(dev)
+    const p = g && port ? nodeGeom(g.eq).port(port) : null
+    return g && p ? { x: g.x + p.x, y: g.y + p.y, dir: p.side === 'left' ? -1 : 1, device: dev, far } : null
+  }
+  const ends = new Map<string, [EndInfo, EndInfo]>()
+  const wires: ChannelWire[] = []
+  for (const e of edges) {
+    const A = endOf(e.source, e.sourceHandle, e.target), B = endOf(e.target, e.targetHandle, e.source)
+    if (!A || !B) continue
+    ends.set(e.id, [A, B])
+    const ra = geo.get(e.source)!, rb = geo.get(e.target)!
+    const right = (g: typeof ra) => g.x + nodeGeom(g.eq).width
+    if (A.dir > 0 && B.dir < 0 && B.x > A.x) wires.push({ id: e.id, sx: A.x, sy: A.y, tx: B.x, ty: B.y, sourceRight: right(ra) })
+    else if (B.dir > 0 && A.dir < 0 && A.x > B.x) wires.push({ id: e.id, sx: B.x, sy: B.y, tx: A.x, ty: A.y, sourceRight: right(rb) })
+  }
+  const channel = planChannels(wires)
+  // Which wires are stubs.
+  const stub = new Map<string, boolean>()
+  for (const e of edges) {
+    const en = ends.get(e.id)
+    const mode = e.data?.mode ?? 'all'
+    if (!en || e.selected || mode === 'all') { stub.set(e.id, false); continue }
+    if (mode === 'stubs') { stub.set(e.id, true); continue }
+    const [A, B] = en
+    const pts = route(A, A.dir, B, B.dir, rects, e.data?.lane ?? 0, channel.get(e.id))
+    const len = pts.slice(1).reduce((t, p, i) => t + Math.abs(p.x - pts[i].x) + Math.abs(p.y - pts[i].y), 0)
+    const endRects = rects.filter((r) => r.id === A.device || r.id === B.device)
+    stub.set(e.id, len > SMART_LEN || crossings(pts, rects, endRects) > 0)
+  }
+  // Bundles: wires leaving one side of a device for the same far device.
+  const byKey = new Map<string, { id: string; end: EndInfo; text: string }[]>()
+  for (const e of edges) {
+    const en = ends.get(e.id)
+    if (!en || e.selected) continue
+    en.forEach((end, i) => {
+      const key = `${end.device}|${end.dir}|${end.far}`
+      const text = `${e.data?.label ?? ''} ${(i === 0 ? e.data?.toPort : e.data?.fromPort) ?? ''}`
+      byKey.set(key, [...(byKey.get(key) ?? []), { id: e.id, end, text }])
+    })
+  }
+  // Smart mode: if part of a bundle became stubs, the rest of it does too, so they read as one group.
+  for (const ms of byKey.values()) if (ms.length > 1 && ms.some((m) => stub.get(m.id))) for (const m of ms) stub.set(m.id, true)
+  const groups = new Map<string, StubGroup>()
+  for (const [key, all] of byKey) {
+    const ms = all.filter((m) => stub.get(m.id))
+    if (ms.length < 2) continue
+    ms.sort((a, b) => a.end.y - b.end.y)
+    const width = Math.max(70, ...ms.map((m) => tagW(m.text)))
+    const g: StubGroup = { key, ids: ms.map((m) => m.id), ys: ms.map((m) => m.end.y), x: ms[0].end.x, dir: ms[0].end.dir, leader: ms[0].id, bx: ms[0].end.x + ms[0].end.dir * (STUB + width + 14) }
+    for (const m of ms) groups.set(`${m.id}|${m.end.device}|${m.end.dir}`, g)
+  }
+  const plan = { channel, stub, groups }
+  cache = { rects, edges, sel, plan }
   return plan
 }
 
 const dirOf = (p: Position) => (p === Position.Left ? -1 : 1)
+/** Rough width of a stub tag (monospace 9.5px + padding). */
+const tagW = (s: string) => s.length * 6 + 16
 
 /**
  * A cable on the wiring diagram: re-routes live around devices as you drag them,
  * and its label is drawn in a layer above every device so it's never hidden.
+ * As a stub, several wires to the same device are bundled under one tag naming it.
  */
 export const CableEdge = memo(function CableEdge(props: EdgeProps<CableEdgeType>) {
-  const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected, data } = props
+  const { id, source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected, data } = props
   const rects = useFlowStore(obstaclesOf, sameRects)
-  const channel = channelPlan(rects).get(id)
+  const plan = useFlowStore((s) => planFor(s, rects))
+  const channel = plan.channel.get(id)
   const sDir = dirOf(sourcePosition), tDir = dirOf(targetPosition)
-  const pts = route({ x: sourceX, y: sourceY }, sDir, { x: targetX, y: targetY }, tDir, rects, data?.lane ?? 0, channel)
   const color = data?.color ?? '#888'
-  const mode = data?.mode ?? 'all'
-  const len = pts.slice(1).reduce((a, p, i) => a + Math.abs(p.x - pts[i].x) + Math.abs(p.y - pts[i].y), 0)
-  const ends = rects.filter((r) => (sourceX >= r.x0 && sourceX <= r.x1 && sourceY >= r.y0 && sourceY <= r.y1) || (targetX >= r.x0 && targetX <= r.x1 && targetY >= r.y0 && targetY <= r.y1))
-  // Smart: long runs, or wires that can't avoid devices, become labelled stubs (selected wires always show in full).
-  const stub = !selected && (mode === 'stubs' || (mode === 'smart' && (len > 1400 || crossings(pts, rects, ends) > 0)))
   const stroke = { stroke: color, strokeWidth: selected ? 3 : 1.6, strokeDasharray: data?.dashed ? '6 3' : undefined }
-  if (stub) {
-    const STUB = 34
-    const a = { x: sourceX + sDir * STUB, y: sourceY }, b = { x: targetX + tDir * STUB, y: targetY }
-    const tag = (p: Pt, dir: number, text: string | undefined, key: string) => (
-      <div key={key} className={`cable-stub nodrag nopan ${dir < 0 ? 'left' : 'right'}`}
-        style={{ transform: `translate(${dir < 0 ? '-100%' : '0'}, -50%) translate(${p.x}px, ${p.y}px)`, borderColor: color }}
-        onClick={(e) => { e.stopPropagation(); data?.onSelect?.() }} title={`${data?.label ?? ''} → ${text ?? ''}\nClick to select · the full wire shows while selected`}>
-        <b style={{ color }}>{data?.label}</b>{text && <span>{dir < 0 ? '◂ ' : ''}{text}{dir < 0 ? '' : ' ▸'}</span>}
-      </div>
-    )
+  if (plan.stub.get(id) && !selected) {
+    const end = (x: number, y: number, dir: number, device: string, text: string | undefined, port: string | undefined, name: string | undefined, key: string) => {
+      const g = plan.groups.get(`${id}|${device}|${dir}`)
+      const select = (e: React.MouseEvent) => { e.stopPropagation(); data?.onSelect?.() }
+      if (!g) {
+        const p = { x: x + dir * STUB, y }
+        return (
+          <g key={key}>
+            <BaseEdge id={`${id}:${key}`} path={`M ${x} ${y} L ${p.x} ${p.y}`} interactionWidth={10} style={stroke} />
+            <EdgeLabelRenderer>
+              <div className={`cable-stub nodrag nopan ${dir < 0 ? 'left' : 'right'}`}
+                style={{ transform: `translate(${dir < 0 ? '-100%' : '0'}, -50%) translate(${p.x}px, ${p.y}px)`, borderColor: color }}
+                onClick={select} title={`${data?.label ?? ''} → ${text ?? ''}\nClick to select · the full wire shows while selected`}>
+                <b style={{ color }}>{data?.label}</b>{text && <span>{dir < 0 ? '◂ ' : ''}{text}{dir < 0 ? '' : ' ▸'}</span>}
+              </div>
+            </EdgeLabelRenderer>
+          </g>
+        )
+      }
+      // Bundled: short stub + "label · port" tag, all reaching one bracket, then one tag naming the device.
+      const bx = g.bx
+      const p = { x: x + dir * STUB, y }
+      const y0 = Math.min(...g.ys), y1 = Math.max(...g.ys), ym = (y0 + y1) / 2
+      return (
+        <g key={key}>
+          <BaseEdge id={`${id}:${key}`} path={`M ${x} ${y} L ${bx} ${y}`} interactionWidth={10} style={stroke} />
+          {g.leader === id && <path d={`M ${bx} ${y0} L ${bx} ${y1} M ${bx} ${ym} L ${bx + dir * 22} ${ym}`} fill="none" stroke="var(--text-2)" strokeWidth={1.6} />}
+          <EdgeLabelRenderer>
+            <div className={`cable-stub nodrag nopan grouped ${dir < 0 ? 'left' : 'right'}`}
+              style={{ transform: `translate(${dir < 0 ? '-100%' : '0'}, -50%) translate(${p.x}px, ${p.y}px)`, borderColor: color }}
+              onClick={select} title={`${data?.label ?? ''} → ${text ?? ''}\nClick to select · the full wire shows while selected`}>
+              <b style={{ color }}>{data?.label}</b>{port && <span>{port}</span>}
+            </div>
+            {g.leader === id && (
+              <div className={`cable-stub-group nodrag nopan ${dir < 0 ? 'left' : 'right'}`}
+                style={{ transform: `translate(${dir < 0 ? '-100%' : '0'}, -50%) translate(${bx + dir * 22}px, ${ym}px)` }}
+                title={`${g.ids.length} wires to ${name ?? ''}`}>
+                {dir < 0 ? '◂ ' : ''}{name}{dir < 0 ? '' : ' ▸'} <span>×{g.ids.length}</span>
+              </div>
+            )}
+          </EdgeLabelRenderer>
+        </g>
+      )
+    }
     return (
       <>
-        <BaseEdge id={`${id}:a`} path={`M ${sourceX} ${sourceY} L ${a.x} ${a.y}`} interactionWidth={10} style={stroke} />
-        <BaseEdge id={`${id}:b`} path={`M ${targetX} ${targetY} L ${b.x} ${b.y}`} interactionWidth={10} style={stroke} />
-        <EdgeLabelRenderer>
-          {tag(a, sDir, data?.toText, 'a')}
-          {tag(b, tDir, data?.fromText, 'b')}
-        </EdgeLabelRenderer>
+        {end(sourceX, sourceY, sDir, source, data?.toText, data?.toPort, data?.toName, 'a')}
+        {end(targetX, targetY, tDir, target, data?.fromText, data?.fromPort, data?.fromName, 'b')}
       </>
     )
   }
+  const pts = route({ x: sourceX, y: sourceY }, sDir, { x: targetX, y: targetY }, tDir, rects, data?.lane ?? 0, channel)
   const path = roundedPath(pts)
   const lp = labelPoint(pts, rects)
   return (
@@ -111,3 +195,5 @@ export const CableEdge = memo(function CableEdge(props: EdgeProps<CableEdgeType>
     </>
   )
 })
+
+export type { Pt }

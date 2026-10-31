@@ -3,6 +3,7 @@
 import type { LogoAsset, Project } from '../model'
 import { Svg } from './svg'
 import { sheetLabel } from '../sheetnumbers'
+import { fieldValue, titleBlockOf, type TBContext } from '../titleblock'
 
 export interface SheetSize { key: string; name: string; w: number; h: number }
 /** Landscape dimensions in mm. */
@@ -33,7 +34,6 @@ export interface SheetFrame {
 }
 
 const MARGIN = 10
-const TB_H = 30
 
 export function sheetSize(o: SheetOptions): { w: number; h: number } {
   const s = SHEETS.find((x) => x.key === o.sheet) ?? SHEETS[0]
@@ -47,6 +47,7 @@ export function newSheet(p: Project, o: SheetOptions, page: number, pages: numbe
   svg.rect(MARGIN / 2, MARGIN / 2, w - MARGIN, h - MARGIN, { lw: 0.5 })
   let area = { x: MARGIN, y: MARGIN, w: w - MARGIN * 2, h: h - MARGIN * 2 }
   if (o.titleBlock) {
+    const TB_H = Math.max(14, Math.min(80, titleBlockOf(p).height))
     const top = h - MARGIN / 2 - TB_H
     titleBlock(svg, p, o, { x: MARGIN / 2, y: top, w: w - MARGIN, h: TB_H }, page, pages, subtitle, sheetNo ?? sheetLabel(o.drawingNumber, page - 1))
     area = { ...area, h: top - MARGIN - 2 }
@@ -80,33 +81,44 @@ export function newSheet(p: Project, o: SheetOptions, page: number, pages: numbe
 }
 
 function titleBlock(svg: Svg, p: Project, o: SheetOptions, r: { x: number; y: number; w: number; h: number }, page: number, pages: number, subtitle: string, sheetNo?: string) {
+  const tb = titleBlockOf(p)
   svg.line(r.x, r.y, r.x + r.w, r.y, { lw: 0.5 })
-  const logo: LogoAsset | undefined = (p.logos ?? []).find((l) => l.id === o.logoId)
-  const cells: { label: string; value: string; w: number }[] = [
-    { label: 'PROJECT', value: p.info.name || 'Untitled Project', w: 0.24 },
-    { label: 'CLIENT', value: p.info.client || '', w: 0.14 },
-    { label: 'LOCATION', value: p.info.location || '', w: 0.12 },
-    { label: 'DRAWING', value: [o.title, subtitle].filter(Boolean).join(' – '), w: 0.2 },
-    { label: 'DESIGNER', value: p.info.designer || '', w: 0.1 },
-    { label: 'REV', value: (p.revisions?.length ? p.revisions[p.revisions.length - 1].rev : p.info.revision) || '', w: 0.05 },
-    { label: 'DATE', value: new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }), w: 0.08 },
-    { label: sheetNo ? `SHEET  ·  ${page} OF ${pages}` : 'SHEET', value: sheetNo ?? `${page} OF ${pages}`, w: 0.07 },
-  ]
-  const logoW = logo ? Math.min(60, r.w * 0.12) : 0
-  let x = r.x
+  // Logo: the title block's own (saved with it), else one picked in the print dialog (older projects).
+  const legacy: LogoAsset | undefined = (p.logos ?? []).find((l) => l.id === o.logoId)
+  const logo = tb.logo?.dataUrl ?? legacy?.dataUrl
+  const logoW = logo ? Math.min(tb.logoWidth, r.w * 0.25) : 0
   if (logo) {
-    svg.image(x + 2, r.y + 2, logoW - 4, r.h - 4, logo.dataUrl)
-    x += logoW
-    svg.line(x, r.y, x, r.y + r.h, { lw: 0.35 })
+    const lx = tb.logoSide === 'right' ? r.x + r.w - logoW : r.x
+    svg.image(lx + 2, r.y + 2, logoW - 4, r.h - 4, logo)
+    svg.line(tb.logoSide === 'right' ? lx : lx + logoW, r.y, tb.logoSide === 'right' ? lx : lx + logoW, r.y + r.h, { lw: 0.35 })
   }
-  const rest = r.w - logoW
-  for (const c of cells) {
-    const cw = rest * c.w
-    svg.text(x + 2, r.y + 4, c.label, { size: 2.2, fill: '#555', baseline: 'middle' })
-    const size = c.label === 'PROJECT' || c.label === 'DRAWING' || (sheetNo && c.label.startsWith('SHEET')) ? 5 : 4
-    svg.text(x + 2, r.y + r.h / 2 + 3, c.value.toUpperCase(), { size, weight: c.label === 'PROJECT' || c.label === 'DRAWING' || (sheetNo && c.label.startsWith('SHEET')) ? 'bold' : 'normal', maxWidth: cw - 4 })
-    x += cw
-    if (x < r.x + r.w - 1) svg.line(x, r.y, x, r.y + r.h, { lw: 0.35 })
+  const ctx: TBContext = {
+    drawing: [o.title, subtitle].filter(Boolean).join(' – '),
+    sheet: sheetNo ?? `${page} OF ${pages}`,
+    rev: (p.revisions?.length ? p.revisions[p.revisions.length - 1].rev : p.info.revision) || '',
+    date: new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }),
+  }
+  const x0 = r.x + (tb.logoSide === 'left' ? logoW : 0), w = r.w - logoW
+  const twoRows = tb.fields.some((f) => f.row === 1)
+  const rowH = twoRows ? r.h / 2 : r.h
+  if (twoRows) svg.line(x0, r.y + rowH, x0 + w, r.y + rowH, { lw: 0.35 })
+  for (const row of [0, 1] as const) {
+    const fs = tb.fields.filter((f) => f.row === row)
+    if (!fs.length) continue
+    const total = fs.reduce((t, f) => t + Math.max(1, f.width), 0)
+    let x = x0
+    const y = r.y + row * rowH
+    fs.forEach((f, i) => {
+      const cw = (w * Math.max(1, f.width)) / total
+      const caption = f.source === 'sheet' && sheetNo ? `${f.label || 'SHEET'}  ·  ${page} OF ${pages}` : f.label
+      if (caption) svg.text(x + 2, y + Math.min(4, rowH * 0.18), caption, { size: 2.2, fill: '#555', baseline: 'middle' })
+      const lines = fieldValue(p, f, ctx).toUpperCase().split('\n').filter((l, k, all) => l || all.length === 1)
+      const size = Math.min(f.big ? 5 : 4, (rowH - (caption ? 6 : 3)) / Math.max(1, lines.length) / 1.2)
+      const top = y + (caption ? 6 : 2) + (rowH - (caption ? 6 : 2) - lines.length * size * 1.2) / 2 + size * 0.6
+      lines.forEach((l, k) => svg.text(x + 2, top + k * size * 1.2, l, { size: k === 0 ? size : size * 0.8, weight: f.big && k === 0 ? 'bold' : 'normal', maxWidth: cw - 4 }))
+      x += cw
+      if (i < fs.length - 1) svg.line(x, y, x, y + rowH, { lw: 0.35 })
+    })
   }
 }
 

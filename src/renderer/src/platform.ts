@@ -67,6 +67,8 @@ const browserShim: RackflowAPI = {
   openReleasePage: async (url) => { window.open(url ?? 'https://github.com/creativedamage/RackFlow/releases/latest', '_blank') },
   onUpdateStatus: () => () => {},
   fetchSpecPage: async () => { throw new Error('The browser preview can’t fetch pages – paste the specs instead.') },
+  storeGet: async (name) => { try { return JSON.parse(localStorage.getItem(`rackflow.${name}`) ?? 'null') } catch { return null } },
+  storeSet: async (name, data) => { try { localStorage.setItem(`rackflow.${name}`, JSON.stringify(data)) } catch { /* private mode */ } },
   getTheme: async () => { try { const t = localStorage.getItem('rackflow.theme'); return t === 'light' || t === 'dark' ? t : 'system' } catch { return 'system' } },
   setTheme: async (t) => { try { localStorage.setItem('rackflow.theme', t) } catch { /* private mode */ } },
   exportAll: async (files) => { for (const f of files) download(f.kind === 'pdf' ? f.name.replace(/\.pdf$/, '.html') : f.name, f.content, f.kind === 'pdf' ? 'text/html' : 'text/csv'); return 'Downloads' },

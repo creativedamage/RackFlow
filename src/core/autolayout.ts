@@ -44,9 +44,12 @@ interface Unit {
   utility: boolean
 }
 
-const COL_GAP = 140       // minimum gap between columns
-const TRACK = 8           // extra gap per wire turning in a column gap
-const ROW_GAP = 36        // vertical gap between blocks in a column
+const COL_GAP = 180       // minimum gap between columns
+/** Wire tracks: distance from a device before the first track, and between parallel tracks. */
+export const WIRE_TRACK_GAP = 26
+export const WIRE_TRACK_SPACING = 12
+const TRACK = 12          // extra gap per wire turning in a column gap
+const ROW_GAP = 48        // vertical gap between blocks in a column
 const MEMBER_GAP = 28     // gap between devices inside a group block
 const GROUP_PAD = 22, GROUP_LABEL = 26 // matches the diagram's group frame
 
@@ -268,7 +271,7 @@ export interface ChannelWire { id: string; sx: number; sy: number; tx: number; t
  * gap get separate tracks; wires going down take tracks right-to-left from the
  * top, wires going up the other way, so wires in one gap never cross.
  */
-export function planChannels(wires: ChannelWire[], gap = 18, spacing = 7): Map<string, number> {
+export function planChannels(wires: ChannelWire[], gap = WIRE_TRACK_GAP, spacing = WIRE_TRACK_SPACING): Map<string, number> {
   const res = new Map<string, number>()
   const buckets = new Map<number, ChannelWire[]>()
   for (const w of wires) {

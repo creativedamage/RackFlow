@@ -6,7 +6,7 @@ import type { EquipmentInstance, NetInfo, PortAddress, PortTemplate, Project } f
 import { cablesAt, resolve } from './project'
 import { SIGNALS } from './signals'
 
-const PASSIVE = new Set(['patchBay', 'wallPlate', 'floorBox'])
+const PASSIVE = new Set(['patchBay', 'wallPlate', 'floorBox', 'connectorPanel'])
 export const MGMT = 'mgmt'
 
 export interface SwitchLink {

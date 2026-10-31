@@ -3,10 +3,10 @@
 export interface Rect { id: string; x0: number; y0: number; x1: number; y1: number }
 export type Pt = { x: number; y: number }
 
-export const WIRE_GAP = 18    // how far a wire leaves a port before turning
-export const WIRE_CLEAR = 10  // keep-out margin around devices
+export const WIRE_GAP = 26    // how far a wire leaves a port before turning
+export const WIRE_CLEAR = 14  // keep-out margin around devices
 const GAP = WIRE_GAP
-const STEP = 8                // search step for a free lane
+const STEP = 12                // search step for a free lane
 const CLEAR = WIRE_CLEAR
 
 const hitsH = (y: number, xa: number, xb: number, r: Rect) => y > r.y0 && y < r.y1 && Math.max(xa, xb) > r.x0 && Math.min(xa, xb) < r.x1
@@ -30,7 +30,7 @@ export function crossings(pts: Pt[], rects: Rect[], ends: Rect[]): number {
 export function route(s: Pt, sDir: number, t: Pt, tDir: number, rects: Rect[], lane: number, channel?: number): Pt[] {
   const ends = rects.filter((r) => (s.x >= r.x0 && s.x <= r.x1 && s.y >= r.y0 && s.y <= r.y1) || (t.x >= r.x0 && t.x <= r.x1 && t.y >= r.y0 && t.y <= r.y1))
   const sx = s.x + sDir * GAP, tx = t.x + tDir * GAP
-  const spread = ((lane % 9) - 4) * 3 // keeps parallel wires from stacking exactly
+  const spread = ((lane % 9) - 4) * 5 // keeps parallel wires from stacking exactly
   const options: Pt[][] = []
   // The planned track for this wire comes first; it's kept unless it runs through a device.
   if (channel != null && sDir === -tDir) {

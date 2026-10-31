@@ -9,7 +9,7 @@ export type MenuCommand =
   | 'new' | 'open' | 'save' | 'saveAs' | 'save-and-close'
   | 'undo' | 'redo' | 'delete' | 'selectAll' | 'zoomFit'
   | 'mode:diagram' | 'mode:rack' | 'mode:patch' | 'mode:sheet' | 'mode:led'
-  | 'newProduct' | 'newTemplate' | 'toggleInspector' | 'editDevice' | 'findDevice' | 'tidy' | 'exportAll' | 'theme:system' | 'theme:light' | 'theme:dark'
+  | 'newProduct' | 'newTemplate' | 'toggleInspector' | 'editDevice' | 'findDevice' | 'tidy' | 'exportAll' | 'numbering' | 'theme:system' | 'theme:light' | 'theme:dark'
 
 export interface AiStatus { hasKey: boolean; model: string; canEncrypt: boolean }
 
@@ -61,6 +61,9 @@ export interface RackflowAPI {
 
   /** Native Save / Don't Save / Cancel sheet before replacing the open project. */
   /** Writes every export file into a new folder the user picks; returns the folder. */
+  /** App-wide saved items (title block templates, numbering standards). */
+  storeGet<T = unknown>(name: 'TitleBlocks' | 'NumberingStandards'): Promise<T | null>
+  storeSet(name: 'TitleBlocks' | 'NumberingStandards', data: unknown): Promise<void>
   getTheme(): Promise<'system' | 'light' | 'dark'>
   setTheme(t: 'system' | 'light' | 'dark'): Promise<void>
   exportAll(files: { name: string; kind: 'pdf' | 'text'; content: string }[], folderName: string): Promise<string | null>

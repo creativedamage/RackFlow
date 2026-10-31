@@ -9,7 +9,8 @@ import { CATEGORIES, type Annotation, type Cable, type EquipmentInstance, type P
 import { DOMAINS } from '../signals'
 import { portDomain } from '../project'
 import { planChannels, type ChannelWire } from '../autolayout'
-import { headerHeight, NODE_WIDTH, nodeGeom, ROW_H, splitPorts } from '../diagramgeom'
+import { headerHeight, NODE_WIDTH, nodeGeom, previewHeight, ROW_H, splitPorts } from '../diagramgeom'
+import { plateInner, withLayout } from '../platelayout'
 import { crossings, route, WIRE_CLEAR, type Pt, type Rect } from '../wireroute'
 import { groupsOf } from '../groups'
 import { newSheet, sheetSize, type SheetOptions } from './sheet'
@@ -99,7 +100,9 @@ export function sideReach(p: Project, e: EquipmentInstance, o: Pick<SchematicOpt
     if (!g || !oe || !op) continue
     // Wire label ("V-0012" / "PB002-VSW001"); stubs add the stub and the flag naming the far end.
     const label = 84
-    const flag = STUB + Math.max(40, textWidth(`${portRef(oe, op)} (SHT AV1099)`, 7.5) + 14)
+    // Single flag, or (bundled with others to the same device) port text + bracket + device-name flag.
+    const flag = Math.max(STUB + Math.max(40, textWidth(`${portRef(oe, op)} (SHT AV1099)`, 7.5) + 14),
+      STUB * 2 + textWidth(op.label, 6.5) + 8 + textWidth(`${oe.tag} · ${oe.product.manufacturer} ${oe.product.model} (SHT AV1099)`, 7.5) + 14)
     const r = o.wires === 'all' ? label : Math.max(label, flag)
     if (g.side === 'left') left = Math.max(left, r); else right = Math.max(right, r)
   }
@@ -242,6 +245,14 @@ function drawDevice(svg: Svg, e: EquipmentInstance, o: SchematicOptions) {
   svg.text(x + NODE_WIDTH / 2, y + 11, maker, { size: 9, anchor: 'middle', maxWidth: NODE_WIDTH - 16 })
   svg.text(x + NODE_WIDTH / 2, y + 23, model, { size: 9.5, anchor: 'middle', maxWidth: NODE_WIDTH - 16 })
   if (e.room?.trim()) svg.text(x + NODE_WIDTH / 2, y + 36, `(${e.room.trim().toUpperCase()})`, { size: 8, anchor: 'middle', fill: '#444', maxWidth: NODE_WIDTH - 16 })
+  // Plate / box / panel face drawing.
+  const ph = previewHeight(e)
+  if (ph && e.product.plate) {
+    const L = withLayout(e.product.plate).layout!
+    const top = y + (e.room?.trim() ? 54 : 40), availH = ph - 8, availW = NODE_WIDTH - 20
+    const k = Math.min(availW / L.w, availH / L.h)
+    svg.raw(`<g transform="translate(${x + (NODE_WIDTH - L.w * k) / 2} ${top + (availH - L.h * k) / 2}) scale(${k})">${plateInner(e.product.plate)}</g>`)
+  }
   svg.line(x, y + h - 4, x + NODE_WIDTH, y + h - 4, { lw: 0.5 })
   const kind = e.product.category === 'other' ? 'DEVICE' : CATEGORIES[e.product.category].name.toUpperCase()
   svg.text(x + NODE_WIDTH / 2, y + boxH - 8, kind, { size: 9, anchor: 'middle', maxWidth: NODE_WIDTH - 16 })
@@ -282,7 +293,8 @@ function drawWires(svg: Svg, p: Project, o: SchematicOptions, eqs: EquipmentInst
     const [s, t] = a.dir > 0 ? [a, b] : [b, a]
     if (s.dir > 0 && t.dir < 0 && t.pt.x > s.pt.x) wires.push({ id: c.id, sx: s.pt.x, sy: s.pt.y, tx: t.pt.x, ty: t.pt.y, sourceRight: s.eq.position.x + NODE_WIDTH + BADGE })
   }
-  const plan = planChannels(wires, 18, 7)
+  const plan = planChannels(wires)
+  const bundles = new Map<string, { here: End; there: End; label: string; tags: string; ref: string; sht: string; stroke: string }[]>()
   for (const c of cables) {
     const a = endOf(p, c.from), b = endOf(p, c.to)
     if (!a || !b) continue
@@ -305,10 +317,28 @@ function drawWires(svg: Svg, p: Project, o: SchematicOptions, eqs: EquipmentInst
       for (const [here, there] of [[a, b], [b, a]] as const) {
         if (!onPage.has(here.eq.id)) continue
         const sheet = sheetOf.get(there.eq.id)
-        const ref = `${portRef(there.eq, there.port)}${sheet && sheet !== page ? ` (SHT ${labels[sheet - 1] ?? sheet})` : ''}`
-        offSheet(svg, here, c.label, tags, ref, stroke)
+        const sht = sheet && sheet !== page ? ` (SHT ${labels[sheet - 1] ?? sheet})` : ''
+        const key = `${here.eq.id}|${here.dir}|${there.eq.id}`
+        bundles.set(key, [...(bundles.get(key) ?? []), { here, there, label: c.label, tags, ref: `${portRef(there.eq, there.port)}${sht}`, sht, stroke }])
       }
     }
+  }
+  // Off-sheet ends: one flag each, or – when several go to the same device – a bracket and one flag naming it.
+  for (const ms of bundles.values()) {
+    if (ms.length < 2) { const m = ms[0]; offSheet(svg, m.here, m.label, m.tags, m.ref, m.stroke); continue }
+    ms.sort((x, y) => x.here.pt.y - y.here.pt.y)
+    const dir = ms[0].here.dir
+    const w = Math.max(...ms.map((m) => textWidth(`${m.there.port.label}`, 6.5))) + 8
+    const bx = ms[0].here.pt.x + dir * (STUB + w)
+    for (const m of ms) {
+      svg.line(m.here.pt.x, m.here.pt.y, bx, m.here.pt.y, { lw: 1, stroke: m.stroke })
+      endLabel(svg, m.here, m.label, m.tags, m.stroke)
+      svg.text(m.here.pt.x + dir * (STUB + 2), m.here.pt.y - 3.5, m.there.port.label.toUpperCase(), { size: 6.5, anchor: dir > 0 ? 'start' : 'end', fill: m.stroke })
+    }
+    const y0 = ms[0].here.pt.y, y1 = ms[ms.length - 1].here.pt.y, ym = (y0 + y1) / 2
+    svg.line(bx, y0, bx, y1, { lw: 1.4 })
+    const there = ms[0].there.eq
+    offSheet(svg, { ...ms[0].here, pt: { x: bx, y: ym } }, '', '', `${there.tag} · ${there.product.manufacturer} ${there.product.model}${ms[0].sht}`.toUpperCase(), '#000')
   }
 }
 

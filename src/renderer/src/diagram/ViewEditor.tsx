@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 import {
-  CATEGORIES, createView, DOMAINS, layoutView, nodeGeom, portInView, viewCandidates, viewMembers, viewsOf,
+  CATEGORIES, createView, DOMAINS, layoutView, nodeGeom, portDomain, viewCandidates, viewMembers, viewPortIds, viewsOf,
   type EquipmentCategory, type SignalDomain,
 } from '@core/index'
 import { useStore } from '../store'
 import { Modal, TextInput, Toggle } from '../components/ui'
 import { openView } from './GroupsPanel'
 
-const INFRA: EquipmentCategory[] = ['wallPlate', 'floorBox', 'patchBay']
+const INFRA: EquipmentCategory[] = ['wallPlate', 'floorBox', 'connectorPanel', 'patchBay']
 
 /**
  * Create / edit a signal view: name, which signal types it shows, and which
@@ -21,6 +21,9 @@ export function ViewEditor({ id, onClose }: { id: string; onClose: () => void })
   const [domains, setDomains] = useState<SignalDomain[]>(existing?.domains ?? ['audio'])
   const [auto, setAuto] = useState(existing?.auto ?? true)
   const [hideUnused, setHideUnused] = useState(existing?.hideUnused ?? false)
+  // Exact port picks per device (device id → port ids); a device without one uses the signal match.
+  const [portPick, setPortPick] = useState<Record<string, string[]>>(existing?.ports ?? {})
+  const [open, setOpen] = useState<string | null>(null)
   // Device choice: null = "everything matching" until the user ticks something.
   const [picked, setPicked] = useState<Set<string> | null>(() => (existing ? new Set(viewMembers(project, existing).map((e) => e.id as string)) : null))
   const cands = useMemo(() => new Set(viewCandidates(project, { domains }).map((e) => e.id as string)), [project, domains])
@@ -38,12 +41,14 @@ export function ViewEditor({ id, onClose }: { id: string; onClose: () => void })
       v.domains = domains
       v.auto = auto
       v.hideUnused = hideUnused || undefined
+      const picks = Object.fromEntries(Object.entries(portPick).filter(([k]) => checked.has(k)))
+      v.ports = Object.keys(picks).length ? picks : undefined
       const c = new Set(viewCandidates(d, v).map((e) => e.id as string))
       v.include = [...checked].filter((x) => !auto || !c.has(x))
       v.exclude = auto ? [...c].filter((x) => !checked.has(x)) : []
       for (const k of Object.keys(v.positions)) if (!checked.has(k)) delete v.positions[k]
       // Port set changed → block sizes changed, so lay the whole view out again.
-      const reshaped = !existing || existing.hideUnused !== v.hideUnused || existing.domains.join() !== domains.join()
+      const reshaped = !existing || existing.hideUnused !== v.hideUnused || existing.domains.join() !== domains.join() || JSON.stringify(existing.ports ?? {}) !== JSON.stringify(v.ports ?? {})
       layoutView(d, v.id, nodeGeom, { onlyNew: !reshaped })
       vid = v.id
     })
@@ -52,14 +57,43 @@ export function ViewEditor({ id, onClose }: { id: string; onClose: () => void })
   }
 
   const row = (e: (typeof sorted)[number]) => {
-    const n = e.product.ports.filter((x) => portInView(x, domains)).length
+    const shown = viewPortIds({ domains, ports: portPick }, e)
+    const n = shown.size
+    const exact = !!portPick[e.id]
+    const setPorts = (ids: Set<string>) => setPortPick({ ...portPick, [e.id]: e.product.ports.filter((x) => ids.has(x.id)).map((x) => x.id) })
     return (
-      <label key={e.id} className={`ve-row ${checked.has(e.id) ? '' : 'off'}`}>
-        <input type="checkbox" checked={checked.has(e.id)} onChange={() => toggle(e.id)} />
-        <b>{e.tag}</b>
-        <span className="ellipsis">{e.product.model} <span className="muted">· {CATEGORIES[e.product.category]?.name}</span></span>
-        <span className="muted small">{n ? `${n} port${n === 1 ? '' : 's'}` : 'no matching ports'}</span>
-      </label>
+      <div key={e.id}>
+        <label className={`ve-row ${checked.has(e.id) ? '' : 'off'}`}>
+          <input type="checkbox" checked={checked.has(e.id)} onChange={() => toggle(e.id)} />
+          <b>{e.tag}</b>
+          <span className="ellipsis">{e.product.model} <span className="muted">· {CATEGORIES[e.product.category]?.name}</span></span>
+          <button className={`link small ${exact ? 've-exact' : ''}`} onClick={(ev) => { ev.preventDefault(); setOpen(open === e.id ? null : e.id) }}
+            title="Choose exactly which ports of this device show in the view">
+            {n ? `${n} of ${e.product.ports.length} ports` : 'no ports'}{exact ? ' (picked)' : ''} {open === e.id ? '▾' : '▸'}
+          </button>
+        </label>
+        {open === e.id && (
+          <div className="ve-ports">
+            <div className="row-gap">
+              <button className="mini" onClick={() => setPorts(new Set(e.product.ports.filter((x) => { const d = portDomain(x); return !!d && domains.includes(d) }).map((x) => x.id)))}>Only {domains.map((d) => DOMAINS[d].name).join(' / ')}</button>
+              <button className="mini" onClick={() => setPorts(new Set(e.product.ports.map((x) => x.id)))}>All</button>
+              <button className="mini" onClick={() => setPorts(new Set())}>None</button>
+              {exact && <button className="mini" onClick={() => { const n2 = { ...portPick }; delete n2[e.id]; setPortPick(n2) }} title="Go back to showing whatever matches the view's signals">Reset</button>}
+            </div>
+            <div className="ve-port-grid">
+              {e.product.ports.map((x) => {
+                const d = portDomain(x)
+                return (
+                  <label key={x.id} className={shown.has(x.id) ? '' : 'off'}>
+                    <input type="checkbox" checked={shown.has(x.id)} onChange={() => { const s2 = new Set(shown); if (s2.has(x.id)) s2.delete(x.id); else s2.add(x.id); setPorts(s2); if (!checked.has(e.id)) toggle(e.id) }} />
+                    <span className="dot" style={{ background: d ? DOMAINS[d].color : '#999' }} />{x.label}
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
     )
   }
 

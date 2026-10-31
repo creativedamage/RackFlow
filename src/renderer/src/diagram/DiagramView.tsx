@@ -184,7 +184,8 @@ export function DiagramView() {
         id: c.id, source: c.from.equipment, sourceHandle: c.from.port, target: c.to.equipment, targetHandle: c.to.port,
         type: 'cable' as const, selected: isSel, zIndex: lifted ? 1000 : 0,
         data: { label: c.label, color, dashed: sev === 'error', lane: lane + shown.cables.indexOf(c), onSelect: () => select([], c.id),
-          mode: wireMode, toText: to ? `${to.equipment.tag} · ${to.port.label}` : undefined, fromText: from ? `${from.equipment.tag} · ${from.port.label}` : undefined },
+          mode: wireMode, toText: to ? `${to.equipment.tag} · ${to.port.label}` : undefined, fromText: from ? `${from.equipment.tag} · ${from.port.label}` : undefined,
+          toPort: to?.port.label, fromPort: from?.port.label, toName: to ? `${to.equipment.tag} · ${to.equipment.product.model}` : undefined, fromName: from ? `${from.equipment.tag} · ${from.equipment.product.model}` : undefined },
       }
     })
   }, [shown, cableSeverity, selectedCable, selection, select, wireMode])
