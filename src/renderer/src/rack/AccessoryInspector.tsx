@@ -1,4 +1,4 @@
-import { ACCESSORY_KEYS, ACCESSORY_KINDS, newId, type LogoAsset, type Rack, type RackAccessory } from '@core/index'
+import { ACCESSORY_KEYS, ACCESSORY_KINDS, canHaveLogo, newId, type LogoAsset, type Rack, type RackAccessory } from '@core/index'
 import { useStore } from '../store'
 import { Field, Select, TextInput } from '../components/ui'
 
@@ -48,13 +48,16 @@ export function AccessoryInspector({ rack, acc }: { rack: Rack; acc: RackAccesso
       <Field label="Type"><Select value={acc.kind} onChange={(k) => upd('Panel Type', (a) => { a.kind = k; if (!ACCESSORY_KINDS[k].heights.includes(a.height)) a.height = ACCESSORY_KINDS[k].heights[0] })} options={ACCESSORY_KEYS.map((k) => ({ value: k, label: ACCESSORY_KINDS[k].name }))} /></Field>
       <Field label="Height"><Select value={acc.height} onChange={(h) => upd('Panel Height', (a) => { a.height = h })} options={meta.heights.map((h) => ({ value: h, label: `${h}U` }))} /></Field>
       <Field label="Label" hint="Text shown on printed elevations"><TextInput value={acc.label ?? ''} placeholder={meta.label || 'none'} onCommit={(v) => upd('Panel Label', (a) => { a.label = v.trim() || undefined })} /></Field>
-      {acc.kind === 'logo' && (<>
+      {canHaveLogo(acc.kind) && (<>
         <h4>Logo</h4>
-        {logo ? <div className={`logo-preview finish-${acc.finish ?? 'black'}`}><img src={logo.dataUrl} alt={logo.name} /></div> : <p className="muted small">No image yet.</p>}
+        {logo ? <div className={`logo-preview finish-${acc.finish ?? 'black'}`}><img src={logo.dataUrl} alt={logo.name} /></div> : <p className="muted small">No logo on this panel. Upload one, or pick one you've already added.</p>}
         <Field label="Image">
           <Select value={acc.logoId ?? ''} onChange={(v) => upd('Panel Logo', (a) => { a.logoId = v || undefined })} options={[{ value: '', label: 'None' }, ...logos.map((l) => ({ value: l.id, label: l.name }))]} />
         </Field>
-        <button onClick={async () => { const id = await uploadLogo(); if (id) upd('Panel Logo', (a) => { a.logoId = id }) }}>Upload Image…</button>
+        <div className="row" style={{ display: 'flex', gap: 6 }}>
+          <button className="primary" onClick={async () => { const id = await uploadLogo(); if (id) upd('Panel Logo', (a) => { a.logoId = id }) }}>Upload Logo…</button>
+          {logo && <button onClick={() => upd('Remove Logo', (a) => { delete a.logoId })}>Remove</button>}
+        </div>
         <Field label="Panel finish"><Select value={acc.finish ?? 'black'} onChange={(v) => upd('Panel Finish', (a) => { a.finish = v })} options={[{ value: 'black', label: 'Black' }, { value: 'white', label: 'White' }, { value: 'silver', label: 'Silver' }]} /></Field>
         <p className="muted small">PNG with a transparent background or SVG works best. The logo is stored in the project file.</p>
       </>)}

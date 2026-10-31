@@ -1,8 +1,9 @@
 import { deviceMenu } from '../product/productActions'
 import { showContextMenu } from '../components/ContextMenu'
 import { useMemo, useState } from 'react'
-import { ACCESSORY_KINDS, accessoryLabel, addAccessory, addRack, fillWithBlanks, RackLayout, type AccessoryKind, type EquipmentId, type Rack, type RackAccessory, type RackFace } from '@core/index'
+import { ACCESSORY_KINDS, accessoryLabel, canHaveLogo, addAccessory, addRack, fillWithBlanks, RackLayout, type AccessoryKind, type EquipmentId, type Rack, type RackAccessory, type RackFace } from '@core/index'
 import { RackPrintDialog } from './RackPrint'
+import { uploadLogo } from './AccessoryInspector'
 import { useStore } from '../store'
 import { DRAG_MIME, type DragPayload } from '../components/Sidebar'
 import { Empty, NumberInput, Segmented, TextInput, Toggle } from '../components/ui'
@@ -226,11 +227,16 @@ function AccessoryItem({ rack, acc, other, selected, style, logo }: { rack: Rack
       onClick={selectMe}
       onKeyDown={(e) => { if (e.key === 'Backspace' || e.key === 'Delete') { e.stopPropagation(); remove() } }}
       onContextMenu={(e) => { selectMe(); showContextMenu(e, [
+        ...(canHaveLogo(acc.kind) ? [
+          { label: acc.logoId ? 'Change Logo…' : 'Add Logo…', onClick: () => void uploadLogo().then((id) => { if (id) apply('Panel Logo', (d) => { const a = d.racks.find((r) => r.id === rack.id)?.accessories.find((x) => x.id === acc.id); if (a) a.logoId = id }) }) },
+          ...(acc.logoId ? [{ label: 'Remove Logo', onClick: () => apply('Remove Logo', (d) => { const a = d.racks.find((r) => r.id === rack.id)?.accessories.find((x) => x.id === acc.id); if (a) delete a.logoId }) }] : []),
+          'sep' as const] : []),
         ...ACCESSORY_KINDS[acc.kind].heights.map((h) => ({ label: `${h}U${h === acc.height ? ' ✓' : ''}`, onClick: () => apply('Panel Height', (d) => { const a = d.racks.find((r) => r.id === rack.id)?.accessories.find((x) => x.id === acc.id); if (a) a.height = h }) })),
         'sep', { label: 'Remove Panel', danger: true, onClick: remove },
       ]) }}
       title={`${ACCESSORY_KINDS[acc.kind].name} ${acc.height}U · drag to move · right-click for options · Delete removes`}>
-      {acc.kind === 'logo' && logo ? <img className="acc-logo" src={logo} alt="" /> : <span className="acc-label">{label || (acc.kind === 'logo' ? 'LOGO PANEL – choose an image' : '')}</span>}
+      {logo && <img className="acc-logo" src={logo} alt="" />}
+      {(!logo || acc.label?.trim()) && <span className="acc-label">{(logo ? acc.label : label) || (acc.kind === 'logo' ? 'LOGO PANEL – choose an image' : '')}</span>}
     </div>
   )
 }

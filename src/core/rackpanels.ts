@@ -13,6 +13,10 @@ export const ACCESSORY_KINDS: Record<AccessoryKind, { name: string; label: strin
 }
 export const ACCESSORY_KEYS = Object.keys(ACCESSORY_KINDS) as AccessoryKind[]
 
+/** Panels that can carry a logo (any flat panel face). */
+export const LOGO_KINDS: AccessoryKind[] = ['blank', 'logo', 'vent', 'drawer']
+export const canHaveLogo = (k: AccessoryKind) => LOGO_KINDS.includes(k)
+
 export const accessoryLabel = (a: RackAccessory) => a.label?.trim() || ACCESSORY_KINDS[a.kind]?.label || a.kind.toUpperCase()
 
 /** Adds a panel at the nearest free position to `start`; returns it, or null if it doesn't fit. */
