@@ -160,7 +160,8 @@ function adapter(c: ConnectorType): { w: number; h: number; svg: string } {
   // Adapter body with the snap-in tabs at each end.
   const body = (w: number, h: number) => rect(-w / 2, -h / 2, w, h, 0.7, 0.35) + rect(-w / 2 + w * 0.3, -h / 2 - 0.7, w * 0.4, 0.7, 0.2, 0.22) + rect(-w / 2 + w * 0.3, h / 2, w * 0.4, 0.7, 0.2, 0.22)
   switch (c) {
-    case 'lcDuplex': return { w: 7, h: 13, svg: body(7, 13) + lcPort(0, -3.1, 'left') + lcPort(0, 3.1, 'left') }
+    // Horizontal, like FS FHD cassettes: 6 duplex adapters (12 LC) per row.
+    case 'lcDuplex': return { w: 13, h: 7, svg: rect(-6.5, -3.5, 13, 7, 0.7, 0.35) + rect(-7.2, -1.4, 0.7, 2.8, 0.2, 0.22) + rect(6.5, -1.4, 0.7, 2.8, 0.2, 0.22) + lcPort(-3.1, 0, 'top') + lcPort(3.1, 0, 'top') }
     case 'scDuplex': return { w: 9.8, h: 25.4, svg: body(9.8, 25.4) + scPort(0, -6.35) + scPort(0, 6.35) }
     case 'mdc': return { w: 4.2, h: 8.6, svg: body(4.2, 8.6) + mdcPort(0, -1.9) + mdcPort(0, 1.9) }
     case 'mpo8': return { w: 7, h: 13, svg: body(7, 13) + mtpPort(0, 0, 8) }
@@ -214,7 +215,7 @@ export function fiberInner(spec: FiberSpec, o: FiberDrawOpts = {}): string {
     if (!m) return
     const a = adapter(m.front.connector)
     const areaW = sw - 10, areaH = sh - textH - 2
-    const perRowMax = Math.max(1, Math.floor((areaW + 1.2) / (a.w + 1.2)))
+    const perRowMax = m.front.connector === 'lcDuplex' ? 6 : Math.max(1, Math.floor((areaW + 1.2) / (a.w + 1.2)))
     const rows = Math.max(1, Math.ceil(m.front.count / perRowMax))
     const per = Math.ceil(m.front.count / rows)
     const scale = Math.min(1, areaH / (rows * a.h + (rows - 1) * 1.5))
