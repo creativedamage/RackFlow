@@ -27,7 +27,7 @@ export function Toolbar() {
         {dirty && <span className="dirty-dot" title="Unsaved changes" />}
         {!isElectron && (
           <span className="file-buttons">
-            <button onClick={newDocument}>New</button>
+            <button onClick={() => void newDocument()}>New</button>
             <button onClick={() => void openDocument()}>Open…</button>
             <button onClick={() => void saveDocument()}>Save</button>
           </span>

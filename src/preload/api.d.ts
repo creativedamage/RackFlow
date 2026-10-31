@@ -59,6 +59,9 @@ export interface RackflowAPI {
   aiSettings(patch: { key?: string | null; model?: string }): Promise<void>
   aiLookup(req: { query: string; url?: string; text?: string }): Promise<{ json: unknown; via: string }>
 
+  /** Native Save / Don't Save / Cancel sheet before replacing the open project. */
+  askSaveChanges(name: string): Promise<'save' | 'discard' | 'cancel'>
+
   onMenu(cb: (cmd: MenuCommand) => void): () => void
   onOpenFile(cb: (file: OpenedFile) => void): () => void
 }

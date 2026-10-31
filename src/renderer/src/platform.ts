@@ -67,6 +67,7 @@ const browserShim: RackflowAPI = {
   openReleasePage: async (url) => { window.open(url ?? 'https://github.com/creativedamage/RackFlow/releases/latest', '_blank') },
   onUpdateStatus: () => () => {},
   fetchSpecPage: async () => { throw new Error('The browser preview can’t fetch pages – paste the specs instead.') },
+  askSaveChanges: async (name) => (confirm(`Save changes to “${name}” first?\n\nOK = Save · Cancel = choose whether to discard`) ? 'save' : confirm('Discard your changes and continue?') ? 'discard' : 'cancel'),
   aiStatus: async () => ({ hasKey: false, model: 'claude-sonnet-4-5', canEncrypt: false }),
   aiSettings: async () => { throw new Error('AI lookup needs the Mac app.') },
   aiLookup: async () => { throw new Error('AI lookup needs the Mac app.') },

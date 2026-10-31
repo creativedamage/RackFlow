@@ -15,6 +15,16 @@ export type Mode = 'diagram' | 'rack' | 'patch' | 'sheet'
 
 interface HistoryEntry { project: Project; label: string }
 
+// The last saved (or opened) document. "Unsaved changes" means different from this,
+// so adding something and deleting it again doesn't count.
+let savedRef: unknown = null
+let savedJson = ''
+function rememberSaved(p: Project) { savedRef = p; savedJson = JSON.stringify(p) }
+export function changedSinceSave(p: Project): boolean {
+  if (p === savedRef) return false
+  return JSON.stringify(p) !== savedJson
+}
+
 export interface AppState {
   project: Project
   path: string | null
@@ -107,30 +117,30 @@ export const useStore = create<AppState>((set, get) => ({
     const prev = get().project
     const next = produce(prev, fn)
     if (next === prev) return
-    set({ project: next, dirty: true, past: [...get().past.slice(-MAX_HISTORY + 1), { project: prev, label }], future: [] })
+    set({ project: next, dirty: changedSinceSave(next), past: [...get().past.slice(-MAX_HISTORY + 1), { project: prev, label }], future: [] })
   },
   amend: (fn) => {
     const prev = get().project
     const next = produce(prev, fn)
-    if (next !== prev) set({ project: next, dirty: true })
+    if (next !== prev) set({ project: next, dirty: changedSinceSave(next) })
   },
   undo: () => {
     const { past, project, future } = get()
     const last = past[past.length - 1]
     if (!last) return
-    set({ project: last.project, past: past.slice(0, -1), future: [{ project, label: last.label }, ...future], dirty: true })
+    set({ project: last.project, past: past.slice(0, -1), future: [{ project, label: last.label }, ...future], dirty: changedSinceSave(last.project) })
   },
   redo: () => {
     const { past, project, future } = get()
     const next = future[0]
     if (!next) return
-    set({ project: next.project, future: future.slice(1), past: [...past, { project, label: next.label }], dirty: true })
+    set({ project: next.project, future: future.slice(1), past: [...past, { project, label: next.label }], dirty: changedSinceSave(next.project) })
   },
-  load: (project, path) => set({
+  load: (project, path) => { rememberSaved(project); set({
     project, path, dirty: false, past: [], future: [], selection: [], selectedCable: null,
     selectedRack: project.racks[0]?.id ?? null, selectedBay: project.patchBays[0]?.id ?? null, fitRequest: get().fitRequest + 1,
-  }),
-  markSaved: (path) => set({ path, dirty: false }),
+  }) },
+  markSaved: (path) => { rememberSaved(get().project); set({ path, dirty: false }) },
   set: (patch) => set(patch),
   select: (ids, cable = null) => set({ selection: ids, selectedCable: cable, selectedAccessory: null }),
   focusIssue: (s) => {
@@ -160,6 +170,8 @@ export const useStore = create<AppState>((set, get) => ({
     setTimeout(() => get().dismissToast(t.id), opts.ms ?? (opts.undo ? 6000 : 3800))
   },
 }))
+rememberSaved(useStore.getState().project)
+
 
 /** Debounced design-rule check (150 ms after the last edit). */
 let auditTimer: ReturnType<typeof setTimeout> | undefined
@@ -191,9 +203,21 @@ export async function saveDocument(saveAs = false): Promise<boolean> {
   return true
 }
 
-export async function openDocument() {
+/**
+ * Before replacing the open project: if it has real unsaved changes, ask
+ * Save / Don't Save / Cancel. Resolves true when it's OK to continue.
+ */
+export async function confirmDiscard(): Promise<boolean> {
   const s = useStore.getState()
-  if (s.dirty && !confirm('Discard unsaved changes to the current project?')) return
+  if (!s.dirty || !changedSinceSave(s.project)) { if (s.dirty) s.set({ dirty: false }); return true }
+  const choice = await api.askSaveChanges(s.project.info.name || 'Untitled Project')
+  if (choice === 'cancel') return false
+  if (choice === 'save') return saveDocument()
+  return true
+}
+
+export async function openDocument() {
+  if (!(await confirmDiscard())) return
   const file = await api.openProject()
   if (file) loadFile(file.path, file.data)
 }
@@ -209,8 +233,7 @@ export function loadFile(path: string, data: string) {
   }
 }
 
-export function newDocument() {
-  const s = useStore.getState()
-  if (s.dirty && !confirm('Discard unsaved changes to the current project?')) return
-  s.load(newProject(), null)
+export async function newDocument() {
+  if (!(await confirmDiscard())) return
+  useStore.getState().load(newProject(), null)
 }

@@ -250,6 +250,15 @@ function registerIPC() {
     }
   })
   ipcMain.on('window:close', () => { allowClose = true; win?.close() })
+  ipcMain.handle('dialog:saveChanges', async (_e, name: string) => {
+    if (!win) return 'discard'
+    const r = await dialog.showMessageBox(win, {
+      type: 'warning', buttons: ['Save', 'Don’t Save', 'Cancel'], defaultId: 0, cancelId: 2,
+      message: `Do you want to save the changes you made to “${name}”?`,
+      detail: 'Your changes will be lost if you don’t save them.',
+    })
+    return r.response === 0 ? 'save' : r.response === 1 ? 'discard' : 'cancel'
+  })
 
   ipcMain.handle('library:products', () => readAll(libDir('Products')))
   ipcMain.handle('library:saveProduct', (_e, p: { key: string }) => writeItem(libDir('Products'), p.key, p))

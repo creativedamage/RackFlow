@@ -7,7 +7,7 @@ import { useEffect } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
 import { newCustomProduct, newCustomTemplate } from '@core/index'
 import { api, isMac } from './platform'
-import { loadFile, newDocument, openDocument, saveDocument, useStore } from './store'
+import { confirmDiscard, loadFile, newDocument, openDocument, saveDocument, useStore } from './store'
 import { Toolbar } from './components/Toolbar'
 import { Sidebar } from './components/Sidebar'
 import { DiagramView } from './diagram/DiagramView'
@@ -60,7 +60,7 @@ export function App() {
   useEffect(() => api.onMenu(async (cmd) => {
     const s = useStore.getState()
     switch (cmd) {
-      case 'new': newDocument(); break
+      case 'new': await newDocument(); break
       case 'open': await openDocument(); break
       case 'save': await saveDocument(); break
       case 'saveAs': await saveDocument(true); break
@@ -102,8 +102,7 @@ export function App() {
   }), [])
 
   useEffect(() => api.onOpenFile((f) => {
-    if (useStore.getState().dirty && !confirm('Discard unsaved changes to the current project?')) return
-    loadFile(f.path, f.data)
+    void confirmDiscard().then((ok) => { if (ok) loadFile(f.path, f.data) })
   }), [])
 
   // The right panel shows only when there's something to inspect (design checks live in the ⚠︎ notifications).

@@ -39,6 +39,8 @@ const api: RackflowAPI = {
   aiSettings: (patch) => ipcRenderer.invoke('ai:settings', patch),
   aiLookup: (req) => ipcRenderer.invoke('ai:lookup', req),
 
+  askSaveChanges: (name) => ipcRenderer.invoke('dialog:saveChanges', name),
+
   onMenu: (cb) => on<MenuCommand>('menu', cb),
   onOpenFile: (cb) => on<OpenedFile>('open-file', cb),
 }
