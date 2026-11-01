@@ -155,7 +155,7 @@ export function App() {
 
   return (
     <ReactFlowProvider>
-      <div key={units} className={`app ${isMac ? 'mac' : ''} ${rightPanel ? '' : 'no-inspector'} mode-${mode}`} style={{ ['--insp-w' as string]: `${inspW}px`, ['--tp-w' as string]: `${tpW}px` }}>
+      <div key={units} className={`app ${isMac ? 'mac' : ''} ${rightPanel && mode !== 'diagram' ? '' : 'no-inspector'} ${rightPanel && mode === 'diagram' ? 'insp-float' : ''} mode-${mode}`} style={{ ['--insp-w' as string]: `${inspW}px`, ['--tp-w' as string]: `${tpW}px` }}>
         <Toolbar />
         {mode !== 'sheet' && mode !== 'led' && <Sidebar />}
         <main className="canvas-area">
