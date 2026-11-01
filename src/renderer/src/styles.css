@@ -1078,3 +1078,11 @@ input.mono { font-family: var(--mono); }
 .fb-slots td { padding: 3px 6px; border-bottom: 1px solid var(--line-2); }
 .fb-slots tr.on td { background: var(--accent-soft); }
 .fb-slots input { width: 100%; font-family: var(--mono); text-transform: uppercase; }
+
+/* Pull schedule */
+.pull-check { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border: 1.5px solid var(--text-3); border-radius: 4px; font-size: 11px; font-weight: 700; line-height: 1; color: #fff; }
+.pull-check.on { background: #2f9e44; border-color: #2f9e44; }
+.pull-progress { color: var(--text-2); white-space: nowrap; }
+.pull-progress b { color: var(--text); }
+.xsheet-row.done { color: var(--text-2); }
+.xsheet-row.unwired { color: var(--text-3); }

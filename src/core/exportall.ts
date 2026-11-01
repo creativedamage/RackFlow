@@ -8,16 +8,18 @@ import { ledSheets, defaultLedPrint } from './drawing/ledmap'
 import { sheetsToHTML, sheetSize } from './drawing/sheet'
 import { defaultPrintOptions, layoutLabels, pagesToPrintHTML } from './patchbay/layout'
 import { cablesToCSV } from './schedule'
+import { pullScheduleCSV } from './pullschedule'
 import { networkRows, rowSwitch, rowSwitchPort } from './network'
 import { CATEGORIES } from './model'
 
-export type ExportPart = 'wiring' | 'racks' | 'labels' | 'led' | 'cables' | 'equipment' | 'network'
+export type ExportPart = 'wiring' | 'racks' | 'labels' | 'led' | 'cables' | 'pull' | 'equipment' | 'network'
 export const EXPORT_PARTS: { key: ExportPart; name: string; file: string }[] = [
   { key: 'wiring', name: 'Wiring diagram (every page)', file: 'Wiring Diagram.pdf' },
   { key: 'racks', name: 'Rack elevations (front & rear)', file: 'Rack Elevations.pdf' },
   { key: 'labels', name: 'Patch bay labels', file: 'Patch Labels.pdf' },
   { key: 'led', name: 'LED wall maps (data & power)', file: 'LED Wall Maps.pdf' },
   { key: 'cables', name: 'Cable schedule (CSV)', file: 'Cable Schedule.csv' },
+  { key: 'pull', name: 'Pull schedule (CSV, incl. unwired ports)', file: 'Pull Schedule.csv' },
   { key: 'equipment', name: 'Equipment list (CSV)', file: 'Equipment List.csv' },
   { key: 'network', name: 'Network / IP schedule (CSV)', file: 'Network Schedule.csv' },
 ]
@@ -50,6 +52,7 @@ export function buildExport(p: Project, parts: ExportPart[], sheet = 'ansiB'): E
     if (pages.length) out.push({ name: name('led'), kind: 'pdf', content: sheetsToHTML(pages, sheetSize(o)), count: pages.length })
   }
   if (parts.includes('cables') && p.cables.length) out.push({ name: name('cables'), kind: 'text', content: cablesToCSV(p), count: p.cables.length })
+  if (parts.includes('pull') && p.equipment.length) out.push({ name: name('pull'), kind: 'text', content: pullScheduleCSV(p, { unwired: true }), count: p.cables.length })
   if (parts.includes('equipment') && p.equipment.length) {
     const page = (id?: string) => p.groups?.find((g) => g.id === id)?.name ?? ''
     out.push({ name: name('equipment'), kind: 'text', count: p.equipment.length, content: csv([

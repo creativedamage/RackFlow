@@ -269,7 +269,10 @@ export interface Cable {
   specKey: string | null
   lengthMeters: number | null
   notes: string
+  /** Pull schedule: the route it takes and install progress. */
+  pull?: CablePull
 }
+export interface CablePull { pathway?: string; pulled?: boolean; terminated?: boolean; tested?: boolean }
 
 export type RackFace = 'front' | 'rear'
 
