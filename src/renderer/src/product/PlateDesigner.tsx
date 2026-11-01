@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { produce } from 'immer'
-import { BUILT_IN_KEYS, footprint, makePlateProduct, newPlateText, nextPid, PLATE_MODULE_KEYS, PLATE_MODULES, PLATE_SIZES, PLATE_STYLE_LIST, plateInner, withLayout, autoArrange, type PlateInsert, type PlateKind, type PlateLayout, type PlateSpec, type ProductDefinition, imperial, fmtLen, fmtLenPair, refreshBoxPorts } from '@core/index'
+import { BUILT_IN_KEYS, footprint, makePlateProduct, newPlateText, nextPid, PLATE_MODULE_KEYS, PLATE_MODULES, PLATE_SIZES, PLATE_STYLE_LIST, plateInner, withLayout, autoArrange, type PlateInsert, type PlateKind, type PlateLayout, type PlateSpec, type ProductDefinition, imperial, fmtLen, fmtLenPair, refreshBoxPorts, withoutPortNumbers } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
 import { addProductToDiagram } from '../diagram/placement'
@@ -239,7 +239,7 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
   const saveLibrary = async (place: boolean) => {
     setSaving(true)
     try {
-      const p = { ...product, source: 'user' as const, revision: initial.revision + 1 }
+      const p = { ...(instance ? withoutPortNumbers(instance, product) : product), source: 'user' as const, revision: initial.revision + 1 }
       await api.saveUserProduct(p)
       await useStore.getState().reloadLibrary()
       const n = applyToPlaced(p)

@@ -24,8 +24,7 @@ export function openProductEditor(p: ProductDefinition, instanceId: string | nul
 /** Edits a placed device by id (diagram double-click, ⌘E, context menus). */
 export function editPlacedDevice(id: string) {
   const eq = useStore.getState().project.equipment.find((e) => e.id === id)
-  // Box port numbers live on the placed device, not the product: edit the plain jack names.
-  if (eq) openProductEditor(eq.portBaseLabels ? { ...eq.product, ports: eq.product.ports.map((x) => (eq.portBaseLabels![x.id] != null ? { ...x, label: eq.portBaseLabels![x.id] } : x)) } : eq.product, eq.id)
+  if (eq) openProductEditor(eq.product, eq.id)
 }
 
 /** ⌘E: edit the single selected device. */

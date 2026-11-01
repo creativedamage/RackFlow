@@ -75,21 +75,6 @@ const nat = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: t
 /** Boxes in numbering order: by tag (WP-001, WP-002 …). */
 const boxesInOrder = (p: Project) => p.equipment.filter(isBox).sort((a, b) => nat(a.tag, b.tag))
 
-/** The jack's own name from the box designer (kept after the number), e.g. "Podium". */
-function customName(e: EquipmentInstance, frontId: string): string | undefined {
-  // Same id scheme as platePorts(): an insert's own pid, else module.n.
-  const used = new Map<string, number>()
-  for (const ins of e.product.plate?.inserts ?? []) {
-    for (let i = 0; i < Math.max(1, ins.count); i++) {
-      const n = (used.get(ins.module) ?? 0) + 1
-      used.set(ins.module, n)
-      const id = ins.pid && ins.count === 1 ? ins.pid : `${ins.module}.${n}`
-      if (`${id}.f` === frontId) return ins.label?.trim() || undefined
-    }
-  }
-  return undefined
-}
-
 /** Writes each numbered port's label (and its rear tie line's) from `portNumbers`. */
 export function applyPortLabels(e: EquipmentInstance) {
   const nums = e.portNumbers ?? {}
@@ -103,9 +88,23 @@ export function applyPortLabels(e: EquipmentInstance) {
       continue
     }
     if (base == null) e.portBaseLabels[port.id] = port.label
-    const own = customName(e, frontId)
-    const front = own ? `${num} ${own}` : num
-    port.label = port.face === 'rear' ? `${front} (rear)` : front
+    // One name per jack: the number replaces whatever the jack was called.
+    port.label = port.face === 'rear' ? `${num} (rear)` : num
+  }
+  // The panel itself (designer, face drawing, engraving) carries the same name.
+  if (e.product.plate) {
+    const spec = explodeInserts(e.product.plate)
+    for (const ins of spec.inserts) {
+      const key = `plate:${ins.pid}`, num = nums[`${ins.pid}.f`]
+      if (num) {
+        if (!(key in e.portBaseLabels)) e.portBaseLabels[key] = ins.label ?? ''
+        ins.label = num
+      } else if (key in e.portBaseLabels) {
+        ins.label = e.portBaseLabels[key] || undefined
+        delete e.portBaseLabels[key]
+      }
+    }
+    e.product.plate = spec
   }
   if (!Object.keys(e.portBaseLabels).length) delete e.portBaseLabels
 }
@@ -151,7 +150,9 @@ export function numberBoxPorts(p: Project, opts: { all?: boolean; ids?: string[]
 
 /** After a box's product is rebuilt (designer edit): keep numbers of ports that still exist, number new ones. */
 export function refreshBoxPorts(p: Project, e: EquipmentInstance) {
-  e.portBaseLabels = undefined
+  // The rebuilt product brings fresh port labels; keep the panel's original jack names for "turn numbering off".
+  const keep = Object.entries(e.portBaseLabels ?? {}).filter(([k]) => k.startsWith('plate:'))
+  e.portBaseLabels = keep.length ? Object.fromEntries(keep) : undefined
   if (e.portNumbers) {
     const ids = new Set(e.product.ports.map((x) => x.id))
     e.portNumbers = Object.fromEntries(Object.entries(e.portNumbers).filter(([k]) => ids.has(k)))
@@ -174,20 +175,20 @@ export function duplicatePortNumbers(p: Project): { number: string; where: { eq:
   return [...m.entries()].filter(([, w]) => w.length > 1).map(([number, where]) => ({ number, where }))
 }
 
-const faceCache = new WeakMap<EquipmentInstance, ProductDefinition>()
-/** The device's product with its box port numbers written on the face drawing's jack labels. */
-export function faceProduct(e: EquipmentInstance): ProductDefinition {
-  if (!e.portNumbers || !e.product.plate) return e.product
-  const hit = faceCache.get(e)
-  if (hit) return hit
-  const spec = explodeInserts(e.product.plate)
-  const nums = e.portNumbers
-  const out: ProductDefinition = { ...e.product, plate: { ...spec, inserts: spec.inserts.map((ins) => {
-    const num = nums[`${ins.pid}.f`]
-    if (!num) return ins
-    const own = customName(e, `${ins.pid}.f`)
-    return { ...ins, label: own ? `${num} ${own}` : num }
-  }) } }
-  if (Object.isFrozen(e)) faceCache.set(e, out)
-  return out
+/** The product as drawn on faces – box numbers are written into the plate itself, so this is just the product. */
+export const faceProduct = (e: EquipmentInstance): ProductDefinition => e.product
+
+/**
+ * A placed box's product with its project port numbers taken back out – what
+ * goes into the library, so other projects don't inherit this one's numbers.
+ */
+export function withoutPortNumbers(e: EquipmentInstance, prod: ProductDefinition): ProductDefinition {
+  const base = e.portBaseLabels ?? {}, nums = e.portNumbers ?? {}
+  if (!Object.keys(nums).length) return prod
+  const frontOf = (id: string) => id.replace(/\.r$/, '.f')
+  return {
+    ...prod,
+    ports: prod.ports.map((x) => (nums[frontOf(x.id)] && base[x.id] != null && x.label.startsWith(nums[frontOf(x.id)]) ? { ...x, label: base[x.id] } : x)),
+    plate: prod.plate && { ...prod.plate, inserts: prod.plate.inserts.map((ins) => (ins.pid && nums[`${ins.pid}.f`] === ins.label && `plate:${ins.pid}` in base ? { ...ins, label: base[`plate:${ins.pid}`] || undefined } : ins)) },
+  }
 }
