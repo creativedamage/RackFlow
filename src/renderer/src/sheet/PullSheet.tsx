@@ -6,6 +6,7 @@ import {
 import { useStore } from '../store'
 import { Select } from '../components/ui'
 import { Sheet, type SheetColumn } from './Sheet'
+import { CableLabelsDialog } from './CableLabelsDialog'
 
 type Stage = '' | 'notPulled' | 'notTerminated' | 'notTested' | 'done' | 'unwired'
 const YES = /^(y|yes|x|✓|✔|true|1|done)$/i
@@ -22,6 +23,8 @@ export function PullSheet() {
   const [system, setSystem] = useState<SignalDomain | ''>('')
   const [stage, setStage] = useState<Stage>('')
   const [unwired, setUnwired] = useState(true)
+  const [picked, setPicked] = useState<PullRow[]>([])
+  const [labels, setLabels] = useState(false)
 
   const all = useMemo(() => pullRows(project, { unwired }), [project, unwired])
   const cables = all.filter((r) => r.cable)
@@ -150,12 +153,15 @@ export function PullSheet() {
           <b>{cables.length}</b> pulls · <b>{done('pulled')}</b> pulled · <b>{done('terminated')}</b> terminated · <b>{done('tested')}</b> tested
         </span>
         <span className="spacer" />
-        <button disabled={!rows.length} onClick={print} title="Print or save as PDF (tabloid landscape) – the rows shown">Print…</button>
+        <button disabled={!rows.some((r) => r.cable)} onClick={() => setLabels(true)} title="Wrap-around cable labels for the selected rows (or every row shown)">Print Labels…</button>
+        <button disabled={!rows.length} onClick={print} title="Print or save as PDF (tabloid landscape) – the rows shown">Print Schedule…</button>
         <button disabled={!all.length} onClick={download}>Export CSV</button>
       </div>
-      <Sheet rows={rows} columns={columns} rowKey={(r) => r.key} commit={commit}
+      <Sheet rows={rows} columns={columns} rowKey={(r) => r.key} commit={commit} onSelectionChange={setPicked}
         rowClass={(r) => (r.cable ? (pullDone(r, 'pulled') && pullDone(r, 'terminated') && pullDone(r, 'tested') ? 'done' : '') : 'unwired')}
         emptyText="No cables yet. Wire devices on the Wiring Diagram and they appear here." />
+      {labels && <CableLabelsDialog project={name} onClose={() => setLabels(false)}
+        rows={picked.filter((r) => r.cable).length > 1 ? picked : rows} scope={picked.filter((r) => r.cable).length > 1 ? 'selected rows' : q || system || stage ? 'filtered rows' : 'all'} />}
     </>
   )
 }
