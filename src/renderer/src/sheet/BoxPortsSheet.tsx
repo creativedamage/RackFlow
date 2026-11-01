@@ -42,7 +42,9 @@ export function BoxPortsSheet() {
     { key: 'number', title: 'Number', width: 90, get: (r) => r.number, set: () => { /* commit */ },
       render: (r) => <span className={r.duplicate ? 'bp-dup' : ''} title={r.duplicate ? 'Used by another jack too' : undefined}>{r.number || <span className="muted">—</span>}</span> },
     { key: 'locked', title: 'Locked', width: 80, align: 'center', get: (r) => (r.locked ? '✓' : ''), set: () => { /* commit */ },
-      render: (r) => (r.number ? <span className={`pull-check ${r.locked ? 'on' : ''}`} title={r.locked ? 'Set by hand – Renumber keeps it' : 'Automatic – Renumber may change it'}>{r.locked ? '✓' : ''}</span> : null) },
+      render: (r) => (r.number ? <span className={`pull-check bp-lock ${r.locked ? 'on' : ''}`} title={r.locked ? 'Locked – Renumber keeps it. Click to unlock.' : 'Automatic – Renumber may change it. Click to lock.'}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); useStore.getState().apply(r.locked ? 'Unlock Port Number' : 'Lock Port Number', (d) => setPortLock(d, r.eq.id, r.port.id, !r.locked)) }}>{r.locked ? '✓' : ''}</span> : null) },
     { key: 'front', title: 'Plugged in front', width: 170, get: (r) => r.front },
     { key: 'rear', title: 'Tie line to', width: 170, get: (r) => r.rear },
     { key: 'multipin', title: 'Multipin', width: 120, get: (r) => r.multipin },
@@ -80,8 +82,13 @@ export function BoxPortsSheet() {
               <button className="primary" disabled={!series.trim()} onClick={() => fillRun(series)}>Fill</button>
               <button onClick={() => setSeries(null)}>Cancel</button>
             </span>}
-        <button disabled={!on} onClick={() => { let n = 0; apply('Renumber Box Ports', (d) => { n = numberBoxPorts(d, { all: true }) }); notify(`Renumbered ${n} jacks – locked numbers kept`, { undo: true, kind: 'success' }) }}
-          title="Number every unlocked jack again, box by box in tag order, around the locked ones">Renumber Unlocked</button>
+        <button disabled={!on} onClick={() => {
+          let n = 0
+          apply('Renumber Box Ports', (d) => { n = numberBoxPorts(d, { all: true }) })
+          const locked = all.filter((r) => r.locked).length
+          notify(n ? `Renumbered ${n} jack${n === 1 ? '' : 's'} around ${locked} locked number${locked === 1 ? '' : 's'}` : locked ? 'Already in order – the unlocked jacks already follow your locked numbers' : 'Already in order – lock a number (type it in) and the jacks after it follow on from it', { undo: n > 0, kind: n ? 'success' : 'info' })
+        }}
+          title="Number every unlocked jack again, box by box in tag order. Jacks after a locked number carry on from it (lock M17 → the next ones become M18, M19…)">Renumber Unlocked</button>
         <button onClick={() => useStore.getState().set({ editingNumbering: true })} title="Prefixes (M, L, D…), digits and start for each jack type">Numbering Standards…</button>
       </div>
       {!on && (

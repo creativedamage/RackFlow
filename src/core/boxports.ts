@@ -68,6 +68,14 @@ export function portRule(p: Project, c: PortClass): PortRule {
 
 export const formatPortNumber = (r: PortRule, n: number) => `${r.prefix}${r.prefix ? r.separator : ''}${String(n).padStart(Math.max(1, r.digits), '0')}`
 
+/** The number part of "M17" for a rule with prefix M (null when it doesn't follow the rule). */
+function seqNumber(r: PortRule, num: string): number | null {
+  const pre = r.prefix ? r.prefix + r.separator : ''
+  if (!num.startsWith(pre)) return null
+  const rest = num.slice(pre.length)
+  return /^\d+$/.test(rest) ? parseInt(rest, 10) : null
+}
+
 /** Sequence key: same prefix + separator = same sequence (so "M" can cover mic and line). */
 const seqKey = (r: PortRule) => `${r.prefix}\u0000${r.separator}`
 
@@ -114,7 +122,8 @@ export function applyPortLabels(e: EquipmentInstance) {
 /**
  * Numbers box ports. `all`: renumber every box from the start, box by box in
  * tag order. Otherwise only ports without a number get the next free one.
- * Returns how many ports were (re)numbered.
+ * Returns how many ports got a different number. When renumbering everything,
+ * locked numbers stay and the unlocked jacks after one carry on from it.
  */
 export function numberBoxPorts(p: Project, opts: { all?: boolean; ids?: string[] } = {}): number {
   if (!boxNumberingOf(p).on) return 0
@@ -138,12 +147,18 @@ export function numberBoxPorts(p: Project, opts: { all?: boolean; ids?: string[]
       if (!c) continue
       const r = portRule(p, c)
       if (r.off) { delete next[port.id]; continue }
-      if (next[port.id]) continue
-      const k = seqKey(r), u = useOf(k)
+      const k = seqKey(r)
+      if (next[port.id]) {
+        // A number you set by hand: the jacks after it carry on from it (M17 → M18, M19…).
+        if (opts.all) { const v = seqNumber(r, next[port.id]); if (v != null) counter.set(k, v + 1) }
+        continue
+      }
+      const u = useOf(k)
       let i = counter.get(k) ?? r.start, t: string
       do { t = formatPortNumber(r, i++) } while (u.has(t))
       counter.set(k, i)
-      u.add(t); next[port.id] = t; n++
+      u.add(t); next[port.id] = t
+      if (e.portNumbers?.[port.id] !== t) n++
     }
     e.portNumbers = Object.keys(next).length ? next : undefined
     applyPortLabels(e)

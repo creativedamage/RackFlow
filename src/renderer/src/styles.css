@@ -1131,3 +1131,4 @@ input.mono { font-family: var(--mono); }
 .bp-dup { color: #c92a2a; font-weight: 600; }
 .bp-off { margin: 6px 12px 0; padding: 7px 12px; border-radius: 8px; background: var(--accent-soft); font-size: 12px; }
 .bp-off .link { margin: 0 4px; }
+.bp-lock { cursor: pointer; }

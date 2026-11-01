@@ -77,3 +77,16 @@ describe('box ports schedule', () => {
     expect(boxPortRows(p)[0]).toMatchObject({ number: '', locked: false })
   })
 })
+
+describe('renumber around locked numbers', () => {
+  it('jacks after a locked number carry on from it, and a second renumber changes nothing', () => {
+    const p = newProject(); on(p)
+    const a = addEquipment(p, plate(4), { x: 0, y: 0 }), b = addEquipment(p, plate(4), { x: 0, y: 400 })
+    const first = b.product.ports.find((x) => x.face === 'front' && x.connector === 'xlr3')!
+    setPortNumber(p, b.id, first.id, 'M17')
+    expect(numberBoxPorts(p, { all: true })).toBeGreaterThan(0)
+    expect(labels(a).slice(0, 4)).toEqual(['M1', 'M2', 'M3', 'M4'])
+    expect(labels(b).slice(0, 4)).toEqual(['M17', 'M18', 'M19', 'M20'])
+    expect(numberBoxPorts(p, { all: true })).toBe(0)
+  })
+})
