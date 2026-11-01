@@ -80,3 +80,25 @@ describe('signal views – exact ports', () => {
     expect(viewProject(p, v).equipment[0].product.ports.map((x) => x.id).sort()).toEqual([lo1, dante].sort())
   })
 })
+
+import { duplicateView as dupView, viewsOf } from './index'
+describe('duplicate view', () => {
+  it('copies devices, ports, layout and notes under a new name, right after the original', () => {
+    const p = newProject()
+    const v = createView(p, { name: 'Audio', domains: ['audio'] })
+    v.positions = { x1: { x: 10, y: 20 } }
+    v.ports = { x1: ['a'] }
+    v.number = 'AV201'
+    createView(p, { name: 'Video', domains: ['video'] })
+    p.annotations = [{ id: 'n1', kind: 'note', x: 0, y: 0, text: 'hi', page: v.id } as never]
+    const c = dupView(p, v.id)!
+    expect(viewsOf(p).map((x) => x.name)).toEqual(['Audio', 'Audio (copy)', 'Video'])
+    expect(c.id).not.toBe(v.id)
+    expect(c.number).toBeUndefined()
+    expect(c.positions).toEqual(v.positions)
+    c.ports!.x1.push('b')
+    expect(v.ports!.x1).toEqual(['a'])
+    expect(p.annotations!.filter((a) => a.page === c.id)).toHaveLength(1)
+    expect(dupView(p, v.id)!.name).toBe('Audio (copy 2)')
+  })
+})

@@ -140,7 +140,7 @@ export const DeviceNode = memo(function DeviceNode({ data, selected }: NodeProps
           <span className="dn-sec-name" style={{ color }}>{s.name}</span>
           {s.collapsed && <span className="dn-sec-count">{s.ports.length} port{s.ports.length === 1 ? '' : 's'}</span>}
         </div>
-        {s.faces && !s.collapsed && <div className="dn-faces" style={{ height: FACE_H }}><span>Front</span><span>Rear</span></div>}
+        {s.faces && !s.collapsed && <div className="dn-faces" style={{ height: FACE_H }}><span>{s.heads?.[0] ?? 'Front'}</span><span>{s.heads?.[1] ?? 'Rear'}</span></div>}
       </div>
     )
   }

@@ -165,6 +165,28 @@ export function createView(p: Project, init: Partial<SignalView> & { name: strin
   return v
 }
 
+/**
+ * Copies a view – its signals, devices, picked ports, card sizes, layout and
+ * notes – as "Name (copy)", placed right after the original. The copy gets
+ * its own sheet number later (none at first).
+ */
+export function duplicateView(p: Project, id: string): SignalView | null {
+  const all = viewsOf(p)
+  const src = all.find((v) => v.id === id)
+  if (!src) return null
+  const names = new Set(all.map((v) => v.name))
+  let name = `${src.name} (copy)`
+  for (let i = 2; names.has(name); i++) name = `${src.name} (copy ${i})`
+  // JSON copy: works on Immer drafts too (structuredClone can't copy a draft).
+  const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x))
+  const v: SignalView = { ...clone(src), id: newId(), name, number: undefined }
+  const at = all.indexOf(src)
+  p.views = [...all.slice(0, at + 1), v, ...all.slice(at + 1)]
+  const notes = (p.annotations ?? []).filter((a) => a.page === id).map((a) => ({ ...clone(a), id: newId(), page: v.id }))
+  if (notes.length) p.annotations = [...(p.annotations ?? []), ...notes]
+  return v
+}
+
 export function deleteView(p: Project, id: string) {
   p.views = viewsOf(p).filter((v) => v.id !== id)
   p.annotations = (p.annotations ?? []).filter((a) => a.page !== id)

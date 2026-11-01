@@ -3,6 +3,7 @@
 // free text anywhere – drawn to scale (millimetres). The same drawing is used
 // in the designer, as the preview on the wiring-diagram card and in print.
 
+import { summarizeLabels, tiedTo } from './multipin'
 import type { PlateInsert, PlateKind, PlateLayout, PlateSpec, PlateText, ProductDefinition } from './model'
 import { fiberFaceSize, fiberInner, lcPort } from './fiber'
 import { PLATE_MODULES } from './plates'
@@ -360,7 +361,13 @@ export function plateInner(spec0: PlateSpec, o: PlateDrawOpts = {}): string {
     for (let x = g * 5; x < L.w; x += g * 5) for (let y = g * 5; y < L.h; y += g * 5) dots.push(`M ${n(x)} ${n(y)} h 0.01`)
     out.push(`<path d="${dots.join(' ')}" stroke="currentColor" stroke-opacity="0.2" stroke-width="0.7" stroke-linecap="round"/>`)
   }
-  // Jacks + labels.
+  // Jacks + labels. Names first, so a multipin can list the jacks tied to it.
+  const names = new Map<string, string>()
+  { const c = new Map<string, number>()
+    for (const ins of spec.inserts) {
+      const k = (c.get(ins.module) ?? 0) + 1; c.set(ins.module, k)
+      if (ins.pid) names.set(ins.pid, (ins.label?.trim() || `${shortModule(ins.module)}${k > 1 || spec.inserts.filter((x) => x.module === ins.module).length > 1 ? ` ${k}` : ''}`).toUpperCase())
+    } }
   const counts = new Map<string, number>()
   for (const ins of spec.inserts) {
     if (!ins.pid) continue
@@ -377,6 +384,11 @@ export function plateInner(spec0: PlateSpec, o: PlateDrawOpts = {}): string {
       const text = (ins.label?.trim() || `${shortModule(ins.module)}${k > 1 || spec.inserts.filter((x) => x.module === ins.module).length > 1 ? ` ${k}` : ''}`).toUpperCase()
       const ly = L.labelPos === 'above' ? at.y - f.h / 2 - 2.2 : at.y + f.h / 2 + 3.6
       out.push(`<text x="${n(at.x)}" y="${n(ly)}" font-family="Helvetica, Arial, sans-serif" font-size="2.8" font-weight="bold" text-anchor="middle" fill="currentColor">${esc(text)}</text>`)
+      // Multipin: which channels it carries ("M1-8, RET 1-4").
+      const sum = summarizeLabels(tiedTo(spec, ins.pid).map((j) => names.get(j.pid!) ?? ''))
+      if (sum) out.push(`<text x="${n(at.x)}" y="${n(L.labelPos === 'above' ? ly - 3.2 : ly + 3.2)}" font-family="Helvetica, Arial, sans-serif" font-size="2.4" text-anchor="middle" fill="currentColor">${esc(sum)}</text>`)
+      // Tied jacks show which multipin they ride on.
+      if (o.interactive && ins.tie) out.push(`<text x="${n(at.x + f.w / 2 - 1)}" y="${n(at.y - f.h / 2 + 3)}" font-family="Helvetica, Arial, sans-serif" font-size="2" text-anchor="end" fill="#0a84ff">⇢ ${esc(names.get(ins.tie) ?? '')}</text>`)
     }
   }
   // Free text.

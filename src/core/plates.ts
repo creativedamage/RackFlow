@@ -3,6 +3,7 @@
 // in the room) and a rear termination (the tie line back to the rack).
 
 import { makeFiberProduct } from './fiber'
+import { applyTies, tiedMultipins } from './multipin'
 import { newId, type PlateInsert, type PlateKind, type PlateSpec, type PortTemplate, type ProductDefinition } from './model'
 import type { ConnectorType, Gender, SignalType } from './signals'
 
@@ -76,6 +77,8 @@ const REAR_NAME: Record<Exclude<PlateInsert['rear'], 'same' | 'none'>, Connector
 export function platePorts(spec: PlateSpec): PortTemplate[] {
   const ports: PortTemplate[] = []
   const used = new Map<string, number>()
+  // Jacks tied to a multipin – and the multipin itself – have no tie line of their own.
+  const mps = tiedMultipins(spec)
   for (const ins of spec.inserts) {
     const m = PLATE_MODULES[ins.module]
     if (!m) continue
@@ -83,7 +86,9 @@ export function platePorts(spec: PlateSpec): PortTemplate[] {
       const n = (used.get(ins.module) ?? 0) + 1
       used.set(ins.module, n)
       const base = ins.label?.trim() || shortName(m)
-      const label = ins.label?.trim() && ins.count === 1 ? base : ins.count > 1 || n > 1 ? `${base} ${n}` : base
+      // Number default names whenever the box has more than one of that jack ("XLR-3 Female 1", "… 2").
+      const several = spec.inserts.reduce((t, x) => t + (x.module === ins.module ? Math.max(1, x.count) : 0), 0) > 1
+      const label = ins.label?.trim() && ins.count === 1 ? base : ins.count > 1 || n > 1 || several ? `${base} ${n}` : base
       const id = ins.pid && ins.count === 1 ? ins.pid : `${ins.module}.${n}`
       if (m.power) {
         ports.push({ id: `${id}.out`, label, connector: m.connector, gender: m.gender, direction: 'output', signals: [...m.signals], group: 'Power',
@@ -91,7 +96,7 @@ export function platePorts(spec: PlateSpec): PortTemplate[] {
         continue
       }
       ports.push({ id: `${id}.f`, label, connector: m.connector, gender: m.gender, direction: 'bidirectional', signals: [...m.signals], group: m.group, face: 'front', maxConnections: 1 })
-      if (ins.rear !== 'none') {
+      if (ins.rear !== 'none' && !ins.tie && !(ins.pid && mps.has(ins.pid))) {
         const rc = ins.rear === 'same' ? m.connector : REAR_NAME[ins.rear]
         ports.push({ id: `${id}.r`, label: `${label} (rear)`, connector: rc, gender: ins.rear === 'same' ? m.gender === 'male' ? 'male' : 'female' : 'female',
           direction: 'bidirectional', signals: [...m.signals], group: m.group, face: 'rear', maxConnections: 1 })
@@ -113,7 +118,7 @@ export function plateSummary(spec: PlateSpec): string {
 /** Builds (or rebuilds) the product for a plate spec. */
 export function makePlateProduct(spec: PlateSpec, meta: { key?: string; manufacturer?: string; model: string }): ProductDefinition {
   const hasPower = spec.inserts.some((i) => PLATE_MODULES[i.module]?.power)
-  return {
+  const prod: ProductDefinition = {
     key: meta.key ?? `user.plate.${newId()}`,
     manufacturer: meta.manufacturer?.trim() || 'Custom',
     model: meta.model.trim() || ({ wallBox: 'Wall Box', floorBox: 'Floor Box', rackPanel: 'Connector Panel', wallPlate: 'Wall Plate' } as const)[spec.kind],
@@ -130,6 +135,8 @@ export function makePlateProduct(spec: PlateSpec, meta: { key?: string; manufact
     supply: hasPower ? { volts: spec.power?.volts ?? 120, amps: spec.power?.amps ?? 20, phases: 1 } : undefined,
     plate: structuredClone(spec),
   }
+  applyTies(prod)
+  return prod
 }
 
 export const newPlateSpec = (kind: PlateKind = 'wallPlate'): PlateSpec => kind === 'wallPlate'

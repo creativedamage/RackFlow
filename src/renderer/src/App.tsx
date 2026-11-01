@@ -173,7 +173,9 @@ export function App() {
           : <PlateDesigner key={editingPlate.product.key + (editingPlate.instanceId ?? '')} initial={editingPlate.product} instanceId={editingPlate.instanceId} />)}
         {editingTemplate && <TemplateEditor key={editingTemplate.key} initial={editingTemplate} />}
         {finding && <DeviceFinder initialQuery={finding.query} />}
-        {editingView && <ViewEditor key={editingView} id={editingView} onClose={() => useStore.getState().set({ editingView: null })} />}
+        {editingView && <ViewEditor key={editingView} id={editingView} copied={useStore.getState().copiedView === editingView}
+          onClose={() => useStore.getState().set({ editingView: null, copiedView: null })}
+          onCancel={() => { const s = useStore.getState(); const copy = s.copiedView === editingView; s.set({ editingView: null, copiedView: null }); if (copy) { s.undo(); s.set({ diagramView: null }) } }} />}
         {editingNumbers && createPortal(<SheetNumbersDialog onClose={() => useStore.getState().set({ editingNumbers: false })} />, document.body)}
         {editingNumbering && createPortal(<NumberingDialog onClose={() => useStore.getState().set({ editingNumbering: false })} />, document.body)}
         {exportingAll && <ExportAllDialog onClose={() => useStore.getState().set({ exportingAll: false })} />}

@@ -13,7 +13,8 @@ const INFRA: EquipmentCategory[] = ['wallBox', 'wallPlate', 'floorBox', 'connect
  * Create / edit a signal view: name, which signal types it shows, and which
  * devices are on it (starts with everything that has a matching port).
  */
-export function ViewEditor({ id, onClose }: { id: string; onClose: () => void }) {
+export function ViewEditor({ id, onClose, onCancel, copied }: { id: string; onClose: () => void; onCancel?: () => void; copied?: boolean }) {
+  const cancel = onCancel ?? onClose
   const project = useStore((s) => s.project)
   const apply = useStore((s) => s.apply)
   const existing = id === 'new' ? undefined : viewsOf(project).find((v) => v.id === id)
@@ -98,14 +99,15 @@ export function ViewEditor({ id, onClose }: { id: string; onClose: () => void })
   }
 
   return (
-    <Modal title={existing ? `Edit View – ${existing.name}` : 'New Signal View'} onClose={onClose} wide footer={<>
+    <Modal title={copied && existing ? `Duplicated View – ${existing.name}` : existing ? `Edit View – ${existing.name}` : 'New Signal View'} onClose={cancel} wide footer={<>
       <span className="muted">{checked.size} device{checked.size === 1 ? '' : 's'} · only {domains.map((d) => DOMAINS[d].name).join(', ') || '–'} ports</span>
       <span className="spacer" />
-      <button onClick={onClose}>Cancel</button>
-      <button className="primary" disabled={!domains.length} onClick={save}>{existing ? 'Save View' : 'Create View'}</button>
+      <button onClick={cancel} title={copied ? 'Cancel – the copy is removed' : undefined}>Cancel</button>
+      <button className="primary" disabled={!domains.length} onClick={save}>{copied ? 'Save Copy' : existing ? 'Save View' : 'Create View'}</button>
     </>}>
       <div className="view-editor">
         <div className="ve-left form">
+          {copied && <p className="ve-copy small">This is a copy of the view – change the name, signals, devices or ports below. <b>Cancel</b> removes the copy.</p>}
           <p className="muted small" style={{ margin: 0 }}>A view is an extra page that shows devices from your diagram with <b>only the ports and wires</b> of the signal types you choose – e.g. the audio tie lines from wall plates and floor boxes to the patch bay. It has its own layout; the main diagram keeps every port.</p>
           <label className="field-label">Name</label>
           <TextInput value={name} placeholder={defaultName} onCommit={setName} />

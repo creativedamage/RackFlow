@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Panel } from '@xyflow/react'
 import { create } from 'zustand'
-import { autoGroupBySystem, createGroup, deleteView, pageNumbers, GENERAL_PAGE, DOMAINS, groupColor, groupsOf, membersOf, moveToPage, nodeGeom, setInView, ungroup, viewMembers, viewsOf, type DeviceGroup, type SignalDomain } from '@core/index'
+import { autoGroupBySystem, createGroup, deleteView, duplicateView, pageNumbers, GENERAL_PAGE, DOMAINS, groupColor, groupsOf, membersOf, moveToPage, nodeGeom, setInView, ungroup, viewMembers, viewsOf, type DeviceGroup, type SignalDomain } from '@core/index'
 import { showContextMenu } from '../components/ContextMenu'
 import { tidyDiagram } from './tidy'
 import type { MenuItem } from '../components/ContextMenu'
@@ -126,6 +126,13 @@ export function PageTabs() {
           onDoubleClick={() => set({ editingView: v.id })}
           onContextMenu={(e) => showContextMenu(e, [
             { label: 'Edit View…', onClick: () => set({ editingView: v.id }) },
+            { label: 'Duplicate View…', onClick: () => {
+              let copy = ''
+              useStore.getState().apply('Duplicate View', (d) => { copy = duplicateView(d, v.id)?.id ?? '' })
+              if (!copy) return
+              openView(copy)
+              set({ editingView: copy, copiedView: copy })
+            } },
             { label: 'Sheet Numbers…', onClick: () => set({ editingNumbers: true }) },
             { label: 'Tidy This View', onClick: () => { openView(v.id); tidyDiagram() } },
             'sep',

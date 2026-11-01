@@ -57,6 +57,8 @@ export interface AppState {
   diagramView: string | null
   /** View being created / edited ('new' or an id). */
   editingView: string | null
+  /** The view being edited was just duplicated – cancelling the editor removes the copy. */
+  copiedView: string | null
   editingNumbers: boolean
   editingNumbering: boolean
   /** Appearance: follow macOS, or force light / dark. */
@@ -127,6 +129,7 @@ export const useStore = create<AppState>((set, get) => ({
   ledPicking: false,
   diagramView: null,
   editingView: null,
+  copiedView: null,
   editingNumbers: false,
   editingNumbering: false,
   theme: 'system',

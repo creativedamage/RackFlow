@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { produce } from 'immer'
-import { BUILT_IN_KEYS, footprint, makePlateProduct, newPlateText, nextPid, PLATE_MODULE_KEYS, PLATE_MODULES, PLATE_SIZES, PLATE_STYLE_LIST, plateInner, withLayout, autoArrange, type PlateInsert, type PlateKind, type PlateLayout, type PlateSpec, type ProductDefinition, imperial, fmtLen, fmtLenPair, refreshBoxPorts, withoutPortNumbers } from '@core/index'
+import { BUILT_IN_KEYS, footprint, makePlateProduct, newPlateText, nextPid, PLATE_MODULE_KEYS, PLATE_MODULES, PLATE_SIZES, PLATE_STYLE_LIST, plateInner, withLayout, autoArrange, type PlateInsert, type PlateKind, type PlateLayout, type PlateSpec, type ProductDefinition, imperial, fmtLen, fmtLenPair, refreshBoxPorts, withoutPortNumbers, isMultipin, MULTIPIN_CHANNELS, summarizeLabels, tiedTo } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
 import { addProductToDiagram } from '../diagram/placement'
@@ -88,6 +88,7 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
     if (!ids.size) return
     edit((d) => {
       d.inserts = d.inserts.filter((x) => !x.pid || !ids.has(x.pid))
+      for (const x of d.inserts) if (x.tie && ids.has(x.tie)) delete x.tie
       for (const id of ids) delete d.layout!.jacks[id]
       d.layout!.texts = d.layout!.texts.filter((t) => !ids.has(t.id))
     })
@@ -99,11 +100,19 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
     d0 = produce(d0, (d) => {
       for (const id of ids) {
         if (isText(id)) { const t = d.layout!.texts.find((x) => x.id === id)!; const c = { ...t, id: newPlateText(0, 0).id, x: t.x + 6, y: t.y + 6 }; d.layout!.texts.push(c); fresh.add(c.id) }
-        else { const ins = d.inserts.find((x) => x.pid === id)!; const pid = nextPid(d, ins.module); d.inserts.push({ ...ins, pid, label: undefined }); const p = d.layout!.jacks[id]; d.layout!.jacks[pid] = { x: p.x + footprint(ins.module).w + 4, y: p.y }; fresh.add(pid) }
+        else { const ins = d.inserts.find((x) => x.pid === id)!; const pid = nextPid(d, ins.module); d.inserts.push({ ...ins, pid, label: undefined, tie: undefined }); const p = d.layout!.jacks[id]; d.layout!.jacks[pid] = { x: p.x + footprint(ins.module).w + 4, y: p.y }; fresh.add(pid) }
       }
     })
     setSpec(d0); setSel(fresh)
   }
+  // Multipin ties: the selected jacks become channels of the selected multipin.
+  const selJacks = spec.inserts.filter((x) => x.pid && sel.has(x.pid))
+  const selMps = selJacks.filter((x) => isMultipin(x.module))
+  const tieable = selJacks.filter((x) => !isMultipin(x.module) && !PLATE_MODULES[x.module]?.power)
+  const tie = (mp: string, ids: string[]) => edit((d) => { for (const x of d.inserts) if (x.pid && ids.includes(x.pid)) x.tie = mp })
+  const untie = (ids: string[]) => edit((d) => { for (const x of d.inserts) if (x.pid && (ids.includes(x.pid) || (x.tie && ids.includes(x.tie)))) delete x.tie })
+  const nameOf = (pid: string) => { const x = spec.inserts.find((q) => q.pid === pid); return x ? x.label?.trim() || short(x.module) : pid }
+
   // ⌘C / ⌘X / ⌘V: copy, cut and paste jacks and text (also into another plate).
   const copySel = () => {
     const ids = [...sel]; if (!ids.length) return false
@@ -123,11 +132,14 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
     const fresh = new Set<string>()
     setSpec(produce(spec, (d) => {
       d.layout ??= structuredClone(L)
+      const remap = new Map<string, string>()
+      for (const it of clipboard!.items) if (it.kind === 'jack' && it.ins.pid) remap.set(it.ins.pid, nextPid({ ...d, inserts: [...d.inserts, ...[...remap.values()].map((v) => ({ module: v.split('.')[0], count: 1, rear: 'none' as const, pid: v }))] }, it.ins.module))
       for (const it of clipboard!.items) {
         if (it.kind === 'text') { const c = { ...structuredClone(it.t), id: newPlateText(0, 0).id, x: Math.min(L.w - 2, it.t.x + off), y: Math.min(L.h - 2, it.t.y + off) }; d.layout!.texts.push(c); fresh.add(c.id) }
         else {
-          const pid = nextPid(d, it.ins.module)
-          d.inserts.push({ ...structuredClone(it.ins), pid, count: 1 })
+          const pid = remap.get(it.ins.pid!) ?? nextPid(d, it.ins.module)
+          const tie = it.ins.tie ? remap.get(it.ins.tie) : undefined
+          d.inserts.push({ ...structuredClone(it.ins), pid, count: 1, tie })
           d.layout!.jacks[pid] = { x: Math.min(L.w, it.x + off), y: Math.min(L.h, it.y + off) }
           fresh.add(pid)
         }
@@ -411,6 +423,20 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
                 <label className="field-label">Back of plate</label>
                 <Select value={oneJack.rear} onChange={(v) => edit((d) => { const x = d.inserts.find((q) => q.pid === one); if (x) x.rear = v })} options={REAR_OPTIONS} />
               </>)}
+              {isMultipin(oneJack.module) && (() => {
+                const ch = tiedTo(spec, one!), cap = MULTIPIN_CHANNELS[oneJack.module]
+                return (<div className="pd-tie">
+                  <label className="field-label">Channels ({ch.length} of {cap})</label>
+                  {ch.length ? <b>{summarizeLabels(ch.map((x) => (x.label?.trim() || short(x.module)).toUpperCase()))}</b> : <p className="muted small" style={{ margin: 0 }}>Nothing tied yet – select this multipin and the XLRs it carries (shift-click or drag a box), then <b>Tie to Multipin</b>.</p>}
+                  {ch.length > cap && <p className="error-text small" style={{ margin: 0 }}>More jacks than the {cap} channels it carries.</p>}
+                  {ch.length > 0 && <span className="row-gap"><button className="mini" onClick={() => setSel(new Set([one!, ...ch.map((x) => x.pid!)]))}>Select its jacks</button><button className="mini" onClick={() => untie([one!])}>Untie all</button></span>}
+                </div>)
+              })()}
+              {oneJack.tie && (<div className="pd-tie">
+                <label className="field-label">Multipin channel</label>
+                <span className="row-gap"><b>Ch {tiedTo(spec, oneJack.tie).findIndex((x) => x.pid === one) + 1} of {nameOf(oneJack.tie)}</b><button className="mini" onClick={() => untie([one!])}>Untie</button></span>
+                <p className="muted small" style={{ margin: 0 }}>Wired inside the box to the multipin – no tie line of its own.</p>
+              </div>)}
               <label className="field-label">Position (centre, from top-left)</label>
               <span className="row-gap">
                 X <LenInput value={L.jacks[one!].x} width={60} onCommit={(v) => setPos(one!, v ?? 0, L.jacks[one!].y)} />
@@ -432,6 +458,13 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
             </>) : sel.size > 1 ? (<>
               <h4>{sel.size} selected</h4>
               <p className="muted small">Use the align and distribute buttons above, or drag them together.</p>
+              {selMps.length === 1 && tieable.length > 0 && (<div className="pd-tie">
+                <h4>Multipin</h4>
+                <button className="primary" onClick={() => tie(selMps[0].pid!, tieable.map((x) => x.pid!))}>Tie {tieable.length} jack{tieable.length === 1 ? '' : 's'} to {nameOf(selMps[0].pid!)}</button>
+                <p className="muted small" style={{ margin: 0 }}>They become its channels (in their order on the box), drop their own tie lines and line up beside it on the wiring diagram. The multipin gets a channel summary, e.g. “M1-8, RET 1-4”.{tiedTo(spec, selMps[0].pid!).length + tieable.filter((x) => x.tie !== selMps[0].pid).length > MULTIPIN_CHANNELS[selMps[0].module] ? ` That’s more than its ${MULTIPIN_CHANNELS[selMps[0].module]} channels.` : ''}</p>
+              </div>)}
+              {selMps.length > 1 && <p className="muted small">Select one multipin with its jacks to tie them.</p>}
+              {tieable.some((x) => x.tie) && <button className="mini" onClick={() => untie(tieable.filter((x) => x.tie).map((x) => x.pid!))}>Untie selected</button>}
             </>) : (<>
               <h4>Face</h4>
               <label className="field-label">Connector labels</label>

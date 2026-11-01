@@ -7,6 +7,7 @@
 
 import type { EquipmentCategory, EquipmentInstance, PortTemplate, ProductDefinition, Project } from './model'
 import { explodeInserts } from './platelayout'
+import { applyTies } from './multipin'
 import { numberingOf } from './numbering'
 import { SIGNALS } from './signals'
 
@@ -107,6 +108,7 @@ export function applyPortLabels(e: EquipmentInstance) {
     e.product.plate = spec
   }
   if (!Object.keys(e.portBaseLabels).length) delete e.portBaseLabels
+  applyTies(e.product)
 }
 
 /**

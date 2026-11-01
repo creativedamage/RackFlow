@@ -254,8 +254,8 @@ function drawDevice(svg: Svg, e: EquipmentInstance, o: SchematicOptions) {
     svg.text(x + 6, y + sec.y + SEC_HEAD / 2 + 0.5, sec.name.toUpperCase(), { size: 7.5, weight: 'bold', fill: '#555', maxWidth: NODE_WIDTH - 12 })
     svg.line(x + 6, y + sec.y + SEC_HEAD - 3, x + NODE_WIDTH - 6, y + sec.y + SEC_HEAD - 3, { lw: 0.3, stroke: '#999' })
     if (sec.faces) {
-      svg.text(x + 6, y + sec.y + SEC_HEAD + FACE_H / 2, 'FRONT', { size: 6.5, fill: '#777' })
-      svg.text(x + NODE_WIDTH - 6, y + sec.y + SEC_HEAD + FACE_H / 2, 'REAR', { size: 6.5, fill: '#777', anchor: 'end' })
+      svg.text(x + 6, y + sec.y + SEC_HEAD + FACE_H / 2, (sec.heads?.[0] ?? 'Front').toUpperCase(), { size: 6.5, fill: '#777' })
+      svg.text(x + NODE_WIDTH - 6, y + sec.y + SEC_HEAD + FACE_H / 2, (sec.heads?.[1] ?? 'Rear').toUpperCase(), { size: 6.5, fill: '#777', anchor: 'end' })
     }
   }
   const secOf = new Map(L.sections.flatMap((sec) => sec.ports.map((q) => [q.id, sec] as const)))
