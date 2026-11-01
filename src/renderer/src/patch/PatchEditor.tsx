@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   clearFormatting, clearRange, copyRange, defaultPrintOptions, fillSeries, findCell, FORMAT_PRESETS, layoutLabels, mergeTitle,
   NORMAL_SYMBOLS, pagesToPrintHTML, pageToSVG, pasteAt, refreshLabels, removeTitles, setNormals, staleCells, STOCKS, styleRange,
-  toggleStyle, type CellStyle, type NormalMode, type PatchBay, type PrintOptions,
+  toggleStyle, arrowGlyph, rowLetter, type CellStyle, type NormalMode, type PatchBay, type PrintOptions, type RowArrow,
 } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
@@ -146,6 +146,18 @@ function FormatBar() {
           <button key={m} className="fb" disabled={!has || !bay || bandForRow(bay, sel!.row) == null} title={NORMAL_SYMBOLS[m].name} onClick={() => normals(m)}>
             {NORMAL_SYMBOLS[m].glyph || '∅'}
           </button>
+        ))}
+      </div>
+      <div className="fb-group" title="Strip ends: a letter for the row, with ▼ and its normalling word (NORMAL, HALF, ISOLATED…) under it">
+        <label className="fb-check"><input type="checkbox" disabled={!bay} checked={!!bay?.rowTabs?.on} onChange={(e) => bay && editBay(bay.id, 'Row Letters', (b) => { b.rowTabs = { ...b.rowTabs, on: e.target.checked } })} /> Row letters</label>
+        <input className="fb-letter" disabled={!has || !bay?.rowTabs?.on} maxLength={3} value={bay && sel ? rowLetter(bay, sel.row) : ''} title="Letter for the selected row"
+          onChange={(e) => editSelection('Row Letter', (b, s) => { b.rowTabs = { on: true, ...b.rowTabs, letters: { ...b.rowTabs?.letters, [String(s.row)]: e.target.value.toUpperCase() } } })} />
+      </div>
+      <div className="fb-group" title="Arrow on every label of the selected row, pointing at the jacks it names">
+        {(['up', 'down', undefined] as (RowArrow | undefined)[]).map((a) => (
+          <button key={a ?? 'none'} className={`fb ${bay && sel && bay.arrows?.[String(sel.row)] === a ? 'on' : ''}`} disabled={!has}
+            title={a ? `${arrowGlyph(a)} on this row's labels` : 'No arrow on this row'}
+            onClick={() => editSelection('Row Arrow', (b, s) => { const m = { ...b.arrows }; if (a) m[String(s.row)] = a; else delete m[String(s.row)]; b.arrows = m })}>{a ? arrowGlyph(a) : '–'}</button>
         ))}
       </div>
       <div className="fb-group">

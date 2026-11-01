@@ -1,7 +1,7 @@
 import { editBayLayout } from '../product/openEditor'
 import { memo, useLayoutEffect, useRef, useState } from 'react'
 import {
-  FORMATS, gapBefore, NORMAL_SYMBOLS, cycleNormal, findCell, titlesIn, totalChannels,
+  FORMATS, gapBefore, NORMAL_SYMBOLS, NORMAL_WORDS, arrowGlyph, rowLetter, rowMode, cycleNormal, findCell, titlesIn, totalChannels,
   type CellStyle, type LabelStripGeometry, type LabelSpan, type PatchBay, type PatchRowTemplate, isTwoSided, panelDescription,
 } from '@core/index'
 import { useStore } from '../store'
@@ -110,6 +110,12 @@ function Strip({ bay, row, bank, sel, title, onSel, onEdit }: {
 
   return (
     <div className="pb-strip" style={{ background: bay.rowFill[String(row.id)] }}>
+      {(bay.rowTabs?.on || bay.arrows?.[String(row.id)]) && (() => {
+        const m = rowMode(bay, row.id), a = arrowGlyph(bay.arrows?.[String(row.id)])
+        return <div className="pb-rowtag" title="Printed on the strip ends (Row letters) · arrow printed on every label of this row">
+          {bay.rowTabs?.on && <b>{rowLetter(bay, row.id)}</b>}{bay.rowTabs?.on && m ? ` ${a || '▼'} ${NORMAL_WORDS[m]}` : a ? ` ${a} on labels` : ''}
+        </div>
+      })()}
       <div className="pb-titles" style={cols}>
         {titles.map((s: LabelSpan) => (
           <div key={s.id} className={`pb-title ${title === s.id ? 'sel' : ''}`} style={{ gridColumn: `${s.start} / ${s.end + 1}`, ...cssFor(s.style), background: s.style?.fill }}
@@ -133,7 +139,7 @@ function Strip({ bay, row, bank, sel, title, onSel, onEdit }: {
               onMouseDown={(e) => down(e, ch)} onMouseEnter={() => enter(ch)}
               onDoubleClick={() => onEdit({ bay: bay.id, row: row.id, channel: ch })}
               title={cell?.text ? `${row.name} ${ch}: ${cell.text.replace(/\n/g, ' / ')}${cell.manual ? ' (typed)' : ' (from wiring)'}` : `${row.name} ${ch}`}>
-              {cell?.text ? lines.map((l, k) => <span key={k}>{l}</span>) : <span className="ch-num">{ch}</span>}
+              {cell?.text ? lines.map((l, k) => <span key={k}>{k === lines.length - 1 && bay.arrows?.[String(row.id)] ? <><i className="pb-arrow">{arrowGlyph(bay.arrows[String(row.id)])}</i>{l}</> : l}</span>) : <span className="ch-num">{ch}</span>}
             </div>
           )
         })}

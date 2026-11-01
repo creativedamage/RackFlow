@@ -1,5 +1,5 @@
 import {
-  newId, type CanvasPoint, type LabelCell, type LabelFormat, type LabelStyle, type NormalBand, type NormalMode, type PatchBay,
+  newId, type CanvasPoint, type LabelCell, type LabelFormat, type LabelStyle, type NormalBand, type NormalMode, type PatchBay, type RowArrow,
   type PatchBayTemplate, type Project,
 } from '../model'
 import { addEquipment, removeEquipment } from '../project'
@@ -102,4 +102,32 @@ export function retemplateBay(p: Project, bayId: string, t: PatchBayTemplate): n
   bay.spans = bay.spans.filter((s) => { const r = t.rows.find((x) => x.id === s.row); return !!r && s.end <= r.strip.channelCount })
   if (!sameRows) bay.normals = defaultNormals(t)
   return before - p.cables.length
+}
+
+/** Words for the strip ends: what the row does, Bittree-style (▼ NORMAL, HALF, ISOLATED…). */
+export const NORMAL_WORDS: Record<NormalMode, string> = { full: 'NORMAL', half: 'HALF', parallel: 'PARALLEL', none: 'ISOLATED' }
+export const arrowGlyph = (a?: RowArrow) => (a === 'up' ? '▲' : a === 'down' ? '▼' : '')
+
+/** A row's letter on the strip ends: the one you typed, else A, B, C… down the bay. */
+export function rowLetter(bay: PatchBay, rowId: number): string {
+  const own = bay.rowTabs?.letters?.[String(rowId)]
+  if (own != null) return own
+  const i = bay.template.rows.findIndex((r) => r.id === rowId)
+  return i < 0 ? '' : String.fromCharCode(65 + (i % 26))
+}
+
+/** The normalling band a row belongs to (the one below it, or – for the bottom row of a pair – above it). */
+export function rowBand(bay: PatchBay, rowId: number): NormalBand | undefined {
+  const rows = bay.template.rows
+  const i = rows.findIndex((r) => r.id === rowId)
+  return bay.normals?.find((n) => n.afterRow === rowId) ?? (i > 0 ? bay.normals?.find((n) => n.afterRow === rows[i - 1].id) : undefined)
+}
+
+/** The row's normalling – the mode most of its channels use (null without a band). */
+export function rowMode(bay: PatchBay, rowId: number): NormalMode | null {
+  const band = rowBand(bay, rowId)
+  if (!band?.modes.length) return null
+  const count = new Map<NormalMode, number>()
+  for (const m of band.modes) count.set(m, (count.get(m) ?? 0) + 1)
+  return [...count.entries()].sort((a, b) => b[1] - a[1])[0][0]
 }
