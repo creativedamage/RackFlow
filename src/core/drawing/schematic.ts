@@ -9,9 +9,7 @@ import { CATEGORIES, type Annotation, type Cable, type EquipmentInstance, type P
 import { DOMAINS } from '../signals'
 import { portDomain } from '../project'
 import { planChannels, type ChannelWire } from '../autolayout'
-import { cardLayout, headerHeight, NODE_WIDTH, nodeGeom, previewHeight, SEC_HEAD, splitPorts } from '../diagramgeom'
-import { productFace } from '../platelayout'
-import { faceProduct } from '../boxports'
+import { cardLayout, headerHeight, NODE_WIDTH, nodeGeom, SEC_HEAD, splitPorts } from '../diagramgeom'
 import { crossings, route, WIRE_CLEAR, type Pt, type Rect } from '../wireroute'
 import { groupsOf } from '../groups'
 import { newSheet, sheetSize, type SheetOptions } from './sheet'
@@ -55,7 +53,8 @@ interface Page { title: string; ids: Set<string>; pageId?: string | null }
 export function schematicSheets(pIn: Project, o: SchematicOptions): string[] {
   if (!pIn.equipment.length) return []
   // Printed cards always show every port – folded sections are a screen convenience.
-  const p0: Project = { ...pIn, equipment: pIn.equipment.map((e) => (e.collapsed || e.ioHidden ? { ...e, collapsed: undefined, ioHidden: undefined } : e)) }
+  // …and no plate / panel face drawing in the device blocks (it looked out of place on paper).
+  const p0: Project = { ...pIn, equipment: pIn.equipment.map((e) => ({ ...e, collapsed: undefined, ioHidden: undefined, noFace: true })) }
   // Notes placed on signal views print on those views' sheets only.
   const views = viewsOf(p0).filter((v) => !o.views || o.views.includes(v.id))
   const viewIds = new Set(viewsOf(p0).map((v) => v.id))
@@ -249,16 +248,8 @@ function drawDevice(svg: Svg, e: EquipmentInstance, o: SchematicOptions) {
   svg.text(x + NODE_WIDTH / 2, y + 11, maker, { size: 9, anchor: 'middle', maxWidth: NODE_WIDTH - 16 })
   svg.text(x + NODE_WIDTH / 2, y + 23, model, { size: 9.5, anchor: 'middle', maxWidth: NODE_WIDTH - 16 })
   if (e.room?.trim()) svg.text(x + NODE_WIDTH / 2, y + 36, `(${e.room.trim().toUpperCase()})`, { size: 8, anchor: 'middle', fill: '#444', maxWidth: NODE_WIDTH - 16 })
-  // Plate / box / panel face drawing.
-  const ph = previewHeight(e)
-  const face = ph ? productFace(faceProduct(e)) : null
-  if (face) {
-    const top = y + (e.room?.trim() ? 80 : 66), availH = ph - 8, availW = NODE_WIDTH - 24
-    const k = Math.min(availW / face.w, availH / face.h)
-    svg.raw(`<g transform="translate(${x + (NODE_WIDTH - face.w * k) / 2} ${top + (availH - face.h * k) / 2}) scale(${k})">${face.inner()}</g>`)
-  }
   const L = cardLayout(e)
-  svg.line(x, y + h + 4, x + NODE_WIDTH, y + h + 4, { lw: 0.5 })
+  svg.line(x, y + h - 2, x + NODE_WIDTH, y + h - 2, { lw: 0.5 })
   for (const sec of L.sections) {
     svg.text(x + 6, y + sec.y + SEC_HEAD / 2 + 0.5, sec.name.toUpperCase(), { size: 7.5, weight: 'bold', fill: '#555', maxWidth: NODE_WIDTH - 12 })
     svg.line(x + 6, y + sec.y + SEC_HEAD - 3, x + NODE_WIDTH - 6, y + sec.y + SEC_HEAD - 3, { lw: 0.3, stroke: '#999' })

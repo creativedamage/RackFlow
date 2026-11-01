@@ -26,6 +26,7 @@ const PREVIEW_W = NODE_WIDTH - 24
 
 /** Height of the plate / box / panel drawing shown on the card (0 when the device has none). */
 export function previewHeight(eq: EquipmentInstance): number {
+  if (eq.noFace) return 0
   const face = productFace(eq.product)
   if (!face) return 0
   const size = eq.nodeSize ?? 'medium'
@@ -35,7 +36,8 @@ export function previewHeight(eq: EquipmentInstance): number {
 }
 
 /** Header height: taller when the device shows its room / location, and its plate drawing. */
-export const headerHeight = (eq: EquipmentInstance) => (eq.room?.trim() ? HEADER_H + 14 : HEADER_H) + ((eq.nodeSize ?? 'medium') === 'small' ? 0 : previewHeight(eq))
+/** Printed blocks (noFace) have a compact two-line header: maker, model (+ room). */
+export const headerHeight = (eq: EquipmentInstance) => eq.noFace ? (eq.room?.trim() ? 44 : 32) : (eq.room?.trim() ? HEADER_H + 14 : HEADER_H) + ((eq.nodeSize ?? 'medium') === 'small' ? 0 : previewHeight(eq))
 
 /** Small cards: tag + drawing only; ports spread down the edges. */
 function smallGeom(eq: EquipmentInstance): NodeGeom {
@@ -127,7 +129,9 @@ export function cardLayout(eq: EquipmentInstance): CardLayout {
   const ports = new Map<string, { y: number; side: 'left' | 'right' }>()
   const sections: CardSection[] = []
   const order = { left: [] as PortTemplate[], right: [] as PortTemplate[] }
-  let y = ioY + IO_H
+  // Printed blocks have no I/O bar.
+  const ioH = eq.noFace ? 0 : IO_H
+  let y = ioY + ioH
   const folded = new Set(eq.collapsed ?? [])
   for (const k of keys) {
     const g = by.get(k)!
@@ -140,7 +144,7 @@ export function cardLayout(eq: EquipmentInstance): CardLayout {
     for (let i = 0; i < n; i++) rows.push({ left: g.left[i], right: g.right[i], li: i, ri: i, y: y + SEC_HEAD + i * ROW_H + ROW_H / 2 })
     const h = collapsed ? SEC_HEAD : SEC_HEAD + n * ROW_H + SEC_PAD
     if (eq.ioHidden) {
-      for (const p of all) ports.set(p.id, { y: ioY + IO_H / 2, side: side.get(p.id)! })
+      for (const p of all) ports.set(p.id, { y: ioY + ioH / 2, side: side.get(p.id)! })
       sections.push({ key: k, name: k, domain: d, y, h: 0, collapsed: true, rows, ports: all })
       continue
     }
@@ -151,7 +155,7 @@ export function cardLayout(eq: EquipmentInstance): CardLayout {
     sections.push({ key: k, name: k, domain: d, y, h, collapsed, rows, ports: all })
     y += h + SEC_GAP
   }
-  const height = eq.ioHidden || !keys.length ? ioY + IO_H + 6 : y - SEC_GAP + 8
+  const height = eq.ioHidden || !keys.length ? ioY + ioH + 6 : y - SEC_GAP + 8
   const out: CardLayout = { width: NODE_WIDTH, height, ioY, sections, ports, order }
   // Only cache settled (frozen) project state – drafts can still change.
   if (Object.isFrozen(eq)) layoutCache.set(eq, out)

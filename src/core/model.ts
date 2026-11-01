@@ -227,6 +227,8 @@ export interface EquipmentInstance {
   /** Wiring-diagram card: port sections folded shut (by section name), or the whole I/O hidden. */
   collapsed?: string[]
   ioHidden?: boolean
+  /** Leave the plate / panel face drawing off the card (printed wiring diagrams). */
+  noFace?: boolean
   /** Box ports: project-wide port numbers (front port id → "M11") and the jack names they replaced. */
   portNumbers?: Record<string, string>
   portBaseLabels?: Record<string, string>
