@@ -67,7 +67,7 @@ import { freeSpot, nodeGeom, placeInFreeSpace, addPatchBay, BUILT_IN_PATCH_TEMPL
 describe('free space', () => {
   it('puts a new patch bay where nothing is', () => {
     const p = newProject()
-    for (let i = 0; i < 6; i++) addEquipment(p, prod('generic.dsp.12x8'), { x: (i % 3) * 300, y: Math.floor(i / 3) * 400 })
+    for (let i = 0; i < 6; i++) addEquipment(p, prod('generic.dsp.12x8'), { x: (i % 3) * 300, y: Math.floor(i / 3) * 600 })
     const bay = addPatchBay(p, BUILT_IN_PATCH_TEMPLATES.find((t) => t.key === 'leviton.6a586-u48')!, { x: 300, y: 0 })
     placeInFreeSpace(p, bay.equipment, nodeGeom)
     const boxes = p.equipment.map((e) => ({ ...e.position, ...nodeGeom(e) }))

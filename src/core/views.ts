@@ -199,3 +199,34 @@ export function viewPrintProject(p: Project, v: SignalView): { project: Project;
   const cables = [...vp.cables, ...leaving.filter((c) => known.has(c.from.equipment) && known.has(c.to.equipment) && !(ids.has(c.from.equipment) && ids.has(c.to.equipment)))]
   return { project: { ...vp, equipment: [...vp.equipment, ...extra], cables }, ids }
 }
+
+/**
+ * Pushes overlapping cards apart (downwards, keeping each column's order) on
+ * every page and signal view. Used once when opening a project drawn with the
+ * older, shorter device cards.
+ */
+export function spreadCards(p: Project, geom: (e: EquipmentInstance) => { width: number; height: number }): number {
+  let moved = 0
+  const spread = (items: { id: string; x: number; y: number; w: number; h: number; page: string }[], set: (id: string, y: number) => void) => {
+    const placed: typeof items = []
+    for (const it of [...items].sort((a, b) => a.y - b.y || a.x - b.x)) {
+      let y = it.y
+      for (let again = true; again;) {
+        again = false
+        for (const q of placed) {
+          if (q.page !== it.page) continue
+          if (it.x < q.x + q.w + 8 && q.x < it.x + it.w + 8 && y < q.y + q.h + 8 && q.y < y + it.h + 8) { y = q.y + q.h + 30; again = true }
+        }
+      }
+      if (y !== it.y) { set(it.id, y); moved++ }
+      placed.push({ ...it, y })
+    }
+  }
+  spread(p.equipment.map((e) => ({ id: e.id, x: e.position.x, y: e.position.y, ...dims(geom(e)), page: e.groupId ?? '' })), (id, y) => { p.equipment.find((e) => e.id === id)!.position.y = y })
+  for (const v of viewsOf(p)) {
+    const vp = viewProject(p, v)
+    spread(vp.equipment.map((e) => ({ id: e.id, x: e.position.x, y: e.position.y, ...dims(geom(e)), page: '' })), (id, y) => { v.positions[id] = { x: v.positions[id]?.x ?? vp.equipment.find((e) => e.id === id)!.position.x, y } })
+  }
+  return moved
+}
+const dims = (g: { width: number; height: number }) => ({ w: g.width, h: g.height })

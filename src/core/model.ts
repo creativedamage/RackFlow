@@ -224,6 +224,9 @@ export interface EquipmentInstance {
   circuit?: CircuitInfo
   /** Diagram group (system) this device belongs to. */
   groupId?: string
+  /** Wiring-diagram card: port sections folded shut (by section name), or the whole I/O hidden. */
+  collapsed?: string[]
+  ioHidden?: boolean
   /** Network sheet: addressing per network port (key = port id, or 'mgmt' for a switch). */
   network?: Record<string, NetInfo>
 }
@@ -305,6 +308,8 @@ export interface DiagramSettings {
   numbering?: import('./sheetnumbers').SheetNumbering
   /** Custom number for the sheet of devices that aren't on a page. */
   generalNumber?: string
+  /** Card design the layout was made for (2 = sectioned cards, 1.8). */
+  cards?: number
 }
 export interface LogoAsset { id: string; name: string; /** data: URL (PNG / JPEG / SVG). */ dataUrl: string; /** Light / white artwork on a transparent background – printed in black on drawings. */ light?: boolean }
 

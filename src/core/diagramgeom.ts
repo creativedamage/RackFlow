@@ -1,17 +1,28 @@
 // Geometry of a device card on the wiring diagram, shared by the on-screen
 // diagram, auto layout and printed schematics so they line up exactly.
 
-import type { EquipmentInstance } from './model'
+import type { EquipmentInstance, PortTemplate } from './model'
+import { DOMAINS, SIGNALS, type SignalDomain } from './signals'
+
+const portDomain = (p: PortTemplate): SignalDomain | null => (p.signals[0] ? SIGNALS[p.signals[0]]?.domain ?? null : null)
 import type { NodeGeom } from './autolayout'
 import { productFace } from './platelayout'
 
-export const NODE_WIDTH = 240
-export const HEADER_H = 40
+export const NODE_WIDTH = 260
+/** Header: type chip, tag, maker · model. */
+export const HEADER_H = 66
 export const ROW_H = 24
+/** The "I/O · Hide" bar under the header. */
+export const IO_H = 22
+/** Port section: header bar, padding below the rows, gap between sections, inset from the card edge. */
+export const SEC_HEAD = 22
+export const SEC_PAD = 5
+export const SEC_GAP = 6
+export const SEC_INSET = 8
 
 export const SMALL_W = 170
 export const SMALL_HEAD = 24
-const PREVIEW_W = NODE_WIDTH - 20
+const PREVIEW_W = NODE_WIDTH - 24
 
 /** Height of the plate / box / panel drawing shown on the card (0 when the device has none). */
 export function previewHeight(eq: EquipmentInstance): number {
@@ -55,20 +66,114 @@ export function splitPorts(eq: EquipmentInstance) {
   return { left, right }
 }
 
+export interface CardRow { left?: PortTemplate; right?: PortTemplate; li: number; ri: number; y: number }
+export interface CardSection { key: string; name: string; domain: SignalDomain | null; y: number; h: number; collapsed: boolean; rows: CardRow[]; ports: PortTemplate[] }
+export interface CardLayout {
+  width: number
+  height: number
+  /** Top of the I/O bar (= bottom of the header incl. drawing). */
+  ioY: number
+  sections: CardSection[]
+  /** Port centre y (card coordinates) and side. */
+  ports: Map<string, { y: number; side: 'left' | 'right' }>
+  /** Each side's ports in the order they appear on the card (for cascading). */
+  order: { left: PortTemplate[]; right: PortTemplate[] }
+}
+
+/** Section name for a port: its group, else its signal type. */
+/** "Analog In" and "Analog Out" share the "Analog" section; plain "Inputs" / "Outputs" fall back to the signal type. */
+export function sectionOf(p: PortTemplate): string {
+  const g = (p.group ?? '').trim().replace(/[\s\-–·]*\b(ins?|outs?|inputs?|outputs?|i\/o)$/i, '').trim()
+  return g || (portDomain(p) ? DOMAINS[portDomain(p)!].name : 'Other')
+}
+
+const layoutCache = new WeakMap<EquipmentInstance, CardLayout>()
+
+/**
+ * The full card: header, I/O bar, then one boxed section per port group
+ * (Analog, Network…) with inputs on the left, outputs on the right, paired row
+ * by row. Folded sections keep their ports at the section bar.
+ */
+export function cardLayout(eq: EquipmentInstance): CardLayout {
+  const hit = layoutCache.get(eq)
+  if (hit) return hit
+  const { left, right } = splitPorts(eq)
+  const side = new Map<string, 'left' | 'right'>([...left.map((p) => [p.id, 'left'] as const), ...right.map((p) => [p.id, 'right'] as const)])
+  const keys: string[] = []
+  const by = new Map<string, { left: PortTemplate[]; right: PortTemplate[] }>()
+  for (const p of eq.product.ports) {
+    const sd = side.get(p.id)
+    if (!sd) continue
+    const k = sectionOf(p)
+    if (!by.has(k)) { by.set(k, { left: [], right: [] }); keys.push(k) }
+    by.get(k)![sd].push(p)
+  }
+  // One-sided sections of the same signal type pair up (patch bay "Top" inputs
+  // with "Bottom" outputs) so the card reads as in ← → out, row by row.
+  const dom = (k: string) => { const g = by.get(k)!; return [...g.left, ...g.right].map(portDomain).find(Boolean) ?? null }
+  for (let i = 0; i < keys.length; i++) {
+    const a = by.get(keys[i])!
+    if (a.right.length || !a.left.length) continue
+    const j = keys.findIndex((k, jj) => jj !== i && !by.get(k)!.left.length && by.get(k)!.right.length > 0 && dom(k) === dom(keys[i]))
+    if (j < 0) continue
+    const name = `${keys[i]} / ${keys[j]}`
+    by.set(name, { left: a.left, right: by.get(keys[j])!.right })
+    by.delete(keys[i]); by.delete(keys[j])
+    const kj = keys[j]
+    keys[i] = name
+    keys.splice(keys.indexOf(kj), 1)
+  }
+  const ioY = headerHeight(eq)
+  const ports = new Map<string, { y: number; side: 'left' | 'right' }>()
+  const sections: CardSection[] = []
+  const order = { left: [] as PortTemplate[], right: [] as PortTemplate[] }
+  let y = ioY + IO_H
+  const folded = new Set(eq.collapsed ?? [])
+  for (const k of keys) {
+    const g = by.get(k)!
+    order.left.push(...g.left); order.right.push(...g.right)
+    const all = [...g.left, ...g.right]
+    const d = all.map(portDomain).find(Boolean) ?? null
+    const collapsed = !!eq.ioHidden || folded.has(k)
+    const n = Math.max(g.left.length, g.right.length)
+    const rows: CardRow[] = []
+    for (let i = 0; i < n; i++) rows.push({ left: g.left[i], right: g.right[i], li: i, ri: i, y: y + SEC_HEAD + i * ROW_H + ROW_H / 2 })
+    const h = collapsed ? SEC_HEAD : SEC_HEAD + n * ROW_H + SEC_PAD
+    if (eq.ioHidden) {
+      for (const p of all) ports.set(p.id, { y: ioY + IO_H / 2, side: side.get(p.id)! })
+      sections.push({ key: k, name: k, domain: d, y, h: 0, collapsed: true, rows, ports: all })
+      continue
+    }
+    for (const r of rows) {
+      if (r.left) ports.set(r.left.id, { y: collapsed ? y + SEC_HEAD / 2 : r.y, side: 'left' })
+      if (r.right) ports.set(r.right.id, { y: collapsed ? y + SEC_HEAD / 2 : r.y, side: 'right' })
+    }
+    sections.push({ key: k, name: k, domain: d, y, h, collapsed, rows, ports: all })
+    y += h + SEC_GAP
+  }
+  const height = eq.ioHidden || !keys.length ? ioY + IO_H + 6 : y - SEC_GAP + 8
+  const out: CardLayout = { width: NODE_WIDTH, height, ioY, sections, ports, order }
+  // Only cache settled (frozen) project state – drafts can still change.
+  if (Object.isFrozen(eq)) layoutCache.set(eq, out)
+  return out
+}
+
 /** Exact card geometry (ports at the card edges). */
 export function nodeGeom(eq: EquipmentInstance): NodeGeom {
   if (eq.nodeSize === 'small') return smallGeom(eq)
-  const { left, right } = splitPorts(eq)
-  const h = headerHeight(eq)
-  const li = new Map(left.map((p, i) => [p.id, i])), ri = new Map(right.map((p, i) => [p.id, i]))
+  const L = cardLayout(eq)
   return {
     width: NODE_WIDTH,
-    height: h + Math.max(left.length, right.length, 1) * ROW_H + 8,
+    height: L.height,
     port: (id) => {
-      const l = li.get(id)
-      if (l != null) return { x: 0, y: h + l * ROW_H + ROW_H / 2, side: 'left' }
-      const r = ri.get(id)
-      return r != null ? { x: NODE_WIDTH, y: h + r * ROW_H + ROW_H / 2, side: 'right' } : null
+      const q = L.ports.get(id)
+      return q ? { x: q.side === 'left' ? 0 : NODE_WIDTH, y: q.y, side: q.side } : null
     },
   }
+}
+
+/** The ports on the same side of the card as `portId`, in card order (for cascading). */
+export function cardSide(eq: EquipmentInstance, portId: string): PortTemplate[] {
+  const L = cardLayout(eq)
+  return L.order.left.some((p) => p.id === portId) ? L.order.left : L.order.right
 }

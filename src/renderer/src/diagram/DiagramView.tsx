@@ -14,7 +14,7 @@ import { useStore } from '../store'
 import { DRAG_MIME, type DragPayload } from '../components/Sidebar'
 import { setViewCenterProvider } from './placement'
 import { pickIndex } from './wiring'
-import { DeviceNode, headerHeight, NODE_WIDTH, ROW_H, splitPorts, type DeviceNodeType } from './DeviceNode'
+import { DeviceNode, NODE_WIDTH, type DeviceNodeType } from './DeviceNode'
 import { GroupFrame, type GroupFrameType } from './GroupFrame'
 import { CableEdge, type CableEdgeType } from './CableEdge'
 import { GroupsPanel, PageTabs, addToViewItems, moveDevicesToPage, pageMenuItems, useGroupFocus, viewMenuItems } from './GroupsPanel'
@@ -30,7 +30,7 @@ const nodeTypes = { device: DeviceNode, groupFrame: GroupFrame, note: NoteNode }
 const edgeTypes = { cable: CableEdge }
 type AnyNode = DeviceNodeType | GroupFrameType | NoteNodeType
 const FRAME_PAD = 22, FRAME_LABEL = 26
-const nodeH = (n: DeviceNodeType) => n.measured?.height ?? headerHeight(n.data.eq) + Math.max(...Object.values(splitPorts(n.data.eq)).map((x) => x.length), 1) * ROW_H + 8
+const nodeH = (n: DeviceNodeType) => n.measured?.height ?? nodeGeom(n.data.eq).height
 const GRID = 8
 
 const pointOf = (e: MouseEvent | TouchEvent | React.MouseEvent) => ('touches' in e ? { x: (e.changedTouches[0] ?? e.touches[0])?.clientX ?? 0, y: (e.changedTouches[0] ?? e.touches[0])?.clientY ?? 0 } : { x: e.clientX, y: e.clientY })
@@ -483,7 +483,7 @@ function PickedPanel() {
   return (
     <Panel position="bottom-center" className="picked-panel">
       <b>{picked.length}</b> port{picked.length === 1 ? '' : 's'} picked.{' '}
-      {picked.length > 1 ? 'Drag from any of them to the first destination port. The rest land on the ports after it.' : 'Shift-click more ports to patch them together.'}
+      Click the first port on the other device – {picked.length > 1 ? 'they cascade down that side in order.' : 'or shift-click another port here to pick the whole run.'}
       <button className="mini" onClick={clear}>Clear (Esc)</button>
     </Panel>
   )

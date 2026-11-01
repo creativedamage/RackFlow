@@ -15,6 +15,11 @@
   --warn: #f08c00;
   --ok: #2f9e44;
   --node-bg: #ffffff;
+  --card-line: #dcdce1;
+  --sec-bg: #f7f7f9;
+  --sec-line: #ebebef;
+  --pill-bg: #ececf0;
+  --pill-line: #e2e2e7;
   --node-mini: #c7c7cc;
   --minimap-mask: rgba(240, 240, 245, 0.7);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -35,7 +40,12 @@
     --line: #38383c;
     --line-2: #2c2c30;
     --accent-soft: rgba(10, 132, 255, 0.22);
-    --node-bg: #2a2a2d;
+    --node-bg: #232326;
+    --card-line: #3a3a3f;
+    --sec-bg: #1c1c1f;
+    --sec-line: #303034;
+    --pill-bg: #2c2c30;
+    --pill-line: #38383d;
     --node-mini: #48484c;
     --minimap-mask: rgba(20, 20, 22, 0.7);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 10px rgba(0, 0, 0, 0.3);
@@ -52,7 +62,12 @@
     --line: #38383c;
     --line-2: #2c2c30;
     --accent-soft: rgba(10, 132, 255, 0.22);
-    --node-bg: #2a2a2d;
+    --node-bg: #232326;
+    --card-line: #3a3a3f;
+    --sec-bg: #1c1c1f;
+    --sec-line: #303034;
+    --pill-bg: #2c2c30;
+    --pill-line: #38383d;
     --node-mini: #48484c;
     --minimap-mask: rgba(20, 20, 22, 0.7);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 10px rgba(0, 0, 0, 0.3);
@@ -185,12 +200,44 @@ textarea { resize: vertical; width: 100%; }
 .device-model { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 70px; }
 .device-cat { position: absolute; right: 10px; top: 6px; font-size: 9px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; }
 .port-row { position: absolute; height: 24px; width: 50%; display: flex; align-items: center; }
-.port-row.left { left: 0; padding-left: 10px; }
-.port-row.right { right: 0; padding-right: 10px; justify-content: flex-end; }
+.port-row.left { left: 0; padding-left: 14px; padding-right: 3px; }
+.port-row.right { right: 0; padding-right: 14px; padding-left: 3px; justify-content: flex-end; }
+.port-row.folded { pointer-events: none; }
+.port-row.folded .react-flow__handle { pointer-events: all; }
 .port-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.port-handle.react-flow__handle { width: 9px; height: 9px; border: 1.5px solid; border-radius: 50%; transition: transform 0.1s, box-shadow 0.1s; }
-.port-handle.bidi.react-flow__handle { border-radius: 2px; }
-.port-handle:not(.linked).react-flow__handle { background: var(--node-bg) !important; }
+/* Port dots: inputs hollow, outputs filled, bidirectional square; colour = signal type. */
+.port-handle.react-flow__handle { width: 10px; height: 10px; border: 1.8px solid var(--pc); border-radius: 50%; background: var(--node-bg); transition: transform 0.1s, box-shadow 0.1s; }
+.port-handle.output.react-flow__handle { background: var(--pc); }
+.port-handle.bidirectional.react-flow__handle { border-radius: 2.5px; background: linear-gradient(135deg, var(--pc) 50%, var(--node-bg) 50%); }
+.port-handle.input.linked.react-flow__handle { background: radial-gradient(circle, var(--pc) 0 2.2px, var(--node-bg) 2.8px); }
+.port-handle.output.linked.react-flow__handle, .port-handle.bidirectional.linked.react-flow__handle { background: var(--pc); box-shadow: 0 0 0 1.5px var(--node-bg), 0 0 0 2.6px var(--pc); }
+/* Device card */
+.device-node.card { border: 1px solid var(--card-line); border-radius: 12px; background: var(--node-bg); }
+.dn-head { position: absolute; left: 0; right: 0; top: 0; padding: 10px 12px 0; }
+.dn-chips { display: flex; align-items: center; gap: 4px; height: 17px; }
+.dn-chip { font-size: 8.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 6px; border-radius: 5px; color: var(--cc); background: color-mix(in srgb, var(--cc) 13%, transparent); border: 1px solid color-mix(in srgb, var(--cc) 35%, transparent); line-height: 11px; white-space: nowrap; max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+.dn-chip.group { text-transform: none; letter-spacing: 0; font-weight: 600; }
+.dn-cat { margin-left: auto; font-size: 9px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dn-title { font-size: 13.5px; font-weight: 700; margin-top: 4px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dn-sub, .dn-room { font-size: 10px; color: var(--text-2); line-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dn-room { color: var(--text-3); }
+.dn-io { position: absolute; left: 12px; right: 12px; display: flex; align-items: center; justify-content: space-between; font-size: 9.5px; color: var(--text-2); letter-spacing: 0.04em; }
+.dn-hide { border: none; background: none; padding: 0 2px; font-size: 9.5px; color: var(--text-2); cursor: pointer; }
+.dn-hide:hover { color: var(--accent); }
+.dn-sec { position: absolute; left: 8px; right: 8px; background: var(--sec-bg); border: 1px solid var(--sec-line); border-radius: 8px; pointer-events: none; }
+.dn-sec-head { display: flex; align-items: center; gap: 5px; padding: 0 8px; font-size: 9.5px; pointer-events: all; cursor: pointer; }
+.dn-sec-head .dot { width: 6px; height: 6px; border-radius: 50%; }
+.dn-caret { color: var(--text-3); font-size: 8px; width: 8px; }
+.dn-sec-name { font-weight: 600; filter: saturate(0.85); }
+.dn-sec-count { color: var(--text-3); margin-left: auto; }
+.dn-pill { position: relative; flex: 1; min-width: 0; height: 19px; display: flex; align-items: center; gap: 4px; padding: 0 7px; background: var(--pill-bg); border: 1px solid var(--pill-line); border-radius: 5px; font-size: 9.5px; cursor: pointer; }
+.port-row.right .dn-pill { justify-content: flex-start; }
+.port-row.right .dn-pill .port-label { flex: 1; text-align: left; }
+.dn-pill:hover { border-color: var(--accent); }
+.dn-pill.target:hover { background: var(--accent-soft); }
+.dn-num { color: var(--text-3); min-width: 14px; font-variant-numeric: tabular-nums; }
+.dn-arrow { color: var(--text-3); }
+.port-row.picked .dn-pill { border-color: var(--accent); background: var(--accent-soft); }
 .port-row:hover .react-flow__handle { transform: translateY(-50%) scale(1.35); }
 .device-node.wiring .port-row.invalid { opacity: 0.28; }
 .port-row.valid .react-flow__handle { box-shadow: 0 0 0 3px rgba(47, 158, 68, 0.55); transform: translateY(-50%) scale(1.25); }
@@ -480,10 +527,10 @@ button.link.show-all:hover { text-decoration: underline; }
 
 /* Patching multiples */
 .port-row.picked .port-label { color: var(--accent); font-weight: 700; }
-.port-row.picked .port-handle { box-shadow: 0 0 0 3px var(--accent); }
-.pick-badge { position: absolute; top: 2px; min-width: 12px; height: 12px; padding: 0 3px; border-radius: 6px; background: var(--accent); color: #fff; font-size: 8px; line-height: 12px; text-align: center; font-weight: 700; pointer-events: none; }
-.port-row.left .pick-badge { right: 4px; }
-.port-row.right .pick-badge { left: 4px; }
+.port-row.picked .port-handle { box-shadow: 0 0 0 3px var(--accent-soft); }
+.pick-badge { position: absolute; top: -5px; z-index: 2; min-width: 12px; height: 12px; padding: 0 3px; border-radius: 6px; background: var(--accent); color: #fff; font-size: 8px; line-height: 12px; text-align: center; font-weight: 700; pointer-events: none; }
+.port-row .pick-badge { right: -4px; }
+.port-row.compact .pick-badge { right: auto; left: 8px; top: 6px; }
 .picked-panel { background: var(--bg-2, #fff); border: 1px solid var(--accent); border-radius: 8px; padding: 6px 10px; font-size: 12px; display: flex; gap: 8px; align-items: center; box-shadow: 0 4px 16px rgba(0,0,0,.12); }
 
 /* Wall plate / floor box builder */
@@ -634,7 +681,6 @@ button.link.show-all:hover { text-decoration: underline; }
 .toast-close:hover { color: #fff; background: transparent !important; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
 .device-room { font-size: 10.5px; color: var(--accent); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 70px; line-height: 14px; }
-.device-node.grouped::before { content: ""; position: absolute; left: -1px; top: -1px; bottom: -1px; width: 5px; background: var(--group-color); border-radius: 10px 0 0 10px; pointer-events: none; }
 .device-node.dim { opacity: 0.18; }
 
 /* Groups */

@@ -5,7 +5,7 @@
 import { create } from 'zustand'
 import { produce } from 'immer'
 import {
-  audit, upgradeBay, BUILT_IN_MANUFACTURERS, ManufacturerDirectory, BUILT_IN_PATCH_TEMPLATES, BUILT_IN_PRODUCTS, CURRENT_SCHEMA, newProject, ProductLibrary,
+  audit, upgradeBay, nodeGeom, spreadCards, BUILT_IN_MANUFACTURERS, ManufacturerDirectory, BUILT_IN_PATCH_TEMPLATES, BUILT_IN_PRODUCTS, CURRENT_SCHEMA, newProject, ProductLibrary,
   type CableId, type EquipmentId, type PatchBayId, type PatchBayTemplate, type ProductDefinition, type Project, type RackId,
   type ValidationIssue, type IssueSubject,
 } from '@core/index'
@@ -225,6 +225,8 @@ export function parseProject(data: string): Project {
   p.patchBays ??= []
   p.racks ??= []
   p.patchBays.forEach(upgradeBay)
+  // 1.8 cards are taller (sections): nudge apart anything that now overlaps.
+  if ((p.diagram?.cards ?? 1) < 2) { spreadCards(p, nodeGeom); p.diagram = { ...(p.diagram ?? {}), cards: 2 } }
   return p
 }
 
