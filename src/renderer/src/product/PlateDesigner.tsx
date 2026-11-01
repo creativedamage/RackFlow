@@ -12,7 +12,7 @@ const REAR_OPTIONS: { value: PlateInsert['rear']; label: string }[] = [
   { value: 'euroblock', label: 'Euroblock (screw terminal)' },
   { value: 'none', label: 'No tie line' },
 ]
-const GROUP_ORDER = ['Audio', 'Speaker', 'Video', 'Network', 'Data', 'Control', 'Lighting', 'Power']
+const GROUP_ORDER = ['Audio', 'Multipin', 'Speaker', 'Video', 'Network', 'Data', 'Control', 'Lighting', 'Power']
 const KIND_NAME: Record<PlateKind, string> = { wallBox: 'Wall Box', wallPlate: 'Wall Plate', floorBox: 'Floor Box', rackPanel: 'Rack Panel' }
 const short = (k: string) => PLATE_MODULES[k].name.replace(/\s*\(.*\)$/, '')
 

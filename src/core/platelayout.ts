@@ -62,7 +62,7 @@ export const finishOf = (f: PlateFinish) => FINISHES.find((x) => x.value === f) 
  * receptacles (33.3 × 66.7 mm face, outlets 38.1 mm apart), binding posts on
  * 19 mm (3/4") centres, D-sub shells.
  */
-type Shape = 'd' | 'keystone' | 'duplex' | 'twist' | 'round' | 'block'
+type Shape = 'd' | 'keystone' | 'duplex' | 'twist' | 'round' | 'block' | 'multi'
 const FOOT: Record<string, { w: number; h: number; shape: Shape; icon: string }> = {
   xlrF: { w: 26, h: 31, shape: 'd', icon: 'xlrF' }, xlrM: { w: 26, h: 31, shape: 'd', icon: 'xlrM' }, dmx: { w: 26, h: 31, shape: 'd', icon: 'xlr5' },
   nl4: { w: 26, h: 31, shape: 'd', icon: 'nl4' }, ethercon: { w: 26, h: 31, shape: 'd', icon: 'ethercon' }, opticalcon: { w: 26, h: 31, shape: 'd', icon: 'oc' },
@@ -74,6 +74,12 @@ const FOOT: Record<string, { w: number; h: number; shape: Shape; icon: string }>
   binding: { w: 32, h: 14, shape: 'block', icon: 'posts' },
   pwr515: { w: 33.3, h: 66.7, shape: 'duplex', icon: '515' }, pwr520: { w: 33.3, h: 66.7, shape: 'duplex', icon: '520' }, pwrSchuko: { w: 50, h: 50, shape: 'round', icon: 'schuko' },
   pwrL530: { w: 44, h: 44, shape: 'twist', icon: 'L530' },
+  // Multipins (chassis flange, approximate – check the maker's drawing for cut-outs)
+  w1F: { w: 38, h: 38, shape: 'multi', icon: 'w1F' }, w1M: { w: 38, h: 38, shape: 'multi', icon: 'w1M' },
+  w2F: { w: 44, h: 44, shape: 'multi', icon: 'w2F' }, w2M: { w: 44, h: 44, shape: 'multi', icon: 'w2M' },
+  socaF: { w: 38, h: 38, shape: 'multi', icon: 'socaF' }, socaM: { w: 38, h: 38, shape: 'multi', icon: 'socaM' },
+  amp57F: { w: 66, h: 17, shape: 'multi', icon: 'amp50' },
+  edac56: { w: 54, h: 28, shape: 'multi', icon: 'edac56' }, edac90: { w: 66, h: 28, shape: 'multi', icon: 'edac90' },
 }
 export const footprint = (module: string) => FOOT[module] ?? { w: 26, h: 31, shape: 'd' as Shape, icon: module }
 
@@ -249,6 +255,30 @@ export function jackSVG(module: string): string {
       L(`M -2.4 ${n(cy + 8.2)} L -2.4 ${n(cy + 6.4)} A 2.4 2.4 0 0 1 2.4 ${n(cy + 6.4)} L 2.4 ${n(cy + 8.2)} Z`) // ground
     }
     C(0, 0, 1.6)
+  } else if (f.shape === 'multi') {
+    if (f.icon.startsWith('amp50')) {
+      // Amphenol 57 / "Centronics" 50: flange with two screws, trapezoid shell, contact tongue.
+      R(-hw, -hh, f.w, f.h, 1, 0.5); C(-hw + 3.6, 0, 1.6); C(hw - 3.6, 0, 1.6)
+      L('M -26 -4.6 L 26 -4.6 L 23.6 4.6 L -23.6 4.6 Z'); R(-21.5, -1.6, 43, 3.2, 0.4)
+      for (let i = 0; i < 25; i++) { const x = (i - 12) * 1.7; L(`M ${n(x)} -1.6 L ${n(x)} -2.6`, 0.2); L(`M ${n(x)} 1.6 L ${n(x)} 2.6`, 0.2) }
+    } else if (f.icon.startsWith('edac')) {
+      // EDAC rectangular: frame with two screws, keyed insert, pin grid.
+      const [rows, cols] = f.icon === 'edac90' ? [5, 18] : [4, 14]
+      R(-hw, -hh, f.w, f.h, 1.5, 0.5); C(-hw + 4, 0, 1.6); C(hw - 4, 0, 1.6)
+      const iw = f.w - 15, ih = f.h - 8
+      L(`M ${n(-iw / 2 + 2)} ${n(-ih / 2)} L ${n(iw / 2)} ${n(-ih / 2)} L ${n(iw / 2)} ${n(ih / 2)} L ${n(-iw / 2)} ${n(ih / 2)} L ${n(-iw / 2)} ${n(-ih / 2 + 2)} Z`)
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) C(-iw / 2 + 2 + (c + 0.5) * ((iw - 4) / cols), -ih / 2 + 1.5 + (r + 0.5) * ((ih - 3) / rows), 0.4, 0.2)
+    } else {
+      // Circular multipin (W1 / W2 / Socapex): square flange, 4 screws, coupling ring, keyway, pin field.
+      const male = f.icon.endsWith('M')
+      const ring = f.icon.startsWith('w2') ? [1, 6, 12, 18, 24] : f.icon.startsWith('w1') ? [1, 8, 14, 16] : [1, 6, 12]
+      const ro = hw - 5, ri = ro - 3
+      R(-hw, -hh, f.w, f.h, 2, 0.5)
+      for (const [x, y] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) C(x * (hw - 3.6), y * (hh - 3.6), 1.4)
+      C(0, 0, ro); C(0, 0, ri); R(-1.3, -ri - 0.4, 2.6, 2.4, 0.3)
+      const step = (ri - 2) / Math.max(1, ring.length - 1)
+      ring.forEach((k, j) => { for (let i = 0; i < k; i++) { const a = (i / k) * Math.PI * 2 + j * 0.2; C(Math.sin(a) * j * step, -Math.cos(a) * j * step, male ? 0.35 : 0.55, 0.22) } })
+    }
   } else if (f.shape === 'twist') {
     C(0, 0, hw, 0.5); C(0, 0, hw - 5)
     for (const a of [-1.2, 0.9, 2.95]) L(`M ${n(Math.cos(a) * 11)} ${n(Math.sin(a) * 11)} A 11 11 0 0 1 ${n(Math.cos(a + 0.55) * 11)} ${n(Math.sin(a + 0.55) * 11)}`, 1.6)

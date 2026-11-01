@@ -150,6 +150,13 @@ export const CONNECTORS = {
   powerCONTrue1: c('powerCON TRUE1', ['ac120V', 'ac230V'], { power: true }),
   dcBarrel: c('DC Barrel', ['dc12V'], { power: true }),
   xlr4: c('XLR-4 (DC)', ['dc12V'], { power: true }),
+  // Multipin audio snakes / tie lines
+  whirlwindW1: c('Whirlwind W1 (39-pin)', ['analogMic', 'analogLine']),
+  whirlwindW2: c('Whirlwind W2 (61-pin)', ['analogMic', 'analogLine']),
+  socapex19: c('Socapex 19-pin', ['analogMic', 'analogLine']),
+  amphenol57: c('Amphenol 57 (50-pin)', ['analogLine', 'analogMic']),
+  edac56: c('EDAC 56-pin', ['analogMic', 'analogLine']),
+  edac90: c('EDAC 90-pin', ['analogMic', 'analogLine']),
 } satisfies Record<string, ConnectorMeta>
 
 export type ConnectorType = keyof typeof CONNECTORS
