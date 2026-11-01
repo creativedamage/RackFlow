@@ -39,3 +39,22 @@ describe('device card', () => {
     expect(r.made.map((m) => m.to.port)).toEqual(ins.slice(2, 6).map((x) => x.id))
   })
 })
+
+import { cardPortLabel, makeFiberProduct } from './index'
+describe('front / rear cards', () => {
+  it('fiber modules show front adapters and rear trunks under Front | Rear headings', () => {
+    const p = newProject()
+    const e = addEquipment(p, makeFiberProduct({ enclosure: 'fhd-1u', fiberType: 'OS2', slots: [{ module: 'lc6' }, { module: 'mtp12-6lc' }, { module: null }, { module: null }] }, { model: 'FHD' }), { x: 0, y: 0 })
+    const L = cardLayout(e)
+    expect(L.sections.map((s) => [s.name, s.faces])).toEqual([['Slot 1', true], ['Slot 2', true]])
+    const s2 = L.sections[1]
+    expect(s2.rows[0].left!.face).toBe('front')
+    expect(s2.rows[0].right!.face).toBe('rear')
+    expect(cardPortLabel(s2.rows[0].left!.label, s2.name, true)).toBe('LC 1')
+    expect(cardPortLabel(s2.rows[0].right!.label, s2.name, true)).toBe('MTP-12 trunk')
+    expect(cardPortLabel(L.sections[0].rows[2].right!.label, 'Slot 1', true)).toBe('LC 3')
+    // Rows start below the heading row.
+    const g = nodeGeom(e)
+    expect(g.port(s2.rows[0].left!.id)!.y).toBe(s2.y + 22 + 14 + 12)
+  })
+})

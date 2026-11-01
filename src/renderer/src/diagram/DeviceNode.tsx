@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react'
 import { Handle, NodeToolbar, Position, type NodeProps, type Node } from '@xyflow/react'
 import {
-  cardLayout, faceProduct, CATEGORIES, connectorName, DOMAINS, nodeGeom, faceSVG, IO_H, portDomain, previewHeight, SEC_HEAD, SIGNALS, SMALL_HEAD, SMALL_W, viewsOf,
+  cardLayout, cardPortLabel, FACE_H, faceProduct, CATEGORIES, connectorName, DOMAINS, nodeGeom, faceSVG, IO_H, portDomain, previewHeight, SEC_HEAD, SIGNALS, SMALL_HEAD, SMALL_W, viewsOf,
   setPortsInView, type CardSection, type EquipmentInstance, type PortTemplate, type SignalDomain,
 } from '@core/index'
 import { clickPort, pickIndex, useWiring } from './wiring'
@@ -55,7 +55,7 @@ export const DeviceNode = memo(function DeviceNode({ data, selected }: NodeProps
     return q === 'clean' ? 'valid' : q === 'caution' ? 'caution' : 'invalid'
   }
 
-  const renderPort = (p: PortTemplate, side: 'left' | 'right', y: number, num: number | null, folded: boolean) => {
+  const renderPort = (p: PortTemplate, side: 'left' | 'right', y: number, num: number | null, folded: boolean, sec?: CardSection) => {
     const d = portDomain(p)
     const color = d ? DOMAINS[d].color : '#888'
     const pick = pickIndex(picked, { equipment: eq.id, port: p.id })
@@ -78,7 +78,7 @@ export const DeviceNode = memo(function DeviceNode({ data, selected }: NodeProps
           <div className={`dn-pill ${picking ? 'target' : ''}`}>
             {num != null && !eq.portNumbers?.[p.id.replace(/\.r$/, '.f')] && <span className="dn-num">{num}.</span>}
             {side === 'left' && <span className="dn-arrow">{arrow}</span>}
-            <span className="port-label">{p.label}</span>
+            <span className="port-label">{sec ? cardPortLabel(p.label, sec.name, sec.faces) : p.label}</span>
             {side === 'right' && <span className="dn-arrow">{arrow}</span>}
             {pick >= 0 && <span className="pick-badge">{pick + 1}</span>}
           </div>
@@ -140,6 +140,7 @@ export const DeviceNode = memo(function DeviceNode({ data, selected }: NodeProps
           <span className="dn-sec-name" style={{ color }}>{s.name}</span>
           {s.collapsed && <span className="dn-sec-count">{s.ports.length} port{s.ports.length === 1 ? '' : 's'}</span>}
         </div>
+        {s.faces && !s.collapsed && <div className="dn-faces" style={{ height: FACE_H }}><span>Front</span><span>Rear</span></div>}
       </div>
     )
   }
@@ -169,8 +170,8 @@ export const DeviceNode = memo(function DeviceNode({ data, selected }: NodeProps
       {lay.sections.flatMap((s) => {
         const folded = s.collapsed
         return s.rows.flatMap((r) => [
-          r.left ? renderPort(r.left, 'left', lay.ports.get(r.left.id)!.y, r.li + 1, folded) : null,
-          r.right ? renderPort(r.right, 'right', lay.ports.get(r.right.id)!.y, r.ri + 1, folded) : null,
+          r.left ? renderPort(r.left, 'left', lay.ports.get(r.left.id)!.y, r.li + 1, folded, s) : null,
+          r.right ? renderPort(r.right, 'right', lay.ports.get(r.right.id)!.y, r.ri + 1, folded, s) : null,
         ])
       })}
     </div>

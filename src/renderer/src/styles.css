@@ -1099,3 +1099,8 @@ input.mono { font-family: var(--mono); }
 
 .cable-color { display: inline-flex; align-items: center; gap: 6px; }
 .cable-color i { width: 11px; height: 11px; border-radius: 3px; border: 1px solid var(--line); flex: none; }
+
+/* Front | Rear headings on panel / box / fiber cards */
+.dn-faces { display: grid; grid-template-columns: 1fr 1fr; padding: 0 6px; font-size: 8px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); line-height: 14px; }
+.dn-faces span { padding-left: 4px; }
+.dn-faces span + span { padding-left: 7px; }

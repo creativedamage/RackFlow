@@ -226,7 +226,7 @@ export function parseProject(data: string): Project {
   p.racks ??= []
   p.patchBays.forEach(upgradeBay)
   // 1.8 cards are taller (sections): nudge apart anything that now overlaps.
-  if ((p.diagram?.cards ?? 1) < 2) { spreadCards(p, nodeGeom); p.diagram = { ...(p.diagram ?? {}), cards: 2 } }
+  if ((p.diagram?.cards ?? 1) < 3) { spreadCards(p, nodeGeom); p.diagram = { ...(p.diagram ?? {}), cards: 3 } }
   return p
 }
 

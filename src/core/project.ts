@@ -16,7 +16,7 @@ export const RACK_UNIT_MM = 44.45
 export const WATTS_TO_BTU = 3.41214163
 
 export function newProject(name = 'Untitled Project'): Project {
-  return { schemaVersion: CURRENT_SCHEMA, info: { name, client: '', designer: '', revision: 'A' }, equipment: [], cables: [], racks: [], patchBays: [], diagram: { cards: 2 } }
+  return { schemaVersion: CURRENT_SCHEMA, info: { name, client: '', designer: '', revision: 'A' }, equipment: [], cables: [], racks: [], patchBays: [], diagram: { cards: 3 } }
 }
 
 // MARK: Lookup

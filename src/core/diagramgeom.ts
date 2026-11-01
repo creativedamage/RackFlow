@@ -69,7 +69,13 @@ export function splitPorts(eq: EquipmentInstance) {
 }
 
 export interface CardRow { left?: PortTemplate; right?: PortTemplate; li: number; ri: number; y: number }
-export interface CardSection { key: string; name: string; domain: SignalDomain | null; y: number; h: number; collapsed: boolean; rows: CardRow[]; ports: PortTemplate[] }
+export interface CardSection { key: string; name: string; domain: SignalDomain | null; y: number; h: number; collapsed: boolean; rows: CardRow[]; ports: PortTemplate[]; /** Front | Rear column headings (panels, boxes, fiber, patch bays). */ faces: boolean }
+
+/** Height of the Front | Rear heading row. */
+export const FACE_H = 14
+
+/** Devices whose card columns are the panel's front and rear rather than in / out. */
+export const isFaceSplit = (eq: EquipmentInstance) => ['wallBox', 'wallPlate', 'floorBox', 'connectorPanel', 'fiberEnclosure'].includes(eq.product.category) || (eq.product.category === 'patchBay' && eq.product.ports.some((p) => p.face === 'front'))
 export interface CardLayout {
   width: number
   height: number
@@ -125,6 +131,7 @@ export function cardLayout(eq: EquipmentInstance): CardLayout {
     keys[i] = name
     keys.splice(keys.indexOf(kj), 1)
   }
+  const faceSplit = isFaceSplit(eq)
   const ioY = headerHeight(eq)
   const ports = new Map<string, { y: number; side: 'left' | 'right' }>()
   const sections: CardSection[] = []
@@ -141,18 +148,20 @@ export function cardLayout(eq: EquipmentInstance): CardLayout {
     const collapsed = !!eq.ioHidden || folded.has(k)
     const n = Math.max(g.left.length, g.right.length)
     const rows: CardRow[] = []
-    for (let i = 0; i < n; i++) rows.push({ left: g.left[i], right: g.right[i], li: i, ri: i, y: y + SEC_HEAD + i * ROW_H + ROW_H / 2 })
-    const h = collapsed ? SEC_HEAD : SEC_HEAD + n * ROW_H + SEC_PAD
+    const faces = faceSplit && g.left.length > 0 && g.right.length > 0
+    const top = SEC_HEAD + (faces ? FACE_H : 0)
+    for (let i = 0; i < n; i++) rows.push({ left: g.left[i], right: g.right[i], li: i, ri: i, y: y + top + i * ROW_H + ROW_H / 2 })
+    const h = collapsed ? SEC_HEAD : top + n * ROW_H + SEC_PAD
     if (eq.ioHidden) {
       for (const p of all) ports.set(p.id, { y: ioY + ioH / 2, side: side.get(p.id)! })
-      sections.push({ key: k, name: k, domain: d, y, h: 0, collapsed: true, rows, ports: all })
+      sections.push({ key: k, name: k, domain: d, y, h: 0, collapsed: true, rows, ports: all, faces })
       continue
     }
     for (const r of rows) {
       if (r.left) ports.set(r.left.id, { y: collapsed ? y + SEC_HEAD / 2 : r.y, side: 'left' })
       if (r.right) ports.set(r.right.id, { y: collapsed ? y + SEC_HEAD / 2 : r.y, side: 'right' })
     }
-    sections.push({ key: k, name: k, domain: d, y, h, collapsed, rows, ports: all })
+    sections.push({ key: k, name: k, domain: d, y, h, collapsed, rows, ports: all, faces })
     y += h + SEC_GAP
   }
   const height = eq.ioHidden || !keys.length ? ioY + ioH + 6 : y - SEC_GAP + 8
@@ -180,4 +189,12 @@ export function nodeGeom(eq: EquipmentInstance): NodeGeom {
 export function cardSide(eq: EquipmentInstance, portId: string): PortTemplate[] {
   const L = cardLayout(eq)
   return L.order.left.some((p) => p.id === portId) ? L.order.left : L.order.right
+}
+
+/** On front / rear cards, a port's name inside its section: without the section name in front ("Slot 1 LC 3" → "LC 3") or "(rear)" – the heading already says so. */
+export function cardPortLabel(label: string, section: string, faces: boolean): string {
+  let t = label
+  if (faces && section && t.toLowerCase().startsWith(section.toLowerCase() + ' ') && t.length > section.length + 1) t = t.slice(section.length + 1)
+  if (faces) t = t.replace(/\s*\(rear\)$/i, '').replace(/\s*\(trunk\)$/i, ' trunk')
+  return t
 }

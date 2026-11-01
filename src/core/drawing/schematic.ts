@@ -9,7 +9,7 @@ import { CATEGORIES, type Annotation, type Cable, type EquipmentInstance, type P
 import { DOMAINS } from '../signals'
 import { portDomain } from '../project'
 import { planChannels, type ChannelWire } from '../autolayout'
-import { cardLayout, headerHeight, NODE_WIDTH, nodeGeom, SEC_HEAD, splitPorts } from '../diagramgeom'
+import { cardLayout, cardPortLabel, FACE_H, headerHeight, NODE_WIDTH, nodeGeom, SEC_HEAD, splitPorts } from '../diagramgeom'
 import { crossings, route, WIRE_CLEAR, type Pt, type Rect } from '../wireroute'
 import { groupsOf } from '../groups'
 import { newSheet, sheetSize, type SheetOptions } from './sheet'
@@ -253,7 +253,12 @@ function drawDevice(svg: Svg, e: EquipmentInstance, o: SchematicOptions) {
   for (const sec of L.sections) {
     svg.text(x + 6, y + sec.y + SEC_HEAD / 2 + 0.5, sec.name.toUpperCase(), { size: 7.5, weight: 'bold', fill: '#555', maxWidth: NODE_WIDTH - 12 })
     svg.line(x + 6, y + sec.y + SEC_HEAD - 3, x + NODE_WIDTH - 6, y + sec.y + SEC_HEAD - 3, { lw: 0.3, stroke: '#999' })
+    if (sec.faces) {
+      svg.text(x + 6, y + sec.y + SEC_HEAD + FACE_H / 2, 'FRONT', { size: 6.5, fill: '#777' })
+      svg.text(x + NODE_WIDTH - 6, y + sec.y + SEC_HEAD + FACE_H / 2, 'REAR', { size: 6.5, fill: '#777', anchor: 'end' })
+    }
   }
+  const secOf = new Map(L.sections.flatMap((sec) => sec.ports.map((q) => [q.id, sec] as const)))
   const kind = e.product.category === 'other' ? 'DEVICE' : CATEGORIES[e.product.category].name.toUpperCase()
   svg.text(x + NODE_WIDTH / 2, y + boxH - 8, kind, { size: 9, anchor: 'middle', maxWidth: NODE_WIDTH - 16 })
   const port = (pt: PortTemplate, _i: number, side: 'left' | 'right') => {
@@ -263,7 +268,8 @@ function drawDevice(svg: Svg, e: EquipmentInstance, o: SchematicOptions) {
     const bx = side === 'left' ? x - BADGE : x + NODE_WIDTH
     svg.rect(bx, py - 6, BADGE, 12, { lw: 0.8, stroke })
     svg.text(bx + BADGE / 2, py + 0.5, connectorBadge(pt.connector), { size: 6.5, anchor: 'middle', maxWidth: BADGE - 3, fill: stroke })
-    const label = pt.label.toUpperCase()
+    const sec = secOf.get(pt.id)
+    const label = (sec ? cardPortLabel(pt.label, sec.name, sec.faces) : pt.label).toUpperCase()
     if (side === 'left') svg.text(x + 5, py, label, { size: 8.5, maxWidth: NODE_WIDTH / 2 - 8 })
     else svg.text(x + NODE_WIDTH - 5, py, label, { size: 8.5, anchor: 'end', maxWidth: NODE_WIDTH / 2 - 8 })
   }
