@@ -171,7 +171,7 @@ export const DeviceNode = memo(function DeviceNode({ data, selected }: NodeProps
         const folded = s.collapsed
         return s.rows.flatMap((r) => [
           r.left ? renderPort(r.left, 'left', lay.ports.get(r.left.id)!.y, r.li + 1, folded, s) : null,
-          r.right ? renderPort(r.right, 'right', lay.ports.get(r.right.id)!.y, r.ri + 1, folded, s) : null,
+          r.right ? renderPort(r.right, 'right', lay.ports.get(r.right.id)!.y, r.ri >= 0 ? r.ri + 1 : null, folded, s) : null,
         ])
       })}
     </div>

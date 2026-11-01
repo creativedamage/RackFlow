@@ -1,6 +1,6 @@
 // Multipin ties: XLRs (or any audio jacks) on a box wired inside to a multipin
-// (W1, W2, EDAC…). Each tied jack is one channel of the multipin and has no
-// tie line of its own; the multipin carries them all out of the box. The
+// (W1, W2, EDAC…). Each tied jack is one channel of the multipin, and keeps
+// its own rear tie line too – the box can be used with or without the snake. The
 // multipin gets a channel summary ("M1-8, RET 1-4") on its port name and on
 // the face drawing, and the card lines the jacks up beside it.
 
@@ -59,6 +59,8 @@ export function applyTies(prod: ProductDefinition) {
     const name = port.label
     port.group = name
     for (const c of chans) c.group = name
+    // Their rear tie lines stay (patch bay or multipin – either way) and sit in the same section.
+    for (const j of tiedTo(spec, ins.pid)) { const r = byId.get(`${j.pid}.r`); if (r) r.group = name }
     const sum = summarizeLabels(chans.map((c) => c.label))
     if (sum) port.label = `${name}${SEP}${sum}`
   }

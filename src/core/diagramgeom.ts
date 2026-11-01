@@ -150,12 +150,28 @@ export function cardLayout(eq: EquipmentInstance): CardLayout {
     const all = [...g.left, ...g.right]
     const d = all.map(portDomain).find(Boolean) ?? null
     const collapsed = !!eq.ioHidden || folded.has(k)
-    const n = Math.max(g.left.length, g.right.length)
     const rows: CardRow[] = []
     const faces = faceSplit && g.left.length > 0 && g.right.length > 0
-    const heads: [string, string] | undefined = g.right.some((p) => mpPorts.has(p.id)) ? ['Channels', 'Multipin'] : undefined
+    const mpHere = g.right.find((p) => mpPorts.has(p.id))
+    const heads: [string, string] | undefined = mpHere ? ['Channels', 'Rear · Multipin'] : undefined
     const top = SEC_HEAD + (faces ? FACE_H : 0)
-    for (let i = 0; i < n; i++) rows.push({ left: g.left[i], right: g.right[i], li: i, ri: i, y: y + top + i * ROW_H + ROW_H / 2 })
+    // A multipin section: the multipin on its own row at the top, then each jack's front
+    // beside its own rear tie line (so they can go to a patch bay as well).
+    const pairs: [PortTemplate | undefined, PortTemplate | undefined][] = []
+    if (mpHere) {
+      pairs.push([undefined, mpHere])
+      const rest = g.right.filter((p) => p !== mpHere)
+      const used = new Set<PortTemplate>()
+      for (const f of g.left) { const r = rest.find((q) => q.id === f.id.replace(/\.f$/, '.r')); if (r) used.add(r); pairs.push([f, r]) }
+      for (const r of rest) if (!used.has(r)) pairs.push([undefined, r])
+    } else for (let i = 0; i < Math.max(g.left.length, g.right.length); i++) pairs.push([g.left[i], g.right[i]])
+    const n = pairs.length
+    let li = 0, ri = 0
+    pairs.forEach(([l, r], i) => {
+      // Multipin sections: a rear is numbered like its front; the multipin row has no number (-1).
+      const rIdx = mpHere ? (r === mpHere ? -1 : l ? li : ri++) : r ? ri++ : ri
+      rows.push({ left: l, right: r, li: l ? li++ : li, ri: rIdx, y: y + top + i * ROW_H + ROW_H / 2 })
+    })
     const h = collapsed ? SEC_HEAD : top + n * ROW_H + SEC_PAD
     if (eq.ioHidden) {
       for (const p of all) ports.set(p.id, { y: ioY + ioH / 2, side: side.get(p.id)! })

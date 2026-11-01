@@ -435,7 +435,7 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
               {oneJack.tie && (<div className="pd-tie">
                 <label className="field-label">Multipin channel</label>
                 <span className="row-gap"><b>Ch {tiedTo(spec, oneJack.tie).findIndex((x) => x.pid === one) + 1} of {nameOf(oneJack.tie)}</b><button className="mini" onClick={() => untie([one!])}>Untie</button></span>
-                <p className="muted small" style={{ margin: 0 }}>Wired inside the box to the multipin – no tie line of its own.</p>
+                <p className="muted small" style={{ margin: 0 }}>Wired inside the box to the multipin. Its own tie line stays, so it can also go to a patch bay.</p>
               </div>)}
               <label className="field-label">Position (centre, from top-left)</label>
               <span className="row-gap">
@@ -461,7 +461,7 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
               {selMps.length === 1 && tieable.length > 0 && (<div className="pd-tie">
                 <h4>Multipin</h4>
                 <button className="primary" onClick={() => tie(selMps[0].pid!, tieable.map((x) => x.pid!))}>Tie {tieable.length} jack{tieable.length === 1 ? '' : 's'} to {nameOf(selMps[0].pid!)}</button>
-                <p className="muted small" style={{ margin: 0 }}>They become its channels (in their order on the box), drop their own tie lines and line up beside it on the wiring diagram. The multipin gets a channel summary, e.g. “M1-8, RET 1-4”.{tiedTo(spec, selMps[0].pid!).length + tieable.filter((x) => x.tie !== selMps[0].pid).length > MULTIPIN_CHANNELS[selMps[0].module] ? ` That’s more than its ${MULTIPIN_CHANNELS[selMps[0].module]} channels.` : ''}</p>
+                <p className="muted small" style={{ margin: 0 }}>They become its channels (in their order on the box) and line up under it on the wiring diagram. Their own tie lines stay, so you can still wire them to a patch bay. The multipin gets a channel summary, e.g. “M1-8, RET 1-4”.{tiedTo(spec, selMps[0].pid!).length + tieable.filter((x) => x.tie !== selMps[0].pid).length > MULTIPIN_CHANNELS[selMps[0].module] ? ` That’s more than its ${MULTIPIN_CHANNELS[selMps[0].module]} channels.` : ''}</p>
               </div>)}
               {selMps.length > 1 && <p className="muted small">Select one multipin with its jacks to tie them.</p>}
               {tieable.some((x) => x.tie) && <button className="mini" onClick={() => untie(tieable.filter((x) => x.tie).map((x) => x.pid!))}>Untie selected</button>}

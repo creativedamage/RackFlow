@@ -150,7 +150,7 @@ export interface PlateInsert {
   rear: PlateRear
   /** Fixed port id base for a single placed jack (designer); keeps cables attached when others are removed. */
   pid?: string
-  /** Wired inside the box to this multipin (its pid): the jack is one of the multipin's channels and has no tie line of its own. */
+  /** Wired inside the box to this multipin (its pid): the jack is also one of the multipin's channels (its own tie line stays). */
   tie?: string
 }
 

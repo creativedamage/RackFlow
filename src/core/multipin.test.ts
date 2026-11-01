@@ -22,18 +22,25 @@ describe('multipin ties', () => {
     const prod = makePlateProduct({ kind: 'wallBox', style: '12" x 12"', inserts: jacks() } as never, { model: 'Stage box' })
     const mp = prod.ports.find((x) => x.id === 'w1F.1.f')!
     expect(mp.label).toBe('Whirlwind W1 Female · M1-8, RET 1-4')
-    // No rear tie line for tied jacks or the multipin; the untied spare keeps its own.
-    expect(prod.ports.filter((x) => x.face === 'rear').map((x) => x.id)).toEqual(['xlrF.9.r'])
+    // Every jack keeps its rear tie line (patch bay or multipin); the tied multipin has none of its own.
+    const rears = prod.ports.filter((x) => x.face === 'rear').map((x) => x.id)
+    expect(rears).toHaveLength(13)
+    expect(rears).not.toContain('w1F.1.r')
     const p: Project = newProject()
     const e = addEquipment(p, prod, { x: 0, y: 0 })
     const sec = cardLayout(e).sections.find((s) => s.heads)!
-    expect(sec.heads).toEqual(['Channels', 'Multipin'])
+    expect(sec.heads).toEqual(['Channels', 'Rear · Multipin'])
     expect(sec.rows[0].right!.id).toBe('w1F.1.f')
-    expect(sec.rows.map((r) => r.left?.label)).toEqual(['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'RET 1', 'RET 2', 'RET 3', 'RET 4'])
-    // The multipin is on the right edge, in line with channel 1.
+    expect(sec.rows[0].left).toBeUndefined()
+    expect(sec.rows.slice(1).map((r) => r.left?.label)).toEqual(['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'RET 1', 'RET 2', 'RET 3', 'RET 4'])
+    // Each jack's rear tie line sits beside it.
+    expect(sec.rows.slice(1).every((r) => r.right!.id === r.left!.id.replace(/\.f$/, '.r'))).toBe(true)
     const g = nodeGeom(e)
     expect(g.port('w1F.1.f')!.x).toBe(g.width)
-    expect(g.port('w1F.1.f')!.y).toBe(g.port('xlrF.1.f')!.y)
+    expect(g.port('xlrF.1.r')!.y).toBe(g.port('xlrF.1.f')!.y)
+    // …and a tied jack can still be wired to a patch bay-style punch-down.
+    const pb = addEquipment(p, makePlateProduct({ kind: 'rackPanel', style: '1RU', inserts: [{ module: 'xlrM', count: 1, rear: 'idcPunchdown', pid: 'xlrM.1' }] } as never, { model: 'Rack panel' }), { x: 400, y: 0 })
+    expect(connect(p, { equipment: e.id, port: 'xlrF.1.r' }, { equipment: pb.id, port: 'xlrM.1.r' }).cableId).toBeTruthy()
     expect(plateSVG(prod.plate!)).toContain('M1-8, RET 1-4')
   })
   it('follows box port numbers', () => {

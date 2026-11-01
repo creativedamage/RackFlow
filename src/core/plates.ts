@@ -77,7 +77,7 @@ const REAR_NAME: Record<Exclude<PlateInsert['rear'], 'same' | 'none'>, Connector
 export function platePorts(spec: PlateSpec): PortTemplate[] {
   const ports: PortTemplate[] = []
   const used = new Map<string, number>()
-  // Jacks tied to a multipin – and the multipin itself – have no tie line of their own.
+  // A multipin with jacks tied to it has no tie line of its own – its channels' tie lines are its rear.
   const mps = tiedMultipins(spec)
   for (const ins of spec.inserts) {
     const m = PLATE_MODULES[ins.module]
@@ -96,7 +96,7 @@ export function platePorts(spec: PlateSpec): PortTemplate[] {
         continue
       }
       ports.push({ id: `${id}.f`, label, connector: m.connector, gender: m.gender, direction: 'bidirectional', signals: [...m.signals], group: m.group, face: 'front', maxConnections: 1 })
-      if (ins.rear !== 'none' && !ins.tie && !(ins.pid && mps.has(ins.pid))) {
+      if (ins.rear !== 'none' && !(ins.pid && mps.has(ins.pid))) {
         const rc = ins.rear === 'same' ? m.connector : REAR_NAME[ins.rear]
         ports.push({ id: `${id}.r`, label: `${label} (rear)`, connector: rc, gender: ins.rear === 'same' ? m.gender === 'male' ? 'male' : 'female' : 'female',
           direction: 'bidirectional', signals: [...m.signals], group: m.group, face: 'rear', maxConnections: 1 })
