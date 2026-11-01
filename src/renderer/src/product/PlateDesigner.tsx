@@ -19,6 +19,10 @@ const short = (k: string) => PLATE_MODULES[k].name.replace(/\s*\(.*\)$/, '')
 type Sel = Set<string>
 const isText = (id: string) => id.startsWith('t.')
 
+/** Designer clipboard: jacks (with their spot) and text, shared across plates so you can paste into another box. */
+type ClipItem = { kind: 'jack'; ins: PlateInsert; x: number; y: number } | { kind: 'text'; t: PlateLayout['texts'][number] }
+let clipboard: { items: ClipItem[]; from: string; pastes: number } | null = null
+
 /**
  * Plate / floor box / rack panel designer: pick a face, click or drag
  * connectors onto it, move them with a snap grid, align and distribute,
@@ -100,6 +104,45 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
     })
     setSpec(d0); setSel(fresh)
   }
+  // ⌘C / ⌘X / ⌘V: copy, cut and paste jacks and text (also into another plate).
+  const copySel = () => {
+    const ids = [...sel]; if (!ids.length) return false
+    const items: ClipItem[] = []
+    for (const id of ids) {
+      if (isText(id)) { const t = L.texts.find((x) => x.id === id); if (t) items.push({ kind: 'text', t: structuredClone(t) }) }
+      else { const ins = spec.inserts.find((x) => x.pid === id); const at = L.jacks[id]; if (ins && at) items.push({ kind: 'jack', ins: structuredClone(ins), x: at.x, y: at.y }) }
+    }
+    clipboard = { items, from: initial.key, pastes: 0 }
+    return items.length > 0
+  }
+  const paste = () => {
+    if (!clipboard?.items.length) return
+    clipboard.pastes++
+    // Same plate: step each paste down-right so copies don't stack; another plate: same spot.
+    const off = clipboard.from === initial.key ? 6 * clipboard.pastes : 0
+    const fresh = new Set<string>()
+    setSpec(produce(spec, (d) => {
+      d.layout ??= structuredClone(L)
+      for (const it of clipboard!.items) {
+        if (it.kind === 'text') { const c = { ...structuredClone(it.t), id: newPlateText(0, 0).id, x: Math.min(L.w - 2, it.t.x + off), y: Math.min(L.h - 2, it.t.y + off) }; d.layout!.texts.push(c); fresh.add(c.id) }
+        else {
+          const pid = nextPid(d, it.ins.module)
+          d.inserts.push({ ...structuredClone(it.ins), pid, count: 1 })
+          d.layout!.jacks[pid] = { x: Math.min(L.w, it.x + off), y: Math.min(L.h, it.y + off) }
+          fresh.add(pid)
+        }
+      }
+    }))
+    setSel(fresh)
+  }
+  useEffect(() => {
+    const busy = (e: Event) => !!(e.target as HTMLElement)?.closest?.('input, textarea, select') || !!window.getSelection()?.toString()
+    const onCopy = (e: ClipboardEvent) => { if (busy(e)) return; if (copySel()) { e.preventDefault(); e.clipboardData?.setData('text/plain', clipboard!.items.map((i) => (i.kind === 'text' ? i.t.text : i.ins.label || i.ins.module)).join('\n')) } }
+    const onCut = (e: ClipboardEvent) => { if (busy(e)) return; if (copySel()) { e.preventDefault(); clipboard!.pastes = -1; remove(sel) } }
+    const onPaste = (e: ClipboardEvent) => { if (busy(e) || !clipboard) return; e.preventDefault(); paste() }
+    document.addEventListener('copy', onCopy); document.addEventListener('cut', onCut); document.addEventListener('paste', onPaste)
+    return () => { document.removeEventListener('copy', onCopy); document.removeEventListener('cut', onCut); document.removeEventListener('paste', onPaste) }
+  })
   const move = (ids: Sel, dx: number, dy: number, record = true) => editL((l) => {
     for (const id of ids) {
       if (isText(id)) { const t = l.texts.find((x) => x.id === id); if (t) { t.x = Math.round((t.x + dx) * 10) / 10; t.y = Math.round((t.y + dy) * 10) / 10 } }
@@ -355,7 +398,7 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
                 {marquee && <rect x={Math.min(marquee.x0, marquee.x1)} y={Math.min(marquee.y0, marquee.y1)} width={Math.abs(marquee.x1 - marquee.x0)} height={Math.abs(marquee.y1 - marquee.y0)} fill="rgba(10,132,255,0.1)" stroke="#0a84ff" strokeWidth={0.4} />}
               </svg>
             </div>
-            <p className="muted small pd-hint">Drag to move (snaps to the grid) · Shift-click or drag a box to select several · arrows nudge (⌥ for a finer step) · ⌘D duplicates · ⌫ deletes · {fmtLenPair(L.w, L.h, 2)}</p>
+            <p className="muted small pd-hint">Drag to move (snaps to the grid) · Shift-click or drag a box to select several · arrows nudge (⌥ for a finer step) · ⌘C / ⌘X / ⌘V copy, cut &amp; paste (also into another box) · ⌘D duplicates · ⌫ deletes · {fmtLenPair(L.w, L.h, 2)}</p>
           </div>
           <div className="pd-inspector form">
             {oneJack ? (<>
