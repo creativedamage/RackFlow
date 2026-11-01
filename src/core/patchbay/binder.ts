@@ -21,10 +21,20 @@ export function binding(bay: PatchBay, row: number, channel: number, p: Project)
   return { remote, cable, signal: validateCable(p, cable).signal }
 }
 
+/** A box port with a project port number (M1, D3…): the number alone says where it goes. */
+export function boxPortNumber(b: Binding): string | undefined {
+  const e = b.remote.equipment
+  return e.portNumbers?.[b.remote.port.id.replace(/\.r$/, '.f')]
+}
+
 export function render(format: LabelFormat, b: Binding, channel: number): string {
+  // Numbered box ports print as just the number ("M1"), not "WP-001 / M1 (REAR)".
+  const num = boxPortNumber(b)
+  if (num && format.template.includes('{port}')) return format.uppercase ? num.toUpperCase() : num
   const tokens: Record<string, string> = {
     '{tag}': b.remote.equipment.tag,
-    '{port}': b.remote.port.label,
+    // The tie line lands on the rear of the box – "(rear)" adds nothing on a patch bay label.
+    '{port}': b.remote.port.label.replace(/\s*\(rear\)$/i, ''),
     '{signal}': b.signal ? SIGNALS[b.signal].name : '',
     '{cable}': b.cable.label,
     '{room}': b.remote.equipment.room ?? '',
