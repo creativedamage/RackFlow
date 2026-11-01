@@ -122,16 +122,17 @@ export function numberBoxPorts(p: Project, opts: { all?: boolean; ids?: string[]
   const used = new Map<string, Set<string>>()
   const counter = new Map<string, number>()
   const useOf = (k: string) => { if (!used.has(k)) used.set(k, new Set()); return used.get(k)! }
-  if (!opts.all) {
-    // Keep what's already numbered anywhere in the project.
-    for (const e of p.equipment.filter(isBox)) for (const port of e.product.ports) {
-      const c = portClass(port), num = e.portNumbers?.[port.id]
-      if (c && num) useOf(seqKey(portRule(p, c))).add(num)
-    }
+  // Keep what's already numbered anywhere in the project – or, when renumbering
+  // everything, just the numbers set by hand (locked).
+  for (const e of p.equipment.filter(isBox)) for (const port of e.product.ports) {
+    const c = portClass(port), num = e.portNumbers?.[port.id]
+    if (c && num && (!opts.all || e.portLocks?.[port.id])) useOf(seqKey(portRule(p, c))).add(num)
   }
   let n = 0
   for (const e of opts.all ? boxesInOrder(p) : boxes) {
-    const next: Record<string, string> = opts.all ? {} : { ...(e.portNumbers ?? {}) }
+    const next: Record<string, string> = opts.all
+      ? Object.fromEntries(Object.entries(e.portNumbers ?? {}).filter(([k]) => e.portLocks?.[k]))
+      : { ...(e.portNumbers ?? {}) }
     for (const port of e.product.ports) {
       const c = portClass(port)
       if (!c) continue
@@ -163,10 +164,88 @@ export function refreshBoxPorts(p: Project, e: EquipmentInstance) {
   else applyPortLabels(e)
 }
 
+/**
+ * Sets one jack's number by hand (and locks it so Renumber keeps it). An empty
+ * value takes the number off and unlocks it.
+ */
+export function setPortNumber(p: Project, eqId: string, portId: string, value: string) {
+  const e = p.equipment.find((x) => x.id === eqId)
+  if (!e) return
+  const v = value.trim()
+  const nums = { ...(e.portNumbers ?? {}) }, locks = { ...(e.portLocks ?? {}) }
+  if (v) { nums[portId] = v; locks[portId] = true } else { delete nums[portId]; delete locks[portId] }
+  e.portNumbers = Object.keys(nums).length ? nums : undefined
+  e.portLocks = Object.keys(locks).length ? locks : undefined
+  applyPortLabels(e)
+}
+
+export function setPortLock(p: Project, eqId: string, portId: string, locked: boolean) {
+  const e = p.equipment.find((x) => x.id === eqId)
+  if (!e || !e.portNumbers?.[portId]) return
+  const locks = { ...(e.portLocks ?? {}) }
+  if (locked) locks[portId] = true; else delete locks[portId]
+  e.portLocks = Object.keys(locks).length ? locks : undefined
+}
+
+/** Splits "M17" into prefix + number for filling a run (M17, M18, M19…). */
+export function numberSeries(first: string, count: number): string[] {
+  const m = /^(.*?)(\d+)$/.exec(first.trim())
+  if (!m) return Array.from({ length: count }, (_, i) => (i === 0 ? first.trim() : `${first.trim()}${i + 1}`))
+  const width = m[2].length > 1 && m[2].startsWith('0') ? m[2].length : 1
+  return Array.from({ length: count }, (_, i) => `${m[1]}${String(parseInt(m[2], 10) + i).padStart(width, '0')}`)
+}
+
+/** One row of the Box Ports schedule: a numbered (or numberable) jack. */
+export interface BoxPortRow {
+  key: string
+  eq: EquipmentInstance
+  port: PortTemplate
+  cls: PortClass
+  number: string
+  locked: boolean
+  /** The jack's own name (from the box designer). */
+  jack: string
+  /** What's plugged into the front, and where the rear tie line goes. */
+  front: string
+  rear: string
+  /** Multipin this jack is tied to. */
+  multipin: string
+  duplicate: boolean
+}
+
+export function boxPortRows(p: Project): BoxPortRow[] {
+  const byId = new Map(p.equipment.map((e) => [e.id as string, e]))
+  const other = (eqId: string, portId: string) => {
+    const c = p.cables.find((x) => (x.from.equipment === eqId && x.from.port === portId) || (x.to.equipment === eqId && x.to.port === portId))
+    if (!c) return ''
+    const o = c.from.equipment === eqId && c.from.port === portId ? c.to : c.from
+    const oe = byId.get(o.equipment)
+    return oe ? `${oe.tag} ${oe.product.ports.find((q) => q.id === o.port)?.label ?? o.port}` : ''
+  }
+  const dup = new Set(duplicatePortNumbers(p).flatMap((d) => d.where.map((w) => `${w.eq.id}/${w.port}`)))
+  const rows: BoxPortRow[] = []
+  for (const e of boxesInOrder(p)) {
+    const ins = new Map((e.product.plate?.inserts ?? []).map((x) => [`${x.pid}.f`, x]))
+    for (const port of e.product.ports) {
+      const cls = portClass(port)
+      if (!cls) continue
+      const tie = ins.get(port.id)?.tie
+      const mp = tie ? e.product.ports.find((q) => q.id === `${tie}.f`) : undefined
+      rows.push({
+        key: `${e.id}/${port.id}`, eq: e, port, cls, number: e.portNumbers?.[port.id] ?? '', locked: !!e.portLocks?.[port.id],
+        jack: e.portBaseLabels?.[port.id] ?? port.label,
+        front: other(e.id, port.id), rear: other(e.id, port.id.replace(/\.f$/, '.r')),
+        multipin: mp ? mp.label.split(' · ')[0] : '', duplicate: dup.has(`${e.id}/${port.id}`),
+      })
+    }
+  }
+  return rows
+}
+
 /** Takes the numbers off every box port (labels go back to the jack names). */
 export function clearBoxPortNumbers(p: Project): number {
   let n = 0
-  for (const e of p.equipment) if (e.portNumbers) { n += Object.keys(e.portNumbers).length; e.portNumbers = undefined; applyPortLabels(e) }
+  for (const e of p.equipment) if (e.portNumbers) { n += Object.keys(e.portNumbers).length; e.portNumbers = undefined; e.portLocks = undefined; applyPortLabels(e) }
   return n
 }
 

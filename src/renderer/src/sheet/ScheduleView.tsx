@@ -7,9 +7,10 @@ import { Modal, NumberInput, Select } from '../components/ui'
 import { Sheet, type SheetColumn } from './Sheet'
 import { NetworkSheet } from './NetworkSheet'
 import { PullSheet } from './PullSheet'
+import { BoxPortsSheet } from './BoxPortsSheet'
 import { colorColumn } from './colorColumn'
 
-type Tab = 'cables' | 'pull' | 'devices' | 'network'
+type Tab = 'cables' | 'pull' | 'ports' | 'devices' | 'network'
 
 /** Spreadsheet view of the whole project: every cable and every device, editable in bulk. */
 export function ScheduleView() {
@@ -19,11 +20,12 @@ export function ScheduleView() {
       <div className="schedule-tabs">
         <button className={tab === 'cables' ? 'on' : ''} onClick={() => setTab('cables')}>Cables</button>
         <button className={tab === 'pull' ? 'on' : ''} onClick={() => setTab('pull')}>Pull Schedule</button>
+        <button className={tab === 'ports' ? 'on' : ''} onClick={() => setTab('ports')}>Box Ports</button>
         <button className={tab === 'devices' ? 'on' : ''} onClick={() => setTab('devices')}>Devices</button>
         <button className={tab === 'network' ? 'on' : ''} onClick={() => setTab('network')}>Network</button>
         <span className="muted small hint">Click, Shift-click or drag to select · type or Enter to edit · ⌘C / ⌘V with Excel, Numbers or Google Sheets · ⌘D fill down · click a header to sort</span>
       </div>
-      {tab === 'cables' ? <CableSheet /> : tab === 'pull' ? <PullSheet /> : tab === 'devices' ? <DeviceSheet /> : <NetworkSheet />}
+      {tab === 'cables' ? <CableSheet /> : tab === 'pull' ? <PullSheet /> : tab === 'ports' ? <BoxPortsSheet /> : tab === 'devices' ? <DeviceSheet /> : <NetworkSheet />}
     </div>
   )
 }

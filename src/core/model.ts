@@ -233,6 +233,8 @@ export interface EquipmentInstance {
   noFace?: boolean
   /** Box ports: project-wide port numbers (front port id → "M11") and the jack names they replaced. */
   portNumbers?: Record<string, string>
+  /** Port numbers set by hand (front port id → true): Renumber leaves them where they are. */
+  portLocks?: Record<string, true>
   portBaseLabels?: Record<string, string>
   /** Network sheet: addressing per network port (key = port id, or 'mgmt' for a switch). */
   network?: Record<string, NetInfo>

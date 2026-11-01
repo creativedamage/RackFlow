@@ -52,3 +52,28 @@ it('library copies of a numbered box carry the plain jack names', () => {
   expect(lib.plate!.inserts.map((x) => x.label)).toEqual([undefined, undefined, undefined, 'NET 9'])
   expect(lib.ports.some((x) => /^M1/.test(x.label))).toBe(false)
 })
+
+import { boxPortRows, numberSeries, setPortNumber } from './index'
+describe('box ports schedule', () => {
+  it('sets numbers by hand, keeps them on renumber, and flags clashes', () => {
+    const p = newProject(); on(p)
+    const a = addEquipment(p, plate(3), { x: 0, y: 0 }), b = addEquipment(p, plate(3), { x: 0, y: 400 })
+    expect(boxPortRows(p).map((r) => r.number)).toEqual(['M1', 'M2', 'M3', 'D1', 'M4', 'M5', 'M6', 'D2'])
+    expect(numberSeries('M17', 3)).toEqual(['M17', 'M18', 'M19'])
+    expect(numberSeries('MIC-009', 2)).toEqual(['MIC-009', 'MIC-010'])
+    const micB = b.product.ports.filter((x) => x.face === 'front' && x.connector === 'xlr3')
+    numberSeries('M17', 3).forEach((n, i) => setPortNumber(p, b.id, micB[i].id, n))
+    expect(labels(b).slice(0, 3)).toEqual(['M17', 'M18', 'M19'])
+    expect(b.product.ports.find((x) => x.id === micB[0].id.replace('.f', '.r'))!.label).toBe('M17 (rear)')
+    // Renumber everything: hand-set numbers stay, the rest fill in around them.
+    numberBoxPorts(p, { all: true })
+    expect(labels(b).slice(0, 3)).toEqual(['M17', 'M18', 'M19'])
+    expect(labels(a).slice(0, 3)).toEqual(['M1', 'M2', 'M3'])
+    // A clash is flagged on both rows.
+    setPortNumber(p, a.id, a.product.ports.find((x) => x.face === 'front')!.id, 'M17')
+    expect(boxPortRows(p).filter((r) => r.duplicate)).toHaveLength(2)
+    // Clearing a number unlocks it.
+    setPortNumber(p, a.id, a.product.ports.find((x) => x.face === 'front')!.id, '')
+    expect(boxPortRows(p)[0]).toMatchObject({ number: '', locked: false })
+  })
+})
