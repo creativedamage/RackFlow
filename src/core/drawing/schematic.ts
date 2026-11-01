@@ -11,6 +11,7 @@ import { portDomain } from '../project'
 import { planChannels, type ChannelWire } from '../autolayout'
 import { cardLayout, headerHeight, NODE_WIDTH, nodeGeom, previewHeight, SEC_HEAD, splitPorts } from '../diagramgeom'
 import { productFace } from '../platelayout'
+import { faceProduct } from '../boxports'
 import { crossings, route, WIRE_CLEAR, type Pt, type Rect } from '../wireroute'
 import { groupsOf } from '../groups'
 import { newSheet, sheetSize, type SheetOptions } from './sheet'
@@ -250,7 +251,7 @@ function drawDevice(svg: Svg, e: EquipmentInstance, o: SchematicOptions) {
   if (e.room?.trim()) svg.text(x + NODE_WIDTH / 2, y + 36, `(${e.room.trim().toUpperCase()})`, { size: 8, anchor: 'middle', fill: '#444', maxWidth: NODE_WIDTH - 16 })
   // Plate / box / panel face drawing.
   const ph = previewHeight(e)
-  const face = ph ? productFace(e.product) : null
+  const face = ph ? productFace(faceProduct(e)) : null
   if (face) {
     const top = y + (e.room?.trim() ? 80 : 66), availH = ph - 8, availW = NODE_WIDTH - 24
     const k = Math.min(availW / face.w, availH / face.h)

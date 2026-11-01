@@ -227,6 +227,9 @@ export interface EquipmentInstance {
   /** Wiring-diagram card: port sections folded shut (by section name), or the whole I/O hidden. */
   collapsed?: string[]
   ioHidden?: boolean
+  /** Box ports: project-wide port numbers (front port id → "M11") and the jack names they replaced. */
+  portNumbers?: Record<string, string>
+  portBaseLabels?: Record<string, string>
   /** Network sheet: addressing per network port (key = port id, or 'mgmt' for a switch). */
   network?: Record<string, NetInfo>
 }

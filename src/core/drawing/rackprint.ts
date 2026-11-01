@@ -3,6 +3,7 @@
 // blank, brush, vent and logo panels drawn and labelled.
 
 import { productFace } from '../platelayout'
+import { faceProduct } from '../boxports'
 import { CATEGORIES, type Project, type Rack, type RackFace } from '../model'
 import { RackLayout, type RackOccupant } from '../rack'
 import { accessoryLabel } from '../rackpanels'
@@ -150,7 +151,7 @@ function drawOccupant(svg: Svg, p: Project, rack: Rack, occ: RackOccupant, x: nu
   const tagSize = Math.min(17, Math.max(10, h * 0.34))
   const half = !!occ.halfSlot
   // Rack connector panels and fiber enclosures: draw the real face (modules, connectors, engravings).
-  const face = productFace(eq.product)
+  const face = productFace(faceProduct(eq))
   if (face?.rack && !half) {
     svg.raw(`<g transform="translate(${x} ${y}) scale(${w / face.w} ${h / face.h})">${face.inner({ bare: true })}</g>`)
     svg.text(inner.x + 2, inner.y + 3.2, eq.tag, { size: 4.2, baseline: 'middle', weight: 'bold' })

@@ -1,6 +1,7 @@
 // Project helpers. Mutating functions are designed to run on Immer drafts
 // (store) or on plain objects (tests); read helpers are pure.
 
+import { boxNumberingOf, isBox, numberBoxPorts } from './boxports'
 import { cableRule, nextNumber, tagRule, type CableSystem } from './numbering'
 import { cableSpec } from './cables'
 import {
@@ -70,6 +71,7 @@ export function addEquipment(p: Project, product: ProductDefinition, at: CanvasP
     product: structuredClone(product), position: { ...at }, rackPlacement: null, room: '', notes: '',
   }
   p.equipment.push(inst)
+  if (isBox(inst) && boxNumberingOf(p).on) numberBoxPorts(p, { ids: [inst.id] })
   return inst
 }
 

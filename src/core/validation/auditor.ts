@@ -1,4 +1,5 @@
 import type { Project } from '../model'
+import { duplicatePortNumbers } from '../boxports'
 import { addrKey } from '../model'
 import { staleCells } from '../patchbay/binder'
 import { isPowerPort } from '../project'
@@ -25,6 +26,9 @@ export function audit(p: Project): ValidationIssue[] {
     out.push({ rule: 'dup-tag', severity: 'error', message: `Tag ${tag} is used by ${items.length} devices.`, subject: { kind: 'equipment', id: items[0].id } })
   for (const [label, items] of dupes(p.cables, (c) => c.label))
     out.push({ rule: 'dup-cable', severity: 'error', message: `Cable label ${label} is used ${items.length} times.`, subject: { kind: 'cable', id: items[0].id } })
+
+  for (const d of duplicatePortNumbers(p))
+    out.push({ rule: 'dup-port-number', severity: 'error', message: `Port number ${d.number} is used ${d.where.length} times (${[...new Set(d.where.map((w) => w.eq.tag))].join(', ')}).`, subject: { kind: 'equipment', id: d.where[1].eq.id } })
 
   const connected = new Set(p.cables.flatMap((c) => [addrKey(c.from), addrKey(c.to)]))
   for (const eq of p.equipment) {

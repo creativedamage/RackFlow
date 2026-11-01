@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { produce } from 'immer'
-import { BUILT_IN_KEYS, footprint, makePlateProduct, newPlateText, nextPid, PLATE_MODULE_KEYS, PLATE_MODULES, PLATE_SIZES, PLATE_STYLE_LIST, plateInner, withLayout, autoArrange, type PlateInsert, type PlateKind, type PlateLayout, type PlateSpec, type ProductDefinition, imperial, fmtLen, fmtLenPair } from '@core/index'
+import { BUILT_IN_KEYS, footprint, makePlateProduct, newPlateText, nextPid, PLATE_MODULE_KEYS, PLATE_MODULES, PLATE_SIZES, PLATE_STYLE_LIST, plateInner, withLayout, autoArrange, type PlateInsert, type PlateKind, type PlateLayout, type PlateSpec, type ProductDefinition, imperial, fmtLen, fmtLenPair, refreshBoxPorts } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
 import { addProductToDiagram } from '../diagram/placement'
@@ -230,7 +230,7 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
     const hits = st.project.equipment.filter((e) => (only ? e.id === only : e.product.key === p.key || e.id === instanceId))
     if (!hits.length) return 0
     st.apply(`Update ${p.model}`, (d) => {
-      for (const e of d.equipment) if (hits.some((h) => h.id === e.id)) e.product = structuredClone(p)
+      for (const e of d.equipment) if (hits.some((h) => h.id === e.id)) { e.product = structuredClone(p); refreshBoxPorts(d, e) }
       const ids = new Map(d.equipment.map((e) => [e.id, new Set(e.product.ports.map((x) => x.id))]))
       d.cables = d.cables.filter((c) => ids.get(c.from.equipment)?.has(c.from.port) && ids.get(c.to.equipment)?.has(c.to.port))
     })

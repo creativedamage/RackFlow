@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react'
 import { Handle, NodeToolbar, Position, type NodeProps, type Node } from '@xyflow/react'
 import {
-  cardLayout, CATEGORIES, connectorName, DOMAINS, nodeGeom, faceSVG, IO_H, portDomain, previewHeight, SEC_HEAD, SIGNALS, SMALL_HEAD, SMALL_W, viewsOf,
+  cardLayout, faceProduct, CATEGORIES, connectorName, DOMAINS, nodeGeom, faceSVG, IO_H, portDomain, previewHeight, SEC_HEAD, SIGNALS, SMALL_HEAD, SMALL_W, viewsOf,
   setPortsInView, type CardSection, type EquipmentInstance, type PortTemplate, type SignalDomain,
 } from '@core/index'
 import { clickPort, pickIndex, useWiring } from './wiring'
@@ -42,7 +42,7 @@ export const DeviceNode = memo(function DeviceNode({ data, selected }: NodeProps
   const size = eq.nodeSize ?? 'medium'
   const viewId = useStore((st) => st.diagramView)
   const ph = previewHeight(eq)
-  const preview = useMemo(() => faceSVG(eq.product, { labels: size !== 'small' || ph > 60 }), [eq.product, size, ph])
+  const preview = useMemo(() => faceSVG(faceProduct(eq), { labels: size !== 'small' || ph > 60 }), [eq, size, ph])
   const small = size === 'small'
   const geom = small ? nodeGeom(eq) : null
   const L = small ? null : cardLayout(eq)
@@ -76,7 +76,7 @@ export const DeviceNode = memo(function DeviceNode({ data, selected }: NodeProps
         }}>
         {!geom && !folded && (
           <div className={`dn-pill ${picking ? 'target' : ''}`}>
-            {num != null && <span className="dn-num">{num}.</span>}
+            {num != null && !eq.portNumbers?.[p.id.replace(/\.r$/, '.f')] && <span className="dn-num">{num}.</span>}
             {side === 'left' && <span className="dn-arrow">{arrow}</span>}
             <span className="port-label">{p.label}</span>
             {side === 'right' && <span className="dn-arrow">{arrow}</span>}

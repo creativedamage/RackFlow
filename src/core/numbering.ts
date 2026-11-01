@@ -16,6 +16,8 @@ export interface NumberingStandard {
   tags: Partial<Record<EquipmentCategory, Partial<NumberRule>>>
   cableDefaults: Omit<NumberRule, 'prefix'>
   cables: Partial<Record<CableSystem, Partial<NumberRule>>>
+  /** Unique port numbers on wall boxes, plates, floor boxes and connector panels. */
+  boxPorts?: import('./boxports').BoxPortNumbering
 }
 
 export const CABLE_PREFIXES: Record<CableSystem, string> = { video: 'V', audio: 'A', network: 'N', control: 'C', lighting: 'L', rf: 'RF', usb: 'U', power: 'P', other: 'X' }
