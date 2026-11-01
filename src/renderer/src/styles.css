@@ -20,6 +20,7 @@
   --sec-line: #ebebef;
   --pill-bg: #ececf0;
   --pill-line: #e2e2e7;
+  --pill-hover: #e2e2e8;
   --node-mini: #c7c7cc;
   --minimap-mask: rgba(240, 240, 245, 0.7);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -46,6 +47,7 @@
     --sec-line: #303034;
     --pill-bg: #2c2c30;
     --pill-line: #38383d;
+    --pill-hover: #36363b;
     --node-mini: #48484c;
     --minimap-mask: rgba(20, 20, 22, 0.7);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 10px rgba(0, 0, 0, 0.3);
@@ -68,6 +70,7 @@
     --sec-line: #303034;
     --pill-bg: #2c2c30;
     --pill-line: #38383d;
+    --pill-hover: #36363b;
     --node-mini: #48484c;
     --minimap-mask: rgba(20, 20, 22, 0.7);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 10px rgba(0, 0, 0, 0.3);
@@ -210,7 +213,7 @@ textarea { resize: vertical; width: 100%; }
 .port-row.folded .react-flow__handle { pointer-events: all; }
 .port-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 /* Port dots: inputs hollow, outputs filled, bidirectional square; colour = signal type. */
-.port-handle.react-flow__handle { width: 10px; height: 10px; border: 1.8px solid var(--pc); border-radius: 50%; background: var(--node-bg); transition: transform 0.1s, box-shadow 0.1s; }
+.port-handle.react-flow__handle { width: 10px; height: 10px; border: 1.8px solid var(--pc); border-radius: 50%; background: var(--node-bg); transition: scale 0.12s ease, box-shadow 0.12s ease; }
 .port-handle.output.react-flow__handle { background: var(--pc); }
 .port-handle.bidirectional.react-flow__handle { border-radius: 2.5px; background: linear-gradient(135deg, var(--pc) 50%, var(--node-bg) 50%); }
 .port-handle.input.linked.react-flow__handle { background: radial-gradient(circle, var(--pc) 0 2.2px, var(--node-bg) 2.8px); }
@@ -237,15 +240,16 @@ textarea { resize: vertical; width: 100%; }
 .dn-pill { position: relative; flex: 1; min-width: 0; height: 19px; display: flex; align-items: center; gap: 4px; padding: 0 7px; background: var(--pill-bg); border: 1px solid var(--pill-line); border-radius: 5px; font-size: 9.5px; cursor: pointer; }
 .port-row.right .dn-pill { justify-content: flex-start; }
 .port-row.right .dn-pill .port-label { flex: 1; text-align: left; }
-.dn-pill:hover { border-color: var(--accent); }
+.dn-pill { transition: background-color 0.12s ease, border-color 0.12s ease; }
+.dn-pill:hover { background: var(--pill-hover); border-color: var(--pill-line); }
 .dn-pill.target:hover { background: var(--accent-soft); }
 .dn-num { color: var(--text-3); min-width: 14px; font-variant-numeric: tabular-nums; }
 .dn-arrow { color: var(--text-3); }
 .port-row.picked .dn-pill { border-color: var(--accent); background: var(--accent-soft); }
-.port-row:hover .react-flow__handle { transform: translateY(-50%) scale(1.35); }
+.port-row:hover .react-flow__handle { scale: 1.2; }
 .device-node.wiring .port-row.invalid { opacity: 0.28; }
-.port-row.valid .react-flow__handle { box-shadow: 0 0 0 3px rgba(47, 158, 68, 0.55); transform: translateY(-50%) scale(1.25); }
-.port-row.caution .react-flow__handle { box-shadow: 0 0 0 3px rgba(240, 140, 0, 0.55); transform: translateY(-50%) scale(1.25); }
+.port-row.valid .react-flow__handle { box-shadow: 0 0 0 3px rgba(47, 158, 68, 0.55); scale: 1.2; }
+.port-row.caution .react-flow__handle { box-shadow: 0 0 0 3px rgba(240, 140, 0, 0.55); scale: 1.2; }
 .port-row.origin .react-flow__handle { box-shadow: 0 0 0 3px var(--accent-soft); }
 .hint-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; color: var(--text-2); box-shadow: var(--shadow); }
 .wiring-hint { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; box-shadow: var(--shadow); font-weight: 500; max-width: 560px; }
