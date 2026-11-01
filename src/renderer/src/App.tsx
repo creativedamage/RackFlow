@@ -22,6 +22,7 @@ import { Toasts } from './components/Toasts'
 import { ScheduleView } from './sheet/ScheduleView'
 import { LedView } from './led/LedView'
 import { ViewEditor } from './diagram/ViewEditor'
+import { setAutoSave } from './autosave'
 import { SheetNumbersDialog } from './diagram/SheetNumbers'
 import { NumberingDialog } from './components/NumberingDialog'
 import { initTheme, showTheme } from './theme'
@@ -99,6 +100,7 @@ export function App() {
       case 'open': await openDocument(); break
       case 'save': await saveDocument(); break
       case 'saveAs': await saveDocument(true); break
+      case 'autosave:toggle': setAutoSave(!s.autoSave); break
       case 'save-and-close': if (await saveDocument()) api.closeWindow(); break
       // ⌘Z inside a text field is the field's own undo, not the document's.
       case 'undo': if (s.editingPlate && !inTextField()) { window.dispatchEvent(new Event('designer:undo')); break } if (fieldHasEdits()) document.execCommand('undo'); else docUndo(false); break

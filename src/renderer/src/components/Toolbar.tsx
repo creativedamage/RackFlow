@@ -1,5 +1,6 @@
 import { openDocument, saveDocument, newDocument, useStore, type Mode } from '../store'
 import { isElectron } from '../platform'
+import { setAutoSave } from '../autosave'
 import { Segmented, TextInput } from './ui'
 import { IssuesButton } from './IssuesButton'
 import { AppMenuButton, UpdatePill } from './UpdatePill'
@@ -26,7 +27,7 @@ export function Toolbar() {
       <div className="toolbar-left">
         <AppMenuButton />
         <TextInput className="doc-title" value={name} onCommit={(v) => apply('Rename Project', (d) => { d.info.name = v || 'Untitled Project' })} />
-        {dirty && <span className="dirty-dot" title="Unsaved changes" />}
+        {isElectron ? <AutoSaveChip /> : dirty && <span className="dirty-dot" title="Unsaved changes" />}
         {!isElectron && (
           <span className="file-buttons">
             <button onClick={() => void newDocument()}>New</button>
@@ -70,5 +71,19 @@ export function Toolbar() {
         <button className={`icon-btn ${showInspector ? 'on' : ''}`} onClick={() => set({ showInspector: !showInspector })} title="Toggle inspector (⌥⌘I)">◧</button>
       </div>
     </header>
+  )
+}
+
+/** Auto-save status next to the title; click to turn it on or off. */
+function AutoSaveChip() {
+  const on = useStore((s) => s.autoSave)
+  const path = useStore((s) => s.path)
+  const dirty = useStore((s) => s.dirty)
+  const label = !on ? (dirty ? 'Unsaved · Auto-save off' : 'Auto-save off') : !path ? (dirty ? 'Not saved yet – ⌘S once to auto-save' : 'Auto-save') : dirty ? 'Saving…' : 'Saved'
+  return (
+    <button className={`autosave-chip ${on ? 'on' : ''} ${dirty ? 'dirty' : ''}`} onClick={() => setAutoSave(!on)}
+      title={on ? 'Auto-save is on: every change is written to the file. Click to turn it off.' : 'Auto-save is off. Click to save every change automatically.'}>
+      <i />{label}
+    </button>
   )
 }

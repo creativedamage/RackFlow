@@ -1119,3 +1119,10 @@ input.mono { font-family: var(--mono); }
 .fb-check { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; white-space: nowrap; padding: 0 4px; }
 .fb-letter { width: 34px; text-align: center; font-weight: 700; }
 .format-bar .fb.on, .format-bar button.fb.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Auto-save status */
+.autosave-chip { -webkit-app-region: no-drag; display: inline-flex; align-items: center; gap: 6px; border: none; background: none; padding: 2px 6px; border-radius: 6px; font-size: 11px; color: var(--text-3); white-space: nowrap; cursor: pointer; }
+.autosave-chip:hover { background: var(--bg-3); color: var(--text-2); }
+.autosave-chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); }
+.autosave-chip.on i { background: #2f9e44; }
+.autosave-chip.on.dirty i { background: #f08c00; }

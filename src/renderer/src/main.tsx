@@ -4,8 +4,10 @@ import '@xyflow/react/dist/style.css'
 import './styles.css'
 import { App } from './App'
 import { initUnits } from './units'
+import { initAutoSave } from './autosave'
 
 initUnits()
+initAutoSave()
 import { CrashGuard } from './components/CrashGuard'
 
 createRoot(document.getElementById('root')!).render(

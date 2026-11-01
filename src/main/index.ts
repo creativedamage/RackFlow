@@ -158,6 +158,7 @@ function buildMenu() {
         { type: 'separator' },
         cmd('Save', 'save', 'CmdOrCtrl+S'),
         cmd('Save As…', 'saveAs', 'Shift+CmdOrCtrl+S'),
+        cmd('Auto Save On / Off', 'autosave:toggle'),
         { type: 'separator' },
         cmd('Export Everything…', 'exportAll', 'Shift+CmdOrCtrl+E'),
         { type: 'separator' },

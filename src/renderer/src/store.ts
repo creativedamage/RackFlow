@@ -29,6 +29,12 @@ export function patchQuietly(fn: (p: Project) => Project) {
   if (wasClean) rememberSaved(next)
   useStore.setState({ project: next, dirty: changedSinceSave(next) })
 }
+/** Auto-save wrote `snapshot` to `path`: it's the saved version now (later edits stay unsaved). */
+export function markSavedSnapshot(path: string, snapshot: Project) {
+  rememberSaved(snapshot)
+  const p = useStore.getState().project
+  useStore.setState({ path, dirty: changedSinceSave(p), lastSaved: Date.now() })
+}
 export function changedSinceSave(p: Project): boolean {
   if (p === savedRef) return false
   return JSON.stringify(p) !== savedJson
@@ -38,6 +44,10 @@ export interface AppState {
   project: Project
   path: string | null
   dirty: boolean
+  /** Save the file after every change (needs a file – Save once first). */
+  autoSave: boolean
+  /** When the file was last written (auto-save status). */
+  lastSaved: number | null
   past: HistoryEntry[]
   future: HistoryEntry[]
 
@@ -114,6 +124,8 @@ export const useStore = create<AppState>((set, get) => ({
   project: newProject(),
   path: null,
   dirty: false,
+  autoSave: (() => { try { return localStorage.getItem('rackflow.autosave') !== 'off' } catch { return true } })(),
+  lastSaved: null,
   past: [],
   future: [],
 
@@ -177,7 +189,7 @@ export const useStore = create<AppState>((set, get) => ({
     project, path, dirty: false, past: [], future: [], selection: [], selectedCable: null,
     selectedRack: project.racks[0]?.id ?? null, selectedBay: project.patchBays[0]?.id ?? null, fitRequest: get().fitRequest + 1,
   }) },
-  markSaved: (path) => { rememberSaved(get().project); set({ path, dirty: false }) },
+  markSaved: (path) => { rememberSaved(get().project); set({ path, dirty: false, lastSaved: Date.now() }) },
   set: (patch) => set(patch),
   select: (ids, cable = null) => set({ selection: ids, selectedCable: cable, selectedAccessory: null }),
   focusIssue: (s) => {
