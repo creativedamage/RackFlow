@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
-  CABLE_CATALOG, cableSpec, DOMAINS, fittingCables, fromLong, longUnit, pullCells, PULL_HEAD, pullRows, pullScheduleCSV, resolve, toLong,
-  type CablePull, type PullRow, type SignalDomain,
+  CABLE_CATALOG, cableSpec, DOMAINS, fittingCables, fromLong, longUnit, pullCells, pullDone, PULL_HEAD, pullRows, pullScheduleCSV, resolve, toLong,
+  type PullRow, type SignalDomain,
 } from '@core/index'
 import { useStore } from '../store'
 import { Select } from '../components/ui'
@@ -25,28 +25,27 @@ export function PullSheet() {
 
   const all = useMemo(() => pullRows(project, { unwired }), [project, unwired])
   const cables = all.filter((r) => r.cable)
-  const done = (k: keyof CablePull) => cables.filter((r) => r.cable!.pull?.[k]).length
+  const done = (k: 'pulled' | 'terminated' | 'tested') => cables.filter((r) => pullDone(r, k)).length
   const rows = useMemo(() => {
     const s = q.toLowerCase()
     return all.filter((r) => {
-      const pl = r.cable?.pull
       if (system && r.system !== system) return false
       if (stage === 'unwired' && r.cable) return false
       if (stage && stage !== 'unwired' && !r.cable) return false
-      if (stage === 'notPulled' && pl?.pulled) return false
-      if (stage === 'notTerminated' && pl?.terminated) return false
-      if (stage === 'notTested' && pl?.tested) return false
-      if (stage === 'done' && !(pl?.pulled && pl?.terminated && pl?.tested)) return false
+      if (stage === 'notPulled' && pullDone(r, 'pulled')) return false
+      if (stage === 'notTerminated' && pullDone(r, 'terminated')) return false
+      if (stage === 'notTested' && pullDone(r, 'tested')) return false
+      if (stage === 'done' && !(pullDone(r, 'pulled') && pullDone(r, 'terminated') && pullDone(r, 'tested'))) return false
       return !s || pullCells(r).join(' ').toLowerCase().includes(s)
     })
   }, [all, q, system, stage])
 
-  const check = (k: keyof Omit<CablePull, 'pathway'>, title: string): SheetColumn<PullRow> => ({
+  const check = (k: 'pulled' | 'terminated' | 'tested', title: string): SheetColumn<PullRow> => ({
     key: k, title, width: 84, align: 'center',
-    get: (r) => (r.cable ? (r.cable.pull?.[k] ? '✓' : '') : ''),
-    value: (r) => (r.cable?.pull?.[k] ? 'yes' : ''),
+    get: (r) => (r.cable ? (pullDone(r, k) ? '✓' : '') : ''),
+    value: (r) => (pullDone(r, k) ? 'yes' : ''),
     options: (r) => (r.cable ? [{ value: '', label: '—' }, { value: 'yes', label: '✓ Yes' }] : []),
-    render: (r) => (r.cable ? <span className={`pull-check ${r.cable.pull?.[k] ? 'on' : ''}`}>{r.cable.pull?.[k] ? '✓' : ''}</span> : null),
+    render: (r) => (r.cable ? <span className={`pull-check ${pullDone(r, k) ? 'on' : ''}`}>{pullDone(r, k) ? '✓' : ''}</span> : null),
     set: (r, v) => { if (!r.cable) return; r.cable.pull = { ...r.cable.pull, [k]: YES.test(v.trim()) || undefined } },
   })
   const endCols = (side: 'from' | 'to', title: string): SheetColumn<PullRow>[] => {
@@ -61,11 +60,11 @@ export function PullSheet() {
   }
 
   const columns = useMemo<SheetColumn<PullRow>[]>(() => [
-    { key: 'label', title: 'Cable', width: 90, get: (r) => r.label || (r.cable ? '' : 'Unwired'), render: (r) => (r.cable ? <b>{r.label}</b> : <span className="muted">Unwired</span>),
+    { key: 'label', title: 'Cable #', width: 110, get: (r) => r.label || (r.cable ? '' : 'Unwired'), render: (r) => (r.cable ? <b>{r.label}</b> : <span className="muted">Unwired</span>),
       set: (r, v) => { if (r.cable) r.cable.label = v.trim() } },
     { key: 'system', title: 'System', width: 84, get: (r) => (r.system ? DOMAINS[r.system].name : '—'),
       render: (r) => <span className="sys"><i style={{ background: r.system ? DOMAINS[r.system].color : '#999' }} />{r.system ? DOMAINS[r.system].name : '—'}</span> },
-    { key: 'type', title: 'Cable Type', width: 200, get: (r) => (r.cable ? r.type : ''), value: (r) => r.cable?.specKey ?? '',
+    { key: 'type', title: 'Cable', width: 210, get: (r) => (r.cable ? (r.channels ? `${r.type} · ${r.channels.used}/${r.channels.of} ch` : r.type) : ''), value: (r) => r.cable?.specKey ?? '',
       options: (r) => {
         if (!r.cable) return []
         const a = resolve(project, r.cable.from), b = resolve(project, r.cable.to)
@@ -98,8 +97,11 @@ export function PullSheet() {
           if (e) e.room = ch.value.trim()
           continue
         }
-        const cable = ch.row.cable ? d.cables.find((c) => c.id === ch.row.cable!.id) : undefined
-        if (cable) ch.col.set?.({ ...ch.row, cable }, ch.value)
+        // A snake row edits every channel in it.
+        for (const one of ch.row.cables) {
+          const cable = d.cables.find((c) => c.id === one.id)
+          if (cable) ch.col.set?.({ ...ch.row, cable }, ch.value)
+        }
       }
     })
   }, [apply])
@@ -115,7 +117,7 @@ export function PullSheet() {
       table { border-collapse: collapse; width: 100%; } th, td { border: 0.6px solid #888; padding: 2px 4px; text-align: left; vertical-align: top; }
       th { background: #eee; font-size: 8px; text-transform: uppercase; } tr { break-inside: avoid; } td.c { text-align: center; }
     </style></head><body><h1>${esc(name)} – Cable Pull Schedule</h1>
-      <div class="sub">${cables.length} cables · ${done('pulled')} pulled · ${done('terminated')} terminated · ${done('tested')} tested · printed ${new Date().toLocaleDateString()}</div>
+      <div class="sub">${cables.length} pulls · ${done('pulled')} pulled · ${done('terminated')} terminated · ${done('tested')} tested · printed ${new Date().toLocaleDateString()}</div>
       <table><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>
       ${rows.map((r) => `<tr>${pullCells(r).map((c, i) => `<td${i >= 17 && i <= 19 ? ' class="c"' : ''}>${esc(i >= 17 && i <= 19 ? (c ? '✓' : (r.cable ? '☐' : '')) : c)}</td>`).join('')}</tr>`).join('')}
       </tbody></table></body></html>`
@@ -145,14 +147,14 @@ export function PullSheet() {
           { value: 'notTested', label: 'Not tested' }, { value: 'done', label: 'Complete' }, { value: 'unwired', label: 'Unwired ports' }]} />
         <label className="toggle small"><input type="checkbox" checked={unwired} onChange={(e) => setUnwired(e.target.checked)} /> Unwired ports{unwired ? ` (${unwiredN})` : ''}</label>
         <span className="pull-progress small" title="Install progress">
-          <b>{cables.length}</b> cables · <b>{done('pulled')}</b> pulled · <b>{done('terminated')}</b> terminated · <b>{done('tested')}</b> tested
+          <b>{cables.length}</b> pulls · <b>{done('pulled')}</b> pulled · <b>{done('terminated')}</b> terminated · <b>{done('tested')}</b> tested
         </span>
         <span className="spacer" />
         <button disabled={!rows.length} onClick={print} title="Print or save as PDF (tabloid landscape) – the rows shown">Print…</button>
         <button disabled={!all.length} onClick={download}>Export CSV</button>
       </div>
       <Sheet rows={rows} columns={columns} rowKey={(r) => r.key} commit={commit}
-        rowClass={(r) => (r.cable ? (r.cable.pull?.pulled && r.cable.pull?.terminated && r.cable.pull?.tested ? 'done' : '') : 'unwired')}
+        rowClass={(r) => (r.cable ? (pullDone(r, 'pulled') && pullDone(r, 'terminated') && pullDone(r, 'tested') ? 'done' : '') : 'unwired')}
         emptyText="No cables yet. Wire devices on the Wiring Diagram and they appear here." />
     </>
   )

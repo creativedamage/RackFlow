@@ -15,7 +15,14 @@ export interface CableSpec {
   labelPrefix: string
   /** Not a separate cable: the device's attached plug goes straight into the outlet. */
   direct?: boolean
+  /** What the crew pulls – the bulk cable ("Cat6A", "12-Channel Snake"). Defaults to the name. */
+  pull?: string
+  /** Multi-channel (snake): connections between the same two devices share one cable, this many per snake. */
+  channels?: number
 }
+
+/** The bulk-cable name used on pull schedules. */
+export const pullName = (s: CableSpec | undefined) => (s ? s.pull ?? s.name : 'TBD')
 
 /** Plugs that are accepted by a receptacle of another type (NEMA T-slot receptacles). */
 const PLUG_ACCEPTS: Partial<Record<ConnectorType, ConnectorType[]>> = {
@@ -57,6 +64,9 @@ export const DIRECT_PLUG: CableSpec = {
   ratedSignals: [], maxLengthMeters: null, labelPrefix: 'P', direct: true,
 }
 
+/** A snake: N channels share one cable (fan-outs at both ends). */
+const snake = (c: CableSpec, n: number): CableSpec => ({ ...c, channels: n, pull: `${n}-Channel Snake` })
+
 const CAT5E: SignalType[] = ['ethernet100M', 'ethernet1G', 'dante', 'aes67', 'ndi', 'sacn', 'artNet', 'ipControl', 'hdbaseT', 'avbMilan']
 
 export const CABLE_CATALOG: CableSpec[] = [
@@ -66,19 +76,22 @@ export const CABLE_CATALOG: CableSpec[] = [
   cable('dp.14', 'DisplayPort 1.4', e('displayPort', 'male'), e('displayPort', 'male'), ['displayPort12', 'displayPort14'], 3, 'V'),
   cable('sdi.12g', '12G-SDI Coax (RG6)', e('bnc', 'male'), e('bnc', 'male'), ['sdiHD', 'sdi3G', 'sdi6G', 'sdi12G'], 70, 'V'),
   cable('sdi.3g', '3G-SDI Coax (RG59)', e('bnc', 'male'), e('bnc', 'male'), ['sdiHD', 'sdi3G', 'analogComposite'], 100, 'V'),
-  cable('cat6a', 'Cat6A U/FTP Patch', e('rj45', 'male'), e('rj45', 'male'), [], 100, 'N'),
-  cable('cat5e', 'Cat5e UTP Patch', e('rj45', 'male'), e('rj45', 'male'), CAT5E, 100, 'N'),
-  cable('cat6', 'Cat6 UTP Patch', e('rj45', 'male'), e('rj45', 'male'), [], 100, 'N'),
-  cable('cat6.stp', 'Cat6 Shielded (F/UTP) Patch', e('rj45', 'male'), e('rj45', 'male'), [], 100, 'N'),
-  cable('cat6a.utp', 'Cat6A UTP Patch', e('rj45', 'male'), e('rj45', 'male'), [], 100, 'N'),
-  cable('cat8', 'Cat8 S/FTP Patch', e('rj45', 'male'), e('rj45', 'male'), [], 30, 'N'),
-  cable('cat5e.h', 'Cat5e Horizontal (punched down both ends)', e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), CAT5E, 90, 'N'),
-  cable('cat6.h', 'Cat6 Horizontal (punched down both ends)', e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), [], 90, 'N'),
-  cable('cat6a.h', 'Cat6A Horizontal (punched down both ends)', e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), [], 90, 'N'),
-  cable('cat6a.h.stp', 'Cat6A Shielded Horizontal (punched down both ends)', e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), [], 90, 'N'),
-  cable('cat6.plug', 'Cat6 Horizontal, punch-down to RJ45 plug', e('idcPunchdown', 'male'), e('rj45', 'male'), [], 90, 'N'),
-  cable('cat6a.plug', 'Cat6A Horizontal, punch-down to RJ45 plug', e('idcPunchdown', 'male'), e('rj45', 'male'), [], 90, 'N'),
-  cable('cat6a.ethercon', 'Cat6A etherCON', e('etherCON', 'male'), e('etherCON', 'male'), [], 100, 'N'),
+  cable('cat6a', 'Cat6A Shielded (U/FTP) – patch', e('rj45', 'male'), e('rj45', 'male'), [], 100, 'N'),
+  cable('cat5e', 'Cat5e – patch', e('rj45', 'male'), e('rj45', 'male'), CAT5E, 100, 'N'),
+  cable('cat6', 'Cat6 – patch', e('rj45', 'male'), e('rj45', 'male'), [], 100, 'N'),
+  cable('cat6.stp', 'Cat6 Shielded (F/UTP) – patch', e('rj45', 'male'), e('rj45', 'male'), [], 100, 'N'),
+  cable('cat6a.utp', 'Cat6A – patch', e('rj45', 'male'), e('rj45', 'male'), [], 100, 'N'),
+  cable('cat8', 'Cat8 – patch', e('rj45', 'male'), e('rj45', 'male'), [], 30, 'N'),
+  // Audio tie lines: single pair or multi-pair snake, punched down at both ends.
+  cable('audio.pair', 'Audio Cable, 1-pair shielded – punch-down', e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), ['analogMic', 'analogLine', 'aes3'], 300, 'A'),
+  ...[4, 8, 12, 16, 24, 32, 48].map((n) => snake(cable(`snake.${n}.h`, `${n}-Channel Snake (multi-pair) – punch-down`, e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), ['analogMic', 'analogLine', 'aes3'], 300, 'A'), n)),
+  cable('cat5e.h', 'Cat5e – punch-down both ends', e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), CAT5E, 90, 'N'),
+  cable('cat6.h', 'Cat6 – punch-down both ends', e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), [], 90, 'N'),
+  cable('cat6a.h', 'Cat6A – punch-down both ends', e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), [], 90, 'N'),
+  cable('cat6a.h.stp', 'Cat6A Shielded – punch-down both ends', e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), [], 90, 'N'),
+  cable('cat6.plug', 'Cat6 – punch-down to RJ45', e('idcPunchdown', 'male'), e('rj45', 'male'), [], 90, 'N'),
+  cable('cat6a.plug', 'Cat6A – punch-down to RJ45', e('idcPunchdown', 'male'), e('rj45', 'male'), [], 90, 'N'),
+  cable('cat6a.ethercon', 'Cat6A – etherCON', e('etherCON', 'male'), e('etherCON', 'male'), [], 100, 'N'),
   cable('fiber.lc.sm', 'Singlemode Fiber LC-LC (OS2)', e('lcDuplex', 'male'), e('lcDuplex', 'male'), [], 10000, 'F'),
   cable('fiber.lc.mm', 'Multimode Fiber LC-LC (OM4)', e('lcDuplex', 'male'), e('lcDuplex', 'male'), [], 400, 'F'),
   cable('fiber.sc.sm', 'Singlemode Fiber SC-SC (OS2)', e('scDuplex', 'male'), e('scDuplex', 'male'), [], 10000, 'F'),
@@ -92,13 +105,14 @@ export const CABLE_CATALOG: CableSpec[] = [
   cable('fiber.mtp24.mm', 'MTP-24 Trunk (OM4)', e('mpo24', 'male'), e('mpo24', 'male'), [], 400, 'F'),
   cable('fiber.mtp8.sm', 'MTP-8 Trunk (OS2)', e('mpo8', 'male'), e('mpo8', 'male'), [], 10000, 'F'),
   cable('fiber.mtp8.mm', 'MTP-8 Trunk (OM4)', e('mpo8', 'male'), e('mpo8', 'male'), [], 400, 'F'),
-  cable('multi.w1', 'Whirlwind W1 Multipin Snake (12 pr)', e('whirlwindW1', 'male'), e('whirlwindW1', 'female'), ['analogMic', 'analogLine', 'aes3'], 150, 'A'),
-  cable('multi.w2', 'Whirlwind W2 Multipin Snake (20 pr)', e('whirlwindW2', 'male'), e('whirlwindW2', 'female'), ['analogMic', 'analogLine', 'aes3'], 150, 'A'),
-  cable('multi.soca', 'Socapex 19-pin Multicable', e('socapex19', 'male'), e('socapex19', 'female'), ['analogMic', 'analogLine', 'aes3'], 150, 'A'),
-  cable('multi.amp57', 'Amphenol 57 50-pin Cable (25 pr)', e('amphenol57', 'male'), e('amphenol57', 'male'), ['analogMic', 'analogLine', 'aes3'], 100, 'A'),
-  cable('multi.edac56', 'EDAC 56-pin Multipin Snake', e('edac56', 'male'), e('edac56', 'female'), ['analogMic', 'analogLine', 'aes3'], 150, 'A'),
-  cable('multi.edac90', 'EDAC 90-pin Multipin Snake', e('edac90', 'male'), e('edac90', 'female'), ['analogMic', 'analogLine', 'aes3'], 150, 'A'),
-  cable('xlr3.mic', 'XLR-3 Mic Cable', e('xlr3', 'female'), e('xlr3', 'male'), ['analogMic', 'analogLine', 'aes3'], 100, 'A'),
+  cable('multi.w1', '12-Channel Snake – Whirlwind W1', e('whirlwindW1', 'male'), e('whirlwindW1', 'female'), ['analogMic', 'analogLine', 'aes3'], 150, 'A'),
+  cable('multi.w2', '20-Channel Snake – Whirlwind W2', e('whirlwindW2', 'male'), e('whirlwindW2', 'female'), ['analogMic', 'analogLine', 'aes3'], 150, 'A'),
+  cable('multi.soca', '6-Channel Snake – Socapex 19-pin', e('socapex19', 'male'), e('socapex19', 'female'), ['analogMic', 'analogLine', 'aes3'], 150, 'A'),
+  cable('multi.amp57', '24-Channel (25-pair) Cable – Amphenol 57', e('amphenol57', 'male'), e('amphenol57', 'male'), ['analogMic', 'analogLine', 'aes3'], 100, 'A'),
+  cable('multi.edac56', '18-Channel Snake – EDAC 56', e('edac56', 'male'), e('edac56', 'female'), ['analogMic', 'analogLine', 'aes3'], 150, 'A'),
+  cable('multi.edac90', '28-Channel Snake – EDAC 90', e('edac90', 'male'), e('edac90', 'female'), ['analogMic', 'analogLine', 'aes3'], 150, 'A'),
+  cable('xlr3.mic', 'XLR Cable', e('xlr3', 'female'), e('xlr3', 'male'), ['analogMic', 'analogLine', 'aes3'], 100, 'A'),
+  ...[4, 8, 12, 16, 24, 32, 48].map((n) => snake(cable(`snake.${n}`, `${n}-Channel Snake (XLR fan-outs)`, e('xlr3', 'female'), e('xlr3', 'male'), ['analogMic', 'analogLine', 'aes3'], 150, 'A'), n)),
   cable('xlr3.trs', 'XLR-3 Male to 1/4" TRS', e('xlr3', 'female'), e('trs6_35', 'male'), ['analogMic', 'analogLine'], 50, 'A'),
   cable('xlr5.dmx', 'DMX 5-pin (120Ω)', e('xlr5', 'female'), e('xlr5', 'male'), ['dmx512'], 300, 'L'),
   cable('euro.pair', 'Shielded Pair (Euroblock)', e('euroblock', 'female'), e('euroblock', 'female'),
@@ -130,6 +144,18 @@ export const CABLE_CATALOG: CableSpec[] = [
   cable('pwr.powercon.515', 'Power Cord NEMA 5-15P → powerCON', e('nema5_15', 'male'), e('powerCON', 'female'), ['ac120V'], null, 'P'),
   cable('usb.c', 'USB-C to USB-C', e('usbC', 'male'), e('usbC', 'male'), ['usb2', 'usb3'], 2, 'U'),
 ]
+
+// Pull-schedule names: what the crew actually pulls.
+for (const c of CABLE_CATALOG) {
+  if (c.pull) continue
+  const cat = /^cat(5e|6a|6|8)/.exec(c.key)
+  if (cat) c.pull = `Cat${cat[1].toUpperCase().replace('E', 'e')}`
+  else if (/^fiber\.(lc|sc|mdc|lcsc|mdclc)\.sm$/.test(c.key)) c.pull = 'Singlemode Fiber (OS2)'
+  else if (/^fiber\.(lc|sc|mdc|lcsc|mdclc)\.mm$/.test(c.key)) c.pull = 'Multimode Fiber (OM4)'
+  else if (c.key === 'xlr3.mic') c.pull = 'XLR Cable'
+  else if (c.key === 'audio.pair') c.pull = 'Audio Cable (1-pair)'
+  else if (c.key.startsWith('multi.')) c.pull = c.name.replace(' – ', ' (') + ')'
+}
 
 // MARK: Exact-fit custom cables
 //

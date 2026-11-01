@@ -25,3 +25,22 @@ it('lists every cable with both ends located, plus unwired ports', () => {
   expect(csv[1]).toContain('C-12')
   expect(csv[1]).toContain('Yes')
 })
+
+import { makePlateProduct } from './index'
+it('names pulls by bulk cable and groups snake channels', () => {
+  const p = newProject()
+  const box = (inserts: unknown[]) => addEquipment(p, makePlateProduct({ kind: 'wallBox', style: '8" x 8"', inserts } as never, { model: 'B' }), { x: 0, y: 0 })
+  const stage = box([{ module: 'xlrF', count: 10, rear: 'same' }, { module: 'rj45', count: 1, rear: 'same' }])
+  const rack = box([{ module: 'xlrM', count: 10, rear: 'same' }, { module: 'rj45', count: 1, rear: 'same' }])
+  const ins = stage.product.ports.filter((x) => x.face === 'rear' && x.connector === 'xlr3')
+  const outs = rack.product.ports.filter((x) => x.face === 'rear' && x.connector === 'xlr3')
+  ins.forEach((x, i) => connect(p, { equipment: stage.id, port: x.id }, { equipment: rack.id, port: outs[i].id }))
+  expect(p.cables.every((c) => c.specKey === 'xlr3.mic')).toBe(true) // XLR is still the default
+  const net = connect(p, { equipment: stage.id, port: stage.product.ports.find((x) => x.face === 'rear' && x.connector === 'rj45')!.id }, { equipment: rack.id, port: rack.product.ports.find((x) => x.face === 'rear' && x.connector === 'rj45')!.id })
+  expect(pullRows(p).find((r) => r.cable?.id === net.cableId)!.type).toBe('Cat6A')
+  for (const c of p.cables) if (c.specKey === 'xlr3.mic') c.specKey = 'snake.8'
+  const snakes = pullRows(p).filter((r) => r.channels)
+  expect(snakes.map((r) => r.channels)).toEqual([{ used: 8, of: 8 }, { used: 2, of: 8 }])
+  expect(snakes[0].type).toBe('8-Channel Snake')
+  expect(snakes[0].cables).toHaveLength(8)
+})
