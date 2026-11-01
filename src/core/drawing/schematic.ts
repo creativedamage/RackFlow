@@ -23,6 +23,9 @@ export interface SchematicOptions extends SheetOptions {
   color: boolean
   /** Signal views to add as extra sheets (undefined = all of them). */
   views?: string[]
+  /** Quick print: just this page's sheet (group id, null = devices on no page) – or just this signal view. */
+  onlyPage?: string | null
+  onlyView?: string
 }
 
 export const defaultSchematic = (p?: Project): SchematicOptions => ({
@@ -56,7 +59,7 @@ export function schematicSheets(pIn: Project, o: SchematicOptions): string[] {
   // …and no plate / panel face drawing in the device blocks (it looked out of place on paper).
   const p0: Project = { ...pIn, equipment: pIn.equipment.map((e) => ({ ...e, collapsed: undefined, ioHidden: undefined, noFace: true })) }
   // Notes placed on signal views print on those views' sheets only.
-  const views = viewsOf(p0).filter((v) => !o.views || o.views.includes(v.id))
+  const views = viewsOf(p0).filter((v) => !o.views || o.views.includes(v.id) || v.id === o.onlyView)
   const viewIds = new Set(viewsOf(p0).map((v) => v.id))
   const p: Project = { ...p0, annotations: (p0.annotations ?? []).filter((a) => !a.page || !viewIds.has(a.page)) }
   // Pages
@@ -83,10 +86,13 @@ export function schematicSheets(pIn: Project, o: SchematicOptions): string[] {
     ...pages.map((pg, i) => (o.split === 'group' ? nums.get(pg.pageId ?? GENERAL_PAGE) ?? sheetLabel(o.drawingNumber, i) : byIndex(i))),
     ...extra.map(({ v }, i) => nums.get(v.id) ?? byIndex(pages.length + i)),
   ]
+  // Quick print draws just one page or view (numbered as in the full set).
+  const mainOk = (pg: Page) => !o.onlyView && (o.onlyPage === undefined || (pg.pageId ?? null) === o.onlyPage)
+  const viewOk = (id: string) => (o.onlyView ? id === o.onlyView : o.onlyPage === undefined)
   return [
-    ...pages.map((pg, i) => drawPage(p, o, pg, i + 1, total, sheetOf, labels)),
+    ...pages.flatMap((pg, i) => (mainOk(pg) ? [drawPage(p, o, pg, i + 1, total, sheetOf, labels)] : [])),
     // Wires leaving a view end in arrows naming the device and the main sheet it's on.
-    ...extra.map(({ v, project: vp, ids }, i) => drawPage(vp, { ...o, split: 'group' }, { title: v.name.toUpperCase(), pageId: v.id, ids }, pages.length + i + 1, total, sheetOf, labels)),
+    ...extra.flatMap(({ v, project: vp, ids }, i) => (viewOk(v.id) ? [drawPage(vp, { ...o, split: 'group' }, { title: v.name.toUpperCase(), pageId: v.id, ids }, pages.length + i + 1, total, sheetOf, labels)] : [])),
   ]
 }
 

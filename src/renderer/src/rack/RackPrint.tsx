@@ -5,6 +5,7 @@ import { DrawingDialog } from '../print/DrawingDialog'
 import { Segmented, Toggle } from '../components/ui'
 
 let remembered: RackPrintOptions | null = null
+export const lastRackOptions = () => remembered
 
 export function RackPrintDialog({ onClose }: { onClose: () => void }) {
   const project = useStore((s) => s.project)

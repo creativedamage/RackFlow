@@ -320,6 +320,7 @@ function PanelForm({ p, onChange }: { p: LedPanel; onChange: (p: LedPanel) => vo
 }
 
 let remembered: LedPrintOptions | null = null
+export const lastLedOptions = () => remembered
 export function LedPrintDialog({ onClose, wallId }: { onClose: () => void; wallId?: string }) {
   const project = useStore((s) => s.project)
   const [o, setO] = useState<LedPrintOptions>(() => remembered ?? defaultLedPrint())

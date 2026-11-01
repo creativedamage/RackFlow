@@ -6,7 +6,7 @@ import type { PatchBayTemplate, ProductDefinition } from '../core/model'
 import type { Manufacturer } from '../core/manufacturers'
 
 export type MenuCommand =
-  | 'new' | 'open' | 'save' | 'saveAs' | 'save-and-close' | 'autosave:toggle'
+  | 'new' | 'open' | 'save' | 'saveAs' | 'save-and-close' | 'autosave:toggle' | 'quickPrint'
   | 'undo' | 'redo' | 'delete' | 'selectAll' | 'zoomFit'
   | 'mode:diagram' | 'mode:rack' | 'mode:patch' | 'mode:sheet' | 'mode:led'
   | 'newProduct' | 'newTemplate' | 'toggleInspector' | 'editDevice' | 'findDevice' | 'tidy' | 'exportAll' | 'numbering' | 'units:imperial' | 'units:metric' | 'theme:system' | 'theme:light' | 'theme:dark'

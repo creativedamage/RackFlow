@@ -5,6 +5,8 @@ import { DrawingDialog } from './DrawingDialog'
 import { Field, Segmented, Select, Toggle } from '../components/ui'
 
 let remembered: SchematicOptions | null = null
+/** The settings last used in the print dialog (quick print reuses them). */
+export const lastSchematicOptions = () => remembered
 
 export function SchematicPrintDialog({ onClose }: { onClose: () => void }) {
   const project = useStore((s) => s.project)
