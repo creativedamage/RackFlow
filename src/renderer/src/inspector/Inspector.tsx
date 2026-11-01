@@ -1,6 +1,6 @@
 import { editPlacedDevice } from '../product/openEditor'
 import { useState } from 'react'
-import { CABLE_CATALOG, cableSpec, CATEGORIES, CONNECTOR_TYPES, connectorIsPower, exactFitCable, fittingCables, cablesAt, connectorName, DOMAINS, heatBTU, orientation, portDomain, resolve, SIGNALS, validateCable, findRack, addToGroup, groupsOf, removeFromGroup, groupColor, circuitLoads, circuitName, isPowerSource, sourceRating, sourcesFor, type Cable, type EquipmentId, type EquipmentInstance, fmtLen, fmtLenPair, fmtWt } from '@core/index'
+import { CABLE_CATALOG, CABLE_COLORS, cableSpec, CATEGORIES, CONNECTOR_TYPES, connectorIsPower, exactFitCable, fittingCables, cablesAt, connectorName, DOMAINS, heatBTU, orientation, portDomain, resolve, SIGNALS, validateCable, findRack, addToGroup, groupsOf, removeFromGroup, groupColor, circuitLoads, circuitName, isPowerSource, sourceRating, sourcesFor, type Cable, type EquipmentId, type EquipmentInstance, fmtLen, fmtLenPair, fmtWt } from '@core/index'
 import { useStore } from '../store'
 import { RackSettings } from '../rack/RackView'
 import { AccessoryInspector } from '../rack/AccessoryInspector'
@@ -135,6 +135,10 @@ function CableInspector({ cable }: { cable: Cable }) {
       {!currentFits && best && (
         <button className="primary fix-cable" onClick={() => upd('Set Cable Type', (c) => { c.specKey = best.key })}>Use {best.name}</button>
       )}
+      <Field label="Color"><select value={cable.color ?? ''} onChange={(e) => upd('Cable Color', (c) => { c.color = e.target.value || undefined })}>
+        <option value="">—</option>{cable.color && !CABLE_COLORS.some((x) => x.name === cable.color) && <option value={cable.color}>{cable.color}</option>}
+        {CABLE_COLORS.map((x) => <option key={x.name} value={x.name}>{x.name}</option>)}
+      </select></Field>
       <Field label="Length"><LongInput value={cable.lengthMeters} allowEmpty step={0.5} min={0} onCommit={(n) => upd('Set Length', (c) => { c.lengthMeters = n })} /></Field>
       <Field label="Notes"><TextInput multiline value={cable.notes} onCommit={(val) => upd('Cable Notes', (c) => { c.notes = val })} /></Field>
       <h4>Checks</h4>

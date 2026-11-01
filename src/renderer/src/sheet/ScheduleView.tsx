@@ -7,6 +7,7 @@ import { Modal, NumberInput, Select } from '../components/ui'
 import { Sheet, type SheetColumn } from './Sheet'
 import { NetworkSheet } from './NetworkSheet'
 import { PullSheet } from './PullSheet'
+import { colorColumn } from './colorColumn'
 
 type Tab = 'cables' | 'pull' | 'devices' | 'network'
 
@@ -79,6 +80,7 @@ function CableSheet() {
         const hit = CABLE_CATALOG.find((c) => c.key === t || c.name.toLowerCase() === t.toLowerCase()) ?? cableSpec(t)
         if (hit) r.cable.specKey = hit.key
       } },
+    colorColumn<CableRow>((r) => r.cable),
     { key: 'length', title: `Length (${longUnit()})`, width: 90, numeric: true, get: (r) => (r.cable.lengthMeters == null ? '' : String(Number(toLong(r.cable.lengthMeters).toFixed(1)))),
       set: (r, v) => { const n = parseFloat(v.replace(',', '.')); r.cable.lengthMeters = v.trim() === '' || isNaN(n) ? null : Math.max(0, fromLong(n)) } },
     { key: 'notes', title: 'Notes', width: 220, get: (r) => r.cable.notes, set: (r, v) => { r.cable.notes = v } },

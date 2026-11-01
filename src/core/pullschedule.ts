@@ -105,7 +105,7 @@ export function pullRows(p: Project, opts: { unwired?: boolean } = {}): PullRow[
 const csvCell = (v: unknown) => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
 const yes = (b?: boolean) => (b ? 'Yes' : '')
 
-export const PULL_HEAD = () => ['Cable #', 'System', 'Cable', `Length (${longUnit()})`,
+export const PULL_HEAD = () => ['Cable #', 'System', 'Cable', 'Color', `Length (${longUnit()})`,
   'From Room', 'From Rack', 'From Device', 'From Model', 'From Port', 'From Connector',
   'To Room', 'To Rack', 'To Device', 'To Model', 'To Port', 'To Connector',
   'Pathway', 'Pulled', 'Terminated', 'Tested', 'Notes']
@@ -115,7 +115,7 @@ export const pullDone = (r: PullRow, k: 'pulled' | 'terminated' | 'tested') => r
 export function pullCells(r: PullRow): string[] {
   const c = r.cable
   const e = (x: PullEnd | null) => (x ? [x.room, x.rack, x.tag, x.device, x.port, x.connector] : ['', '', '', '', '', ''])
-  return [r.label || (c ? '' : 'UNWIRED'), r.system ? DOMAINS[r.system].name : '', r.channels ? `${r.type} (${r.channels.used} of ${r.channels.of} ch)` : r.type, c?.lengthMeters == null ? '' : String(Number(toLong(c.lengthMeters).toFixed(1))),
+  return [r.label || (c ? '' : 'UNWIRED'), r.system ? DOMAINS[r.system].name : '', r.channels ? `${r.type} (${r.channels.used} of ${r.channels.of} ch)` : r.type, c?.color ?? '', c?.lengthMeters == null ? '' : String(Number(toLong(c.lengthMeters).toFixed(1))),
     ...e(r.from), ...e(r.to), c?.pull?.pathway ?? '', yes(pullDone(r, 'pulled')), yes(pullDone(r, 'terminated')), yes(pullDone(r, 'tested')), c?.notes ?? '']
 }
 

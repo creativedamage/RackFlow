@@ -271,6 +271,8 @@ export interface Cable {
   specKey: string | null
   lengthMeters: number | null
   notes: string
+  /** Jacket colour (name from CABLE_COLORS, or any text). */
+  color?: string
   /** Pull schedule: the route it takes and install progress. */
   pull?: CablePull
 }

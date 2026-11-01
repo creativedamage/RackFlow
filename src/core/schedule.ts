@@ -116,8 +116,8 @@ export function renumberCables(p: Project, opts: {
 const csvCell = (v: unknown) => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
 
 export function cablesToCSV(p: Project): string {
-  const head = ['Label', 'System', 'From', 'From Port', 'To', 'To Port', 'Signal', 'Cable Type', `Length (${longUnit()})`, 'Notes', 'Status']
-  const lines = cableRows(p).map((r) => [r.cable.label, r.system ? DOMAINS[r.system].name : '', r.fromTag, r.fromPort, r.toTag, r.toPort, r.signal, r.cableType,
+  const head = ['Label', 'System', 'From', 'From Port', 'To', 'To Port', 'Signal', 'Cable Type', 'Color', `Length (${longUnit()})`, 'Notes', 'Status']
+  const lines = cableRows(p).map((r) => [r.cable.label, r.system ? DOMAINS[r.system].name : '', r.fromTag, r.fromPort, r.toTag, r.toPort, r.signal, r.cableType, r.cable.color ?? '',
     r.cable.lengthMeters == null ? '' : Number(toLong(r.cable.lengthMeters).toFixed(1)), r.cable.notes, r.message].map(csvCell).join(','))
   return [head.join(','), ...lines].join('\n')
 }

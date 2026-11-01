@@ -241,3 +241,14 @@ export function fittingCables(from: PortTemplate, to: PortTemplate): CableSpec[]
   const exact = exactFitCable(from, to)
   return fit.some((c) => sameEnds(c, exact)) ? fit : [...fit, exact]
 }
+
+/** Common jacket colours (name → swatch). */
+export const CABLE_COLORS: { name: string; hex: string }[] = [
+  { name: 'Black', hex: '#1d1d1f' }, { name: 'White', hex: '#f5f5f5' }, { name: 'Gray', hex: '#8e8e93' }, { name: 'Red', hex: '#d62828' },
+  { name: 'Orange', hex: '#f77f00' }, { name: 'Yellow', hex: '#f2c500' }, { name: 'Green', hex: '#2f9e44' }, { name: 'Blue', hex: '#1c64f2' },
+  { name: 'Purple', hex: '#7b2cbf' }, { name: 'Violet', hex: '#9d4edd' }, { name: 'Pink', hex: '#f06595' }, { name: 'Brown', hex: '#8b5a2b' },
+  { name: 'Aqua', hex: '#22b8cf' }, { name: 'Lime', hex: '#94d82d' }, { name: 'Tan', hex: '#d2b48c' },
+]
+export const cableColorHex = (name?: string) => CABLE_COLORS.find((c) => c.name.toLowerCase() === name?.trim().toLowerCase())?.hex
+/** Matches typed / pasted text to a colour name (any other text is kept as typed). */
+export const normalizeColor = (v: string) => { const t = v.trim(); if (!t) return undefined; return CABLE_COLORS.find((c) => c.name.toLowerCase() === t.toLowerCase() || (t.toLowerCase() === 'grey' && c.name === 'Gray'))?.name ?? t }

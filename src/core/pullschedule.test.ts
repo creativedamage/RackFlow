@@ -44,3 +44,16 @@ it('names pulls by bulk cable and groups snake channels', () => {
   expect(snakes[0].type).toBe('8-Channel Snake')
   expect(snakes[0].cables).toHaveLength(8)
 })
+
+import { cablesToCSV, normalizeColor } from './index'
+it('carries the cable colour into both schedules', () => {
+  const p = newProject()
+  const a = addEquipment(p, prod('generic.dsp.12x8'), { x: 0, y: 0 }), b = addEquipment(p, prod('generic.dsp.12x8'), { x: 400, y: 0 })
+  connect(p, { equipment: a.id, port: a.product.ports.find((x) => x.direction === 'output' && /Line/.test(x.label))!.id }, { equipment: b.id, port: b.product.ports.find((x) => x.direction === 'input')!.id })
+  p.cables[0].color = normalizeColor('grey')
+  expect(p.cables[0].color).toBe('Gray')
+  expect(pullScheduleCSV(p).split('\n')[1]).toContain(',Gray,')
+  expect(cablesToCSV(p).split('\n')[0]).toContain('Color')
+  expect(cablesToCSV(p).split('\n')[1]).toContain('Gray')
+  expect(normalizeColor('Hot pink')).toBe('Hot pink')
+})

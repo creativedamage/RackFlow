@@ -7,6 +7,7 @@ import { useStore } from '../store'
 import { Select } from '../components/ui'
 import { Sheet, type SheetColumn } from './Sheet'
 import { CableLabelsDialog } from './CableLabelsDialog'
+import { colorColumn } from './colorColumn'
 
 type Stage = '' | 'notPulled' | 'notTerminated' | 'notTested' | 'done' | 'unwired'
 const YES = /^(y|yes|x|✓|✔|true|1|done)$/i
@@ -81,6 +82,7 @@ export function PullSheet() {
         const hit = CABLE_CATALOG.find((c) => c.key === t || c.name.toLowerCase() === t.toLowerCase()) ?? cableSpec(t)
         if (hit) r.cable.specKey = hit.key
       } },
+    colorColumn<PullRow>((r) => r.cable),
     { key: 'length', title: `Length (${longUnit()})`, width: 84, numeric: true, get: (r) => (r.cable?.lengthMeters == null ? '' : String(Number(toLong(r.cable.lengthMeters).toFixed(1)))),
       set: (r, v) => { if (!r.cable) return; const n = parseFloat(v.replace(',', '.')); r.cable.lengthMeters = v.trim() === '' || isNaN(n) ? null : Math.max(0, fromLong(n)) } },
     ...endCols('from', 'From'),
@@ -122,7 +124,7 @@ export function PullSheet() {
     </style></head><body><h1>${esc(name)} – Cable Pull Schedule</h1>
       <div class="sub">${cables.length} pulls · ${done('pulled')} pulled · ${done('terminated')} terminated · ${done('tested')} tested · printed ${new Date().toLocaleDateString()}</div>
       <table><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>
-      ${rows.map((r) => `<tr>${pullCells(r).map((c, i) => `<td${i >= 17 && i <= 19 ? ' class="c"' : ''}>${esc(i >= 17 && i <= 19 ? (c ? '✓' : (r.cable ? '☐' : '')) : c)}</td>`).join('')}</tr>`).join('')}
+      ${rows.map((r) => `<tr>${pullCells(r).map((c, i) => `<td${i >= 18 && i <= 20 ? ' class="c"' : ''}>${esc(i >= 18 && i <= 20 ? (c ? '✓' : (r.cable ? '☐' : '')) : c)}</td>`).join('')}</tr>`).join('')}
       </tbody></table></body></html>`
     const f = document.createElement('iframe')
     f.style.cssText = 'position:fixed;width:0;height:0;border:0;right:0;bottom:0'
