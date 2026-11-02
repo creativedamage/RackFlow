@@ -21,7 +21,8 @@ function createWindow() {
     title: 'RackFlow',
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 14, y: 14 },
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#161618' : '#f5f5f7',
+    // Liquid Glass: the sidebar and toolbar are translucent over the window's vibrancy.
+    ...(isMac ? { vibrancy: 'sidebar' as const, visualEffectState: 'followWindow' as const, backgroundColor: '#00000000' } : { backgroundColor: nativeTheme.shouldUseDarkColors ? '#161618' : '#f5f5f7' }),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -74,7 +75,10 @@ function createWindow() {
   else void win.loadFile(join(__dirname, '../renderer/index.html'))
 
   win.webContents.once('did-finish-load', () => {
-    if (pendingOpen) { void openPath(pendingOpen); pendingOpen = null }
+    // A file double-clicked in Finder wins; otherwise pick up where you left off – the last project.
+    const last = recent.find((p) => existsSync(p))
+    const target = pendingOpen ?? (process.env.RACKFLOW_NO_REOPEN ? null : last ?? null)
+    if (target) { void openPath(target); pendingOpen = null }
   })
 }
 
@@ -92,7 +96,7 @@ async function loadTheme() {
 }
 function setTheme(t: Theme) {
   nativeTheme.themeSource = t
-  win?.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#161618' : '#f5f5f7')
+  if (!isMac) win?.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#161618' : '#f5f5f7')
   void mkdir(app.getPath('userData'), { recursive: true }).then(() => writeFile(themeFile(), JSON.stringify({ theme: t }), 'utf8')).catch(() => undefined)
   buildMenu()
   send(`theme:${t}`)

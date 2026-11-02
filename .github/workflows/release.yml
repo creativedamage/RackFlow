@@ -66,6 +66,23 @@ jobs:
       - run: npm ci
       - name: Build app
         run: npm run build
+      # macOS 26 Liquid Glass icon: compile build/RackFlow.icon (Icon Composer) into
+      # build/Assets.car with Xcode 26's actool; afterPack puts it in the app. If
+      # this runner has no Xcode 26 the step is skipped and the classic icon is used.
+      - name: Liquid Glass app icon
+        continue-on-error: true
+        run: |
+          X=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$X" ]; then sudo xcode-select -s "$X"; fi
+          xcodebuild -version || true
+          mkdir -p build/car
+          xcrun actool build/RackFlow.icon --compile build/car \
+            --output-format human-readable-text --notices --warnings --errors \
+            --output-partial-info-plist build/car/partial.plist \
+            --app-icon RackFlow --include-all-app-icons \
+            --enable-on-demand-resources NO --development-region en \
+            --target-device mac --minimum-deployment-target 12.0 --platform macosx
+          test -f build/car/Assets.car && cp build/car/Assets.car build/Assets.car && echo "Assets.car ready"
       - name: Package DMG + zip (Apple Silicon and Intel)
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Panel } from '@xyflow/react'
 import { create } from 'zustand'
-import { autoGroupBySystem, createGroup, deleteView, duplicateView, pageNumbers, GENERAL_PAGE, DOMAINS, groupColor, groupsOf, membersOf, moveToPage, nodeGeom, setInView, ungroup, viewMembers, viewsOf, type DeviceGroup, type SignalDomain } from '@core/index'
+import { autoGroupBySystem, createGroup, deleteView, duplicateView, layoutView, pageNumbers, GENERAL_PAGE, DOMAINS, groupColor, groupsOf, membersOf, moveToPage, nodeGeom, setInView, ungroup, viewMembers, viewsOf, type DeviceGroup, type SignalDomain } from '@core/index'
 import { showContextMenu } from '../components/ContextMenu'
 import { tidyDiagram } from './tidy'
 import type { MenuItem } from '../components/ContextMenu'
@@ -126,6 +126,16 @@ export function PageTabs() {
           onDoubleClick={() => set({ editingView: v.id })}
           onContextMenu={(e) => showContextMenu(e, [
             { label: 'Edit View…', onClick: () => set({ editingView: v.id }) },
+            { label: 'Update Devices…', onClick: () => set({ editingView: v.id }) },
+            ...(() => {
+              // Devices selected on the diagram (or another page) that aren't on this view yet.
+              const st = useStore.getState(), have = new Set(viewMembers(st.project, v).map((e) => e.id as string))
+              const add = st.selection.filter((id) => !have.has(id))
+              return add.length ? [{ label: `Add ${add.length} Selected Device${add.length === 1 ? '' : 's'} to “${v.name}”`, onClick: () => {
+                st.apply('Add to View', (d) => { setInView(d, v.id, add, true); layoutView(d, v.id, nodeGeom, { onlyNew: true }) })
+                st.notify(`Added ${add.length} device${add.length === 1 ? '' : 's'} to “${v.name}”`, { undo: true, kind: 'success' })
+              } }] : []
+            })(),
             { label: 'Duplicate View…', onClick: () => {
               let copy = ''
               useStore.getState().apply('Duplicate View', (d) => { copy = duplicateView(d, v.id)?.id ?? '' })

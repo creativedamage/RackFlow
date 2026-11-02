@@ -3,3 +3,5 @@ out/
 dist/
 *.tsbuildinfo
 .DS_Store
+build/Assets.car
+build/car/

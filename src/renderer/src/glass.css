@@ -1,0 +1,183 @@
+/* RackFlow – Liquid Glass (macOS 26 style).
+   Loaded after styles.css: translucent, blurred surfaces with a bright top
+   edge, floating rounded panels, capsule (fully rounded) buttons and
+   segmented controls. Colours keep their roles; only materials and shapes
+   change here. */
+
+:root {
+  --glass: rgba(255, 255, 255, 0.62);
+  --glass-strong: rgba(255, 255, 255, 0.82);
+  --glass-line: rgba(0, 0, 0, 0.09);
+  --glass-edge: rgba(255, 255, 255, 0.85);
+  --glass-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.06);
+  --blur: blur(28px) saturate(180%);
+  --btn-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.72));
+  --btn-hover: linear-gradient(180deg, #ffffff, rgba(246, 247, 250, 0.95));
+  --btn-line: rgba(0, 0, 0, 0.11);
+  --hover: rgba(0, 0, 0, 0.055);
+  --track: rgba(118, 118, 128, 0.14);
+  --thumb: linear-gradient(180deg, #ffffff, rgba(255, 255, 255, 0.9));
+  --radius: 12px;
+  --panel: var(--glass);
+  --bg-2: #f2f3f7;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme=light]) {
+    --glass: rgba(38, 38, 42, 0.58);
+    --glass-strong: rgba(44, 44, 48, 0.82);
+    --glass-line: rgba(255, 255, 255, 0.09);
+    --glass-edge: rgba(255, 255, 255, 0.14);
+    --glass-shadow: 0 14px 36px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
+    --btn-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.07));
+    --btn-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.12));
+    --btn-line: rgba(255, 255, 255, 0.1);
+    --hover: rgba(255, 255, 255, 0.08);
+    --track: rgba(118, 118, 128, 0.26);
+    --thumb: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.16));
+    --bg-2: #141416;
+  }
+}
+:root[data-theme=dark] {
+  --glass: rgba(38, 38, 42, 0.58);
+  --glass-strong: rgba(44, 44, 48, 0.82);
+  --glass-line: rgba(255, 255, 255, 0.09);
+  --glass-edge: rgba(255, 255, 255, 0.14);
+  --glass-shadow: 0 14px 36px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --btn-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.07));
+  --btn-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.12));
+  --btn-line: rgba(255, 255, 255, 0.1);
+  --hover: rgba(255, 255, 255, 0.08);
+  --track: rgba(118, 118, 128, 0.26);
+  --thumb: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.16));
+  --bg-2: #141416;
+}
+
+/* macOS window vibrancy: the sidebar and toolbar show the desktop through frosted glass. */
+html.vibrant, html.vibrant body { background: transparent; }
+html.vibrant .canvas-area, html.vibrant .schedule, html.vibrant .patch-editor { background: var(--bg); }
+
+/* MARK: Buttons – capsules */
+button {
+  border-radius: 999px;
+  padding: 4px 13px;
+  background: var(--btn-bg);
+  border: 0.5px solid var(--btn-line);
+  box-shadow: 0 0.5px 1.5px rgba(0, 0, 0, 0.08);
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease, filter 0.15s ease;
+}
+button:hover:not(:disabled):not(.on):not(.primary) { background: var(--btn-hover); }
+button:active:not(:disabled) { transform: scale(0.97); }
+button.mini { border-radius: 999px; padding: 1px 9px; }
+button.primary {
+  background: linear-gradient(180deg, #3c97ff, #0a7cff);
+  border: 0.5px solid rgba(0, 80, 200, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(10, 132, 255, 0.32);
+  color: #fff;
+}
+button.primary:hover:not(:disabled) { background: linear-gradient(180deg, #54a4ff, #1786ff); }
+button.on:hover:not(:disabled) { filter: brightness(1.06); }
+button.danger { color: var(--danger); }
+.icon-btn, button.link, .gp-icon, .dn-hide, .autosave-chip, .toast-close, .context-menu button, .lib-tabs button, .norm, .dn-sec-head {
+  box-shadow: none;
+}
+.icon-btn { border-radius: 999px; background: transparent; border-color: transparent; }
+.icon-btn:hover:not(:disabled) { background: var(--hover) !important; }
+button.link { background: none; border: none; padding: 0; }
+button.link:hover:not(:disabled) { background: none; text-decoration: underline; }
+/* Keep menus, grid cells and underline tabs square. */
+.context-menu button { border-radius: 7px; }
+.context-menu button:hover:not(:disabled) { background: var(--accent); color: #fff; }
+.norm, .lib-tabs button { border-radius: 0; background: transparent; }
+.lib-tabs button:hover:not(:disabled) { background: transparent; }
+
+/* Tabs and chips become capsules too. */
+.schedule-tabs { gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--line-2); }
+.schedule-tabs button { border-radius: 999px; border-bottom: 0.5px solid var(--btn-line); padding: 4px 15px; }
+.tpl-tabs button { border-radius: 999px; border-bottom: 0.5px solid var(--btn-line); }
+.page-tabs { background: transparent; gap: 4px; padding: 5px 10px; }
+.page-tabs button { border-radius: 999px; box-shadow: none; background: transparent; }
+.page-tabs button:hover:not(:disabled):not(.on) { background: var(--hover); }
+.page-tabs button.on { background: var(--glass-strong); border-color: var(--glass-line); box-shadow: inset 0 1px 0 var(--glass-edge), 0 2px 8px rgba(0, 0, 0, 0.08); }
+.size-bar { border-radius: 999px; }
+.size-bar button { border-radius: 999px; box-shadow: none; background: transparent; }
+
+/* Segmented controls: a capsule track with a glass thumb. */
+.segmented { background: var(--track); border-radius: 999px; padding: 2px; gap: 1px; }
+.segmented button { border-radius: 999px; background: transparent; border: none; box-shadow: none; padding: 3px 13px; }
+.segmented button:hover:not(:disabled):not(.on) { background: var(--hover); color: var(--text); }
+.segmented button.on { background: var(--thumb); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14), inset 0 0.5px 0 var(--glass-edge); }
+
+/* MARK: Fields */
+input, select, textarea { border-radius: 9px; border: 0.5px solid var(--btn-line); background: var(--glass-strong); }
+select { border-radius: 999px; padding: 4px 10px; background: var(--btn-bg); }
+input[type=checkbox], input[type=radio], input[type=range] { box-shadow: none; }
+input[type=search] { border-radius: 999px; padding-left: 12px; }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3.5px var(--accent-soft); }
+.xsheet input, .xsheet select, .pb-cell input { border-radius: 4px; }
+
+/* MARK: Glass surfaces */
+.toolbar {
+  background: var(--glass);
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border-bottom: 0.5px solid var(--glass-line);
+  box-shadow: inset 0 -0.5px 0 var(--glass-edge);
+}
+.sidebar {
+  background: var(--glass);
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border-right: 0.5px solid var(--glass-line);
+}
+.inspector { background: var(--glass-strong); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); }
+.app.insp-float .inspector {
+  background: var(--glass-strong);
+  border: 0.5px solid var(--glass-line); border-radius: 20px;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-edge);
+}
+.diagram-tools, .groups-panel, .picked-panel, .hint-panel, .wiring-hint, .size-bar, .react-flow__controls, .react-flow__minimap {
+  background: var(--glass) !important;
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border: 0.5px solid var(--glass-line) !important;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-edge) !important;
+}
+.diagram-tools, .picked-panel, .wiring-hint { border-radius: 999px !important; padding: 5px 7px; }
+.groups-panel, .hint-panel { border-radius: 18px !important; }
+.react-flow__minimap { border-radius: 16px !important; overflow: hidden; }
+.react-flow__controls { border-radius: 999px !important; overflow: hidden; padding: 3px; }
+.react-flow__controls-button { background: transparent !important; border: none !important; border-radius: 999px; width: 26px; height: 26px; }
+.react-flow__controls-button:hover { background: var(--hover) !important; }
+
+/* Dialogs, menus and toasts float on glass. */
+.modal-backdrop { background: rgba(0, 0, 0, 0.22); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+.modal {
+  background: var(--glass-strong);
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border: 0.5px solid var(--glass-line); border-radius: 24px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28), inset 0 1px 0 var(--glass-edge);
+  overflow: hidden;
+}
+.modal-header, .modal-footer { border-color: var(--glass-line); }
+.context-menu {
+  background: var(--glass-strong) !important;
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border: 0.5px solid var(--glass-line) !important; border-radius: 14px !important;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-edge) !important;
+  padding: 5px !important;
+}
+.toasts .toast { border-radius: 999px; padding: 8px 8px 8px 18px; background: rgba(30, 30, 34, 0.78); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); border: 0.5px solid rgba(255, 255, 255, 0.12); }
+.toast-action { border-radius: 999px; }
+
+/* MARK: Cards & lists */
+.device-node.card { border-radius: 16px; border: 0.5px solid var(--card-line); box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06); }
+.device-node.card.selected { box-shadow: 0 0 0 3px var(--accent-soft), 0 8px 24px rgba(10, 132, 255, 0.18); }
+.dn-sec { border-radius: 12px; }
+.dn-pill { border-radius: 999px; }
+.dn-chip { border-radius: 999px; }
+.lib-row, .lib-item { border-radius: 10px; margin: 0 6px; }
+.lib-row:hover, .lib-item:hover { background: var(--hover); }
+.lib-row.on { background: var(--accent-soft); }
+.chip, .badge { border-radius: 999px; }
+.xsheet { border-radius: 0; }
+.undo-group { border-radius: 999px !important; border: 0.5px solid var(--btn-line) !important; background: var(--btn-bg) !important; overflow: hidden; }
+.undo-group .icon-btn { border-radius: 999px; }
+.react-flow__minimap svg { border-radius: 12px; }
+.react-flow__minimap { background: var(--glass) !important; }

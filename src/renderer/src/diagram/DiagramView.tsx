@@ -4,7 +4,7 @@ import { showContextMenu } from '../components/ContextMenu'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyNodeChanges, Background, BackgroundVariant, ConnectionMode, Controls, MiniMap, Panel, ReactFlow, useConnection, useReactFlow,
-  type Connection, type Edge, type EdgeChange, type NodeChange, type OnConnectStart,
+  type Connection, type Edge, type EdgeChange, type NodeChange, type OnConnectStart, type Viewport,
 } from '@xyflow/react'
 import {
   addEquipment, addPatchBay, addToGroup, pageNumbers, GENERAL_PAGE, layoutView, setInView, viewOffFlags, viewProject, viewsOf, nodeGeom, placeInFreeSpace, connectMany, groupColor, groupsOf, type BulkResult, candidates as findCandidates, connect, DOMAINS, portDomain, resolve, SIGNALS, validate,
@@ -35,6 +35,10 @@ const GRID = 8
 
 const pointOf = (e: MouseEvent | TouchEvent | React.MouseEvent) => ('touches' in e ? { x: (e.changedTouches[0] ?? e.touches[0])?.clientX ?? 0, y: (e.changedTouches[0] ?? e.touches[0])?.clientY ?? 0 } : { x: e.clientX, y: e.clientY })
 
+/** Zoom / position per page or view, kept while the app is open (survives switching tabs). */
+const viewports = new Map<string, Viewport>()
+let seenFit = 0
+
 export function DiagramView() {
   const project = useStore((s) => s.project)
   const selection = useStore((s) => s.selection)
@@ -43,7 +47,7 @@ export function DiagramView() {
   const fitRequest = useStore((s) => s.fitRequest)
   const apply = useStore((s) => s.apply)
   const select = useStore((s) => s.select)
-  const { screenToFlowPosition, fitView } = useReactFlow()
+  const { screenToFlowPosition, fitView, setViewport, getViewport } = useReactFlow()
   const focusGroup = useGroupFocus((s) => s.focus)
   const page = useStore((s) => s.diagramPage)
   const viewId = useStore((s) => s.diagramView)
@@ -190,15 +194,27 @@ export function DiagramView() {
     })
   }, [shown, cableSeverity, selectedCable, selection, select, wireMode])
 
-  useEffect(() => { if (fitRequest) void fitView({ padding: 0.15, duration: 250 }) }, [fitRequest, fitView])
+  // "Fit" requests (open a file, save a view…) – only new ones, so coming back from another tab doesn't re-fit.
+  useEffect(() => {
+    if (!fitRequest || fitRequest === seenFit) return
+    seenFit = fitRequest
+    viewports.clear()
+    void fitView({ padding: 0.15, duration: 250 })
+  }, [fitRequest, fitView])
   // Library ▸ Inventory → frame one device (after any page switch has rendered).
   useEffect(() => {
     const on = (e: Event) => { const id = (e as CustomEvent<string>).detail; setTimeout(() => void fitView({ nodes: [{ id }], padding: 1.2, maxZoom: 1.2, duration: 300 }), 120) }
     window.addEventListener('diagram:locate', on)
     return () => window.removeEventListener('diagram:locate', on)
   }, [fitView])
-  // Switching page frames what's on it.
-  useEffect(() => { const t = setTimeout(() => void fitView({ padding: 0.15, duration: 250 }), 60); return () => clearTimeout(t) }, [page, viewId, fitView])
+  // Each page / view keeps its own zoom and position: coming back (from another page, or from the
+  // rack elevation) puts you where you were; the first visit frames what's on it.
+  const vpKey = viewId ?? page ?? 'all'
+  useEffect(() => {
+    const saved = viewports.get(vpKey)
+    const t = setTimeout(() => { if (saved) void setViewport(saved); else void fitView({ padding: 0.15, duration: 250 }) }, saved ? 0 : 60)
+    return () => { clearTimeout(t); viewports.set(vpKey, getViewport()) }
+  }, [vpKey, fitView, setViewport, getViewport])
 
   const onNodesChange = useCallback((all: NodeChange<AnyNode>[]) => {
     // Dragging a group frame moves its members by the same amount.
@@ -422,8 +438,8 @@ export function DiagramView() {
         zoomOnPinch
         minZoom={0.1}
         maxZoom={4}
-        fitView
-        fitViewOptions={{ padding: 0.2, maxZoom: 1.2 }}
+        defaultViewport={viewports.get(vpKey) ?? undefined}
+        onMoveEnd={(_, vp) => viewports.set(vpKey, vp)}
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={32} size={1.2} />
