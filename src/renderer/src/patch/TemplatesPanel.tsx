@@ -8,7 +8,7 @@ import { addBayToProject } from './addBay'
 type SortKey = 'make' | 'model' | 'type' | 'rows' | 'holes'
 
 /** PatchCAD-style template browser: Make / Model / Type / Rows / Holes. */
-export function TemplatesPanel() {
+export function TemplatesPanel({ peek = false }: { peek?: boolean } = {}) {
   const templates = useStore((s) => s.templates)
   const set = useStore((s) => s.set)
   const [q, setQ] = useState('')
@@ -40,7 +40,7 @@ export function TemplatesPanel() {
   const current = templates.find((t) => t.key === picked)
 
   return (
-    <aside className="inspector templates-panel">
+    <aside className={`inspector templates-panel ${peek ? 'peek' : ''}`}>
       <div className="tp-head"><h3>Add a patch bay</h3><p className="muted small">Click <b>Add</b> (or double-click a row). Each bay also appears on the Wiring Diagram.</p></div>
       <div className="tp-filters">
         <input type="search" placeholder="Search Templates" value={q} onChange={(e) => setQ(e.target.value)} />

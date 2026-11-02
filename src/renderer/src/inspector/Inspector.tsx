@@ -7,7 +7,7 @@ import { AccessoryInspector } from '../rack/AccessoryInspector'
 import { groupSelection, SYSTEM_OPTIONS } from '../diagram/GroupsPanel'
 import { Dot, Field, NumberInput, Select, SeverityIcon, TextInput, LongInput } from '../components/ui'
 
-export function Inspector() {
+export function Inspector({ peek = false }: { peek?: boolean } = {}) {
   const project = useStore((s) => s.project)
   const selection = useStore((s) => s.selection)
   const selectedCable = useStore((s) => s.selectedCable)
@@ -22,7 +22,7 @@ export function Inspector() {
   const acc = accRack?.accessories.find((a) => a.id === selAcc?.id)
 
   return (
-    <aside className="inspector">
+    <aside className={`inspector ${peek ? 'peek' : ''}`}>
       {acc && accRack ? <AccessoryInspector rack={accRack} acc={acc} /> : cable ? <CableInspector cable={cable} /> : eq ? <EquipmentInspector eq={eq} /> : rack ? <RackSettings rack={rack} /> : selection.length > 1 ? <MultiInspector ids={selection} /> : <IssuesList />}
     </aside>
   )

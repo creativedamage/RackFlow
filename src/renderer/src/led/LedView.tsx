@@ -1,3 +1,4 @@
+import { Slide } from '../slide'
 import { useCallback, useMemo, useState } from 'react'
 import { LED_PANELS, PROCESSOR_PRESETS, derivePanel, defaultLedPrint, ledMapSVG, ledSheets, newLedPanel, newLedWall, nodeGeom, placeInFreeSpace, syncLedWallDevice, wallStats, chains, chainColor, type ChainSettings, type Corner, type LedPanel, type LedPrintOptions, type LedView as View, type LedWall, fmtFtIn, fmtWt, fmtLenPair } from '@core/index'
 import { useStore } from '../store'
@@ -31,6 +32,7 @@ export function LedView() {
   const set = useStore((s) => s.set)
   const showList = useStore((s) => s.showSidebar)
   const showSettings = useStore((s) => s.showInspector)
+  const peek = useStore((s) => s.peek)
   const apply = useStore((s) => s.apply)
   const [view, setView] = useState<View>('data')
   const picking = useStore((s) => s.ledPicking)
@@ -48,7 +50,7 @@ export function LedView() {
 
   return (
     <div className={`led-view ${showList ? '' : 'no-list'} ${showSettings && wall ? '' : 'no-settings'}`}>
-      {showList && <aside className="led-list">
+      <Slide open={showList || peek === 'left'} side="left"><aside className={`led-list ${showList ? '' : 'peek'}`}>
         <div className="led-list-head">
           <h3>LED Walls</h3>
           <button className="primary mini" onClick={() => setPicking(true)}>＋ New Wall</button>
@@ -64,7 +66,7 @@ export function LedView() {
             </button>
           )
         })}
-      </aside>}
+      </aside></Slide>
 
       {!wall ? (
         <div className="led-canvas">
@@ -77,7 +79,7 @@ export function LedView() {
         <Canvas wall={wall} view={view} setView={setView} onToggle={(k) => update('Toggle Panel', (w) => {
           w.removed = w.removed.includes(k) ? w.removed.filter((x) => x !== k) : [...w.removed, k]
         })} onPrint={() => setPrinting(true)} />
-        {showSettings && <Settings wall={wall} view={view} update={update} />}
+        <Slide open={showSettings || peek === 'right'} side="right"><Settings wall={wall} view={view} update={update} peek={!showSettings} /></Slide>
       </>)}
 
       {picking && <PanelPicker onClose={() => setPicking(false)} onPick={(p, c, r) => { setPicking(false); createLedWall(p, c, r) }} />}
@@ -131,7 +133,7 @@ function ChainFields({ s, onChange, limit, kind }: { s: ChainSettings; onChange:
   </>)
 }
 
-function Settings({ wall, view, update }: { wall: LedWall; view: View; update: (label: string, fn: (w: LedWall) => void) => void }) {
+function Settings({ wall, view, update, peek }: { wall: LedWall; view: View; update: (label: string, fn: (w: LedWall) => void) => void; peek?: boolean }) {
   const st = wallStats(wall)
   const apply = useStore((s) => s.apply)
   const set = useStore((s) => s.set)
@@ -139,7 +141,7 @@ function Settings({ wall, view, update }: { wall: LedWall; view: View; update: (
   const [panelEdit, setPanelEdit] = useState(false)
   const preset = PROCESSOR_PRESETS.find((p) => p.px === wall.data.portCapacityPx)?.key ?? 'custom'
   return (
-    <aside className="led-settings form">
+    <aside className={`led-settings form ${peek ? 'peek' : ''}`}>
       <h4>Wall</h4>
       <Field label="Name"><TextInput value={wall.name} onCommit={(v) => update('Rename LED Wall', (w) => { w.name = v || w.name })} /></Field>
       <Field label="Panel">

@@ -37,7 +37,7 @@ const plate = (kind: PlateKind, model: string) => useStore.getState().set({ edit
  * dropdowns (what to show, maker, category, signal). ＋ New makes custom
  * devices, plates, panels, LED walls, patch bays and racks.
  */
-export function Sidebar() {
+export function Sidebar({ peek = false }: { peek?: boolean } = {}) {
   const library = useStore((s) => s.library)
   const templates = useStore((s) => s.templates)
   const equipment = useStore((s) => s.project.equipment)
@@ -120,7 +120,7 @@ export function Sidebar() {
   const filtered = !!(maker || category || domain || query.trim())
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${peek ? 'peek' : ''}`}>
       <div className="sb-drag"><SidebarButton /></div>
       <div className="sidebar-head">
         <div className="lib-heading-row">

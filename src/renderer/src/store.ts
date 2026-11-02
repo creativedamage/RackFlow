@@ -78,6 +78,8 @@ export interface AppState {
   showInspector: boolean
   /** Left sidebar (Library, LED wall list) shown or collapsed – remembered between launches. */
   showSidebar: boolean
+  /** A collapsed sidebar shown over the content while the pointer is at that edge. */
+  peek: 'left' | 'right' | null
   issues: ValidationIssue[]
   /** Bumped to ask the diagram to fit view. */
   fitRequest: number
@@ -149,6 +151,7 @@ export const useStore = create<AppState>((set, get) => ({
   theme: 'system',
   units: 'imperial',
   showInspector: true,
+  peek: null,
   showSidebar: (() => { try { return localStorage.getItem('rackflow.sidebar') !== 'off' } catch { return true } })(),
   issues: [],
   fitRequest: 0,

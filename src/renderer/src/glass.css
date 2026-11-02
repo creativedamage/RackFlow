@@ -334,3 +334,18 @@ button.danger:not(.link):hover:not(:disabled) { background: var(--danger) !impor
 .info-bar input:focus { border-color: var(--accent); }
 .info-bar .count { color: var(--text-2); padding: 0 4px; }
 .info-bar label:first-child { flex-grow: 2; }
+
+/* ── Edge peek: a collapsed sidebar floats over the content ─────────────── */
+.peek {
+  position: fixed !important; z-index: 95; top: 8px; bottom: 8px; margin: 0 !important; height: auto !important;
+  border-radius: 26px !important; overflow: auto;
+  background: linear-gradient(var(--g-tint-strong), var(--g-tint-strong)) padding-box, var(--g-rim) border-box !important;
+  border: 1px solid transparent !important; -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur);
+  box-shadow: var(--g-inner), var(--g-shadow-lg) !important;
+}
+.sidebar.peek, .led-list.peek { left: 8px; right: auto; width: 288px; overflow: hidden; display: flex; flex-direction: column; }
+.led-list.peek { overflow: auto; }
+.inspector.peek, .led-settings.peek { right: 8px; left: auto; top: 60px; width: var(--insp-w, 310px); }
+.templates-panel.peek { width: var(--tp-w, 420px); display: flex; }
+.sidebar.peek { animation: none; }
+.sidebar { animation: none; }

@@ -32,6 +32,7 @@ import { isLightLogo } from './rack/AccessoryInspector'
 import { usePatchUI } from './patch/patchState'
 import { Inspector } from './inspector/Inspector'
 import { toggleSidebar } from './panels'
+import { EdgePeek, Slide } from './slide'
 import { ProductEditor } from './product/ProductEditor'
 import { TemplateEditor } from './patch/TemplateEditor'
 
@@ -155,7 +156,10 @@ export function App() {
 
   // The right panel shows only when there's something to inspect (design checks live in the ⚠︎ notifications).
   const hasSubject = useStore((s) => s.selection.length > 0 || !!s.selectedCable || (s.mode === 'rack' && (!!s.selectedRack || !!s.selectedAccessory)))
-  const rightPanel = showInspector && mode !== 'sheet' && mode !== 'led' && (mode === 'patch' || hasSubject)
+  const rightAvail = mode !== 'sheet' && mode !== 'led' && (mode === 'patch' || hasSubject)
+  const rightPanel = showInspector && rightAvail
+  const peek = useStore((s) => s.peek)
+  const hasWalls = useStore((s) => (s.project.ledWalls?.length ?? 0) > 0)
   const showSidebar = useStore((s) => s.showSidebar)
   const sidebarOn = showSidebar && mode !== 'sheet' && mode !== 'led'
   const inspW = usePanelWidth('insp')
@@ -165,7 +169,7 @@ export function App() {
     <ReactFlowProvider>
       <div key={units} className={`app ${isMac ? 'mac' : ''} ${rightPanel && mode !== 'diagram' ? '' : 'no-inspector'} ${rightPanel && mode === 'diagram' ? 'insp-float' : ''} mode-${mode} ${sidebarOn ? 'has-sidebar' : 'no-sidebar'} ${mode !== 'sheet' ? 'can-sidebar' : ''}`} style={{ ['--insp-w' as string]: `${inspW}px`, ['--tp-w' as string]: `${tpW}px` }}>
         <Toolbar />
-        {sidebarOn && <Sidebar />}
+        {mode !== 'led' && <Slide open={sidebarOn || (peek === 'left' && mode !== 'sheet')} side="left"><Sidebar peek={!sidebarOn} /></Slide>}
         <main className="canvas-area">
           {mode === 'diagram' && <DiagramView />}
           {mode === 'rack' && <RackView />}
@@ -173,7 +177,8 @@ export function App() {
           {mode === 'sheet' && <ScheduleView />}
           {mode === 'led' && <LedView />}
         </main>
-        {rightPanel && (mode === 'patch' ? <TemplatesPanel /> : <Inspector />)}
+        <Slide open={rightPanel || (peek === 'right' && rightAvail)} side="right">{mode === 'patch' ? <TemplatesPanel peek={!rightPanel} /> : <Inspector peek={!rightPanel} />}</Slide>
+        <EdgePeek left={!showSidebar && mode !== 'sheet'} right={!showInspector && (rightAvail || (mode === 'led' && hasWalls))} />
         {rightPanel && <PanelResizer which={mode === 'patch' ? 'tp' : 'insp'} />}
         {editingProduct && <ProductEditor key={editingProduct.key} initial={editingProduct} />}
         {editingPlate && (editingPlate.product.fiber

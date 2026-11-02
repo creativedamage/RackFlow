@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, shell, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, screen, shell, type MenuItemConstructorOptions } from 'electron'
 import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -16,8 +16,9 @@ let pendingOpen: string | null = null
 // MARK: Window
 
 function createWindow() {
+  const area = screen.getPrimaryDisplay().workArea
   win = new BrowserWindow({
-    width: 1440, height: 900, minWidth: 1000, minHeight: 640, show: false,
+    x: area.x, y: area.y, width: area.width, height: area.height, minWidth: 1000, minHeight: 640, show: false,
     title: 'RackFlow',
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 20, y: 19 },
@@ -30,7 +31,8 @@ function createWindow() {
       sandbox: true,
     },
   })
-  win.once('ready-to-show', () => win?.show())
+  // Always open filling the screen (zoomed to the full work area, not full-screen space).
+  win.once('ready-to-show', () => { win?.maximize(); win?.show() })
 
   // External links open in the browser, never inside the app.
   win.webContents.setWindowOpenHandler(({ url }) => { void shell.openExternal(url); return { action: 'deny' } })
