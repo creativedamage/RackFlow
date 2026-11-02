@@ -24,10 +24,16 @@ export const SEC_INSET = 8
 export const SMALL_W = 170
 export const SMALL_HEAD = 24
 const PREVIEW_W = NODE_WIDTH - 24
+/** Panel drawings on diagram cards – off (they looked out of place). */
+const CARD_FACES = false
 
-/** Height of the plate / box / panel drawing shown on the card (0 when the device has none). */
+/**
+ * Height of the plate / box / panel drawing on a diagram card. Cards no longer
+ * show the drawing (it's on the rack elevation and in the panel builder), so
+ * this is 0 – kept so a future, different preview can slot back in here.
+ */
 export function previewHeight(eq: EquipmentInstance): number {
-  if (eq.noFace) return 0
+  if (eq.noFace || !CARD_FACES) return 0
   const face = productFace(eq.product)
   if (!face) return 0
   const size = eq.nodeSize ?? 'medium'

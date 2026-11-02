@@ -98,12 +98,12 @@ export const DeviceNode = memo(function DeviceNode({ data, selected }: NodeProps
 
   const sizeBar = viewId && selected && (
     <NodeToolbar position={Position.Top} className="size-bar nodrag">
-      {(['small', 'medium', 'full'] as const).map((k) => (
-        <button key={k} className={size === k ? 'on' : ''} title={k === 'small' ? 'Small – just the drawing' : k === 'medium' ? 'Medium – drawing + ports' : 'Full size – large drawing + ports'}
+      {(['small', 'medium'] as const).map((k) => (
+        <button key={k} className={(size === 'full' ? 'medium' : size) === k ? 'on' : ''} title={k === 'small' ? 'Compact – tag and model, ports along the edges' : 'Full – every port listed'}
           onClick={() => useStore.getState().apply('Card Size', (d) => {
             const v = viewsOf(d).find((x) => x.id === viewId)
             if (v) v.sizes = { ...(v.sizes ?? {}), [eq.id]: k }
-          })}>{k === 'small' ? 'S' : k === 'medium' ? 'M' : 'L'}</button>
+          })}>{k === 'small' ? 'S' : 'M'}</button>
       ))}
     </NodeToolbar>
   )
