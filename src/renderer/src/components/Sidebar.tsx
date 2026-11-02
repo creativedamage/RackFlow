@@ -120,6 +120,7 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar">
+      <div className="sb-drag" aria-hidden />
       <div className="sidebar-head">
         <div className="lib-heading-row">
           <h2>Library</h2>

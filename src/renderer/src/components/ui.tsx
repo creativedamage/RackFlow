@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode, useLayoutEffect } from 'react'
 import { fromLen, fromLong, fromWt, lenUnit, longUnit, toLen, toLong, toWt, wtUnit } from '@core/index'
 
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
@@ -69,9 +69,28 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
   )
 }
 
+/**
+ * Segmented control with a Liquid Glass "lens": one glass thumb that slides
+ * (and stretches) to the chosen segment instead of each button lighting up.
+ */
 export function Segmented<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: ReactNode; title?: string }[]; onChange: (v: T) => void }) {
+  const box = useRef<HTMLDivElement>(null)
+  const [thumb, setThumb] = useState<{ x: number; w: number } | null>(null)
+  useLayoutEffect(() => {
+    const el = box.current
+    if (!el) return
+    const place = () => {
+      const on = el.querySelector<HTMLElement>('button.on')
+      setThumb(on ? { x: on.offsetLeft, w: on.offsetWidth } : null)
+    }
+    place()
+    const ro = new ResizeObserver(place)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [value, options.length])
   return (
-    <div className="segmented" role="tablist">
+    <div className={`segmented ${thumb ? 'has-thumb' : ''}`} role="tablist" ref={box}>
+      {thumb && <span className="seg-thumb" style={{ transform: `translateX(${thumb.x}px)`, width: thumb.w }} aria-hidden />}
       {options.map((o) => (
         <button key={o.value} role="tab" aria-selected={o.value === value} title={o.title} className={o.value === value ? 'on' : ''} onClick={() => onChange(o.value)}>{o.label}</button>
       ))}

@@ -26,11 +26,13 @@ export function Toolbar() {
   return (
     <header className="toolbar">
       <div className="toolbar-left">
+        <div className="tb-island tb-doc">
         <AppMenuButton />
         <TextInput className="doc-title" value={name} onCommit={(v) => apply('Rename Project', (d) => { d.info.name = v || 'Untitled Project' })} />
         {isElectron ? <AutoSaveChip /> : dirty && <span className="dirty-dot" title="Unsaved changes" />}
+        </div>
         {!isElectron && (
-          <span className="file-buttons">
+          <span className="file-buttons tb-island">
             <button onClick={() => void newDocument()}>New</button>
             <button onClick={() => void openDocument()}>Open…</button>
             <button onClick={() => void saveDocument()}>Save</button>
@@ -52,6 +54,7 @@ export function Toolbar() {
 
       <div className="toolbar-right">
         <UpdatePill />
+        <div className="tb-island tb-tools">
         <button className="icon-btn qp-btn" onClick={() => void quickPrint()} onMouseEnter={(e) => { e.currentTarget.title = `Quick Print (⌘P): ${quickPrintTarget()}, with your last print settings` }} aria-label="Quick Print">
           <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"><path d="M6 7V3h8v4" /><rect x="3" y="7" width="14" height="7" rx="1.5" /><path d="M6 12h8v5H6z" /></svg>
         </button>
@@ -72,7 +75,10 @@ export function Toolbar() {
               ? <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"><path d="M16 12.5A6.5 6.5 0 017.5 4a6.5 6.5 0 108.5 8.5z" /></svg>
               : <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="10" cy="10" r="7" /><path d="M10 3a7 7 0 010 14z" fill="currentColor" /></svg>}
         </button>
-        <button className={`icon-btn ${showInspector ? 'on' : ''}`} onClick={() => set({ showInspector: !showInspector })} title="Toggle inspector (⌥⌘I)">◧</button>
+        <button className={`icon-btn ${showInspector ? 'on' : ''}`} onClick={() => set({ showInspector: !showInspector })} title="Toggle inspector (⌥⌘I)" aria-label="Inspector">
+          <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="2.5" y="3.5" width="15" height="13" rx="3" /><path d="M12.5 3.5v13" /></svg>
+        </button>
+        </div>
       </div>
     </header>
   )

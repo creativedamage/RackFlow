@@ -1,183 +1,287 @@
-/* RackFlow – Liquid Glass (macOS 26 style).
-   Loaded after styles.css: translucent, blurred surfaces with a bright top
-   edge, floating rounded panels, capsule (fully rounded) buttons and
-   segmented controls. Colours keep their roles; only materials and shapes
-   change here. */
+/* ─────────────────────────────────────────────────────────────────────────
+   RackFlow – Liquid Glass (macOS 26)
+   Loaded after styles.css. Principles:
+   • Content first: the canvas runs edge to edge, under the toolbar.
+   • Controls float on glass: toolbar islands, an inset sidebar, floating
+     panels – translucent, blurred, with a light-catching specular rim.
+   • Concentric shapes: capsules for controls, large continuous radii for
+     panels, inner radius = outer radius − padding.
+   • Motion: a sliding glass lens in segmented controls, springy press and
+     appear animations (off with Reduce Motion).
+   ───────────────────────────────────────────────────────────────────────── */
 
 :root {
-  --glass: rgba(255, 255, 255, 0.62);
-  --glass-strong: rgba(255, 255, 255, 0.82);
-  --glass-line: rgba(0, 0, 0, 0.09);
-  --glass-edge: rgba(255, 255, 255, 0.85);
-  --glass-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.06);
-  --blur: blur(28px) saturate(180%);
-  --btn-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.72));
-  --btn-hover: linear-gradient(180deg, #ffffff, rgba(246, 247, 250, 0.95));
-  --btn-line: rgba(0, 0, 0, 0.11);
-  --hover: rgba(0, 0, 0, 0.055);
-  --track: rgba(118, 118, 128, 0.14);
-  --thumb: linear-gradient(180deg, #ffffff, rgba(255, 255, 255, 0.9));
-  --radius: 12px;
-  --panel: var(--glass);
-  --bg-2: #f2f3f7;
+  /* Glass material */
+  --g-tint: rgba(255, 255, 255, 0.58);
+  --g-tint-strong: rgba(255, 255, 255, 0.78);
+  --g-rim: linear-gradient(150deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.28) 32%, rgba(255, 255, 255, 0.06) 58%, rgba(255, 255, 255, 0.6) 100%);
+  --g-hairline: rgba(0, 0, 0, 0.07);
+  --g-inner: inset 0 1px 0.5px rgba(255, 255, 255, 0.85), inset 0 -0.5px 1px rgba(255, 255, 255, 0.35);
+  --g-shadow: 0 10px 34px rgba(17, 24, 39, 0.13), 0 2px 6px rgba(17, 24, 39, 0.07);
+  --g-shadow-lg: 0 30px 80px rgba(17, 24, 39, 0.22), 0 6px 18px rgba(17, 24, 39, 0.1);
+  --g-blur: blur(26px) saturate(190%) brightness(1.04);
+  /* Controls */
+  --c-bg: rgba(255, 255, 255, 0.72);
+  --c-bg-hover: rgba(255, 255, 255, 0.95);
+  --c-press: rgba(0, 0, 0, 0.06);
+  --c-hover: rgba(0, 0, 0, 0.055);
+  --lens: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.82));
+  --lens-shadow: 0 2px 8px rgba(17, 24, 39, 0.14), 0 0.5px 1.5px rgba(17, 24, 39, 0.12), inset 0 1px 0 #fff;
+  --accent-glass: linear-gradient(180deg, rgba(70, 160, 255, 0.96), rgba(10, 122, 255, 0.94));
+  /* Backdrop the glass refracts */
+  --canvas: radial-gradient(1100px 700px at 8% -12%, rgba(10, 132, 255, 0.09), transparent 62%),
+            radial-gradient(900px 700px at 105% 0%, rgba(175, 82, 222, 0.07), transparent 60%),
+            radial-gradient(1000px 800px at 60% 120%, rgba(52, 199, 89, 0.05), transparent 60%), #f5f6fa;
+  --radius: 14px;
+  --panel: var(--g-tint);
+  --bg-2: #f3f4f8;
+  --ease-spring: cubic-bezier(0.32, 1.42, 0.52, 1);
+  --ease: cubic-bezier(0.25, 0.9, 0.3, 1);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme=light]) {
-    --glass: rgba(38, 38, 42, 0.58);
-    --glass-strong: rgba(44, 44, 48, 0.82);
-    --glass-line: rgba(255, 255, 255, 0.09);
-    --glass-edge: rgba(255, 255, 255, 0.14);
-    --glass-shadow: 0 14px 36px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
-    --btn-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.07));
-    --btn-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.12));
-    --btn-line: rgba(255, 255, 255, 0.1);
-    --hover: rgba(255, 255, 255, 0.08);
-    --track: rgba(118, 118, 128, 0.26);
-    --thumb: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.16));
-    --bg-2: #141416;
+    --g-tint: rgba(36, 36, 40, 0.56);
+    --g-tint-strong: rgba(42, 42, 46, 0.8);
+    --g-rim: linear-gradient(150deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.08) 32%, rgba(255, 255, 255, 0.02) 58%, rgba(255, 255, 255, 0.2) 100%);
+    --g-hairline: rgba(255, 255, 255, 0.08);
+    --g-inner: inset 0 1px 0.5px rgba(255, 255, 255, 0.16), inset 0 -0.5px 1px rgba(255, 255, 255, 0.05);
+    --g-shadow: 0 12px 36px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
+    --g-shadow-lg: 0 34px 90px rgba(0, 0, 0, 0.6), 0 6px 18px rgba(0, 0, 0, 0.4);
+    --g-blur: blur(26px) saturate(170%) brightness(0.96);
+    --c-bg: rgba(255, 255, 255, 0.1);
+    --c-bg-hover: rgba(255, 255, 255, 0.17);
+    --c-press: rgba(255, 255, 255, 0.06);
+    --c-hover: rgba(255, 255, 255, 0.09);
+    --lens: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.16));
+    --lens-shadow: 0 2px 10px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    --canvas: radial-gradient(1100px 700px at 8% -12%, rgba(10, 132, 255, 0.14), transparent 62%),
+              radial-gradient(900px 700px at 105% 0%, rgba(175, 82, 222, 0.1), transparent 60%),
+              radial-gradient(1000px 800px at 60% 120%, rgba(52, 199, 89, 0.06), transparent 60%), #141417;
+    --bg-2: #131316;
   }
 }
 :root[data-theme=dark] {
-  --glass: rgba(38, 38, 42, 0.58);
-  --glass-strong: rgba(44, 44, 48, 0.82);
-  --glass-line: rgba(255, 255, 255, 0.09);
-  --glass-edge: rgba(255, 255, 255, 0.14);
-  --glass-shadow: 0 14px 36px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
-  --btn-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.07));
-  --btn-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.12));
-  --btn-line: rgba(255, 255, 255, 0.1);
-  --hover: rgba(255, 255, 255, 0.08);
-  --track: rgba(118, 118, 128, 0.26);
-  --thumb: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.16));
-  --bg-2: #141416;
+  --g-tint: rgba(36, 36, 40, 0.56);
+  --g-tint-strong: rgba(42, 42, 46, 0.8);
+  --g-rim: linear-gradient(150deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.08) 32%, rgba(255, 255, 255, 0.02) 58%, rgba(255, 255, 255, 0.2) 100%);
+  --g-hairline: rgba(255, 255, 255, 0.08);
+  --g-inner: inset 0 1px 0.5px rgba(255, 255, 255, 0.16), inset 0 -0.5px 1px rgba(255, 255, 255, 0.05);
+  --g-shadow: 0 12px 36px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --g-shadow-lg: 0 34px 90px rgba(0, 0, 0, 0.6), 0 6px 18px rgba(0, 0, 0, 0.4);
+  --g-blur: blur(26px) saturate(170%) brightness(0.96);
+  --c-bg: rgba(255, 255, 255, 0.1);
+  --c-bg-hover: rgba(255, 255, 255, 0.17);
+  --c-press: rgba(255, 255, 255, 0.06);
+  --c-hover: rgba(255, 255, 255, 0.09);
+  --lens: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.16));
+  --lens-shadow: 0 2px 10px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  --canvas: radial-gradient(1100px 700px at 8% -12%, rgba(10, 132, 255, 0.14), transparent 62%),
+            radial-gradient(900px 700px at 105% 0%, rgba(175, 82, 222, 0.1), transparent 60%),
+            radial-gradient(1000px 800px at 60% 120%, rgba(52, 199, 89, 0.06), transparent 60%), #141417;
+  --bg-2: #131316;
 }
 
-/* macOS window vibrancy: the sidebar and toolbar show the desktop through frosted glass. */
+/* ── The glass material (one recipe, used everywhere) ───────────────────── */
+.sidebar, .tb-island, .toolbar .segmented, .page-tabs, .diagram-tools, .groups-panel, .picked-panel, .hint-panel, .wiring-hint,
+.size-bar, .react-flow__controls, .react-flow__minimap, .app.insp-float .inspector, .modal, .context-menu, .issues-pop, .fb-pop {
+  background: linear-gradient(var(--g-tint), var(--g-tint)) padding-box, var(--g-rim) border-box !important;
+  border: 1px solid transparent !important;
+  -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur);
+  box-shadow: var(--g-inner), var(--g-shadow) !important;
+}
+.modal, .context-menu, .app.insp-float .inspector, .issues-pop {
+  background: linear-gradient(var(--g-tint-strong), var(--g-tint-strong)) padding-box, var(--g-rim) border-box !important;
+}
+.modal { box-shadow: var(--g-inner), var(--g-shadow-lg) !important; }
+
+/* ── Window & layout: floating inset sidebar, content under the toolbar ─── */
+body { background: var(--canvas); }
 html.vibrant, html.vibrant body { background: transparent; }
-html.vibrant .canvas-area, html.vibrant .schedule, html.vibrant .patch-editor { background: var(--bg); }
+.app { grid-template-columns: 296px minmax(0, 1fr) var(--insp-w, 310px); grid-template-areas: 'sb tb tb' 'sb main insp'; }
+.app.no-inspector { grid-template-columns: 296px minmax(0, 1fr); grid-template-areas: 'sb tb' 'sb main'; }
+.app.no-sidebar { grid-template-columns: minmax(0, 1fr) var(--insp-w, 310px); grid-template-areas: 'tb tb' 'main insp'; }
+.app.no-sidebar.no-inspector { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'tb' 'main'; }
 
-/* MARK: Buttons – capsules */
-button {
-  border-radius: 999px;
-  padding: 4px 13px;
-  background: var(--btn-bg);
-  border: 0.5px solid var(--btn-line);
-  box-shadow: 0 0.5px 1.5px rgba(0, 0, 0, 0.08);
-  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease, filter 0.15s ease;
-}
-button:hover:not(:disabled):not(.on):not(.primary) { background: var(--btn-hover); }
-button:active:not(:disabled) { transform: scale(0.97); }
-button.mini { border-radius: 999px; padding: 1px 9px; }
-button.primary {
-  background: linear-gradient(180deg, #3c97ff, #0a7cff);
-  border: 0.5px solid rgba(0, 80, 200, 0.5);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(10, 132, 255, 0.32);
-  color: #fff;
-}
-button.primary:hover:not(:disabled) { background: linear-gradient(180deg, #54a4ff, #1786ff); }
-button.on:hover:not(:disabled) { filter: brightness(1.06); }
-button.danger { color: var(--danger); }
-.icon-btn, button.link, .gp-icon, .dn-hide, .autosave-chip, .toast-close, .context-menu button, .lib-tabs button, .norm, .dn-sec-head {
-  box-shadow: none;
-}
-.icon-btn { border-radius: 999px; background: transparent; border-color: transparent; }
-.icon-btn:hover:not(:disabled) { background: var(--hover) !important; }
-button.link { background: none; border: none; padding: 0; }
-button.link:hover:not(:disabled) { background: none; text-decoration: underline; }
-/* Keep menus, grid cells and underline tabs square. */
-.context-menu button { border-radius: 7px; }
-.context-menu button:hover:not(:disabled) { background: var(--accent); color: #fff; }
-.norm, .lib-tabs button { border-radius: 0; background: transparent; }
-.lib-tabs button:hover:not(:disabled) { background: transparent; }
-
-/* Tabs and chips become capsules too. */
-.schedule-tabs { gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--line-2); }
-.schedule-tabs button { border-radius: 999px; border-bottom: 0.5px solid var(--btn-line); padding: 4px 15px; }
-.tpl-tabs button { border-radius: 999px; border-bottom: 0.5px solid var(--btn-line); }
-.page-tabs { background: transparent; gap: 4px; padding: 5px 10px; }
-.page-tabs button { border-radius: 999px; box-shadow: none; background: transparent; }
-.page-tabs button:hover:not(:disabled):not(.on) { background: var(--hover); }
-.page-tabs button.on { background: var(--glass-strong); border-color: var(--glass-line); box-shadow: inset 0 1px 0 var(--glass-edge), 0 2px 8px rgba(0, 0, 0, 0.08); }
-.size-bar { border-radius: 999px; }
-.size-bar button { border-radius: 999px; box-shadow: none; background: transparent; }
-
-/* Segmented controls: a capsule track with a glass thumb. */
-.segmented { background: var(--track); border-radius: 999px; padding: 2px; gap: 1px; }
-.segmented button { border-radius: 999px; background: transparent; border: none; box-shadow: none; padding: 3px 13px; }
-.segmented button:hover:not(:disabled):not(.on) { background: var(--hover); color: var(--text); }
-.segmented button.on { background: var(--thumb); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14), inset 0 0.5px 0 var(--glass-edge); }
-
-/* MARK: Fields */
-input, select, textarea { border-radius: 9px; border: 0.5px solid var(--btn-line); background: var(--glass-strong); }
-select { border-radius: 999px; padding: 4px 10px; background: var(--btn-bg); }
-input[type=checkbox], input[type=radio], input[type=range] { box-shadow: none; }
-input[type=search] { border-radius: 999px; padding-left: 12px; }
-input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3.5px var(--accent-soft); }
-.xsheet input, .xsheet select, .pb-cell input { border-radius: 4px; }
-
-/* MARK: Glass surfaces */
-.toolbar {
-  background: var(--glass);
-  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
-  border-bottom: 0.5px solid var(--glass-line);
-  box-shadow: inset 0 -0.5px 0 var(--glass-edge);
-}
 .sidebar {
-  background: var(--glass);
-  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
-  border-right: 0.5px solid var(--glass-line);
+  margin: 8px 0 8px 8px; border-radius: 26px; overflow: hidden; min-height: 0;
+  border-right: none;
 }
-.inspector { background: var(--glass-strong); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); }
-.app.insp-float .inspector {
-  background: var(--glass-strong);
-  border: 0.5px solid var(--glass-line); border-radius: 20px;
-  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-edge);
-}
-.diagram-tools, .groups-panel, .picked-panel, .hint-panel, .wiring-hint, .size-bar, .react-flow__controls, .react-flow__minimap {
-  background: var(--glass) !important;
-  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
-  border: 0.5px solid var(--glass-line) !important;
-  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-edge) !important;
-}
-.diagram-tools, .picked-panel, .wiring-hint { border-radius: 999px !important; padding: 5px 7px; }
-.groups-panel, .hint-panel { border-radius: 18px !important; }
-.react-flow__minimap { border-radius: 16px !important; overflow: hidden; }
-.react-flow__controls { border-radius: 999px !important; overflow: hidden; padding: 3px; }
-.react-flow__controls-button { background: transparent !important; border: none !important; border-radius: 999px; width: 26px; height: 26px; }
-.react-flow__controls-button:hover { background: var(--hover) !important; }
+.sb-drag { height: 8px; flex: none; -webkit-app-region: drag; }
+.app.mac .sb-drag { height: 40px; }
+.sidebar-head { border-bottom: none; padding: 4px 12px 10px; }
+.sidebar-head h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
 
-/* Dialogs, menus and toasts float on glass. */
-.modal-backdrop { background: rgba(0, 0, 0, 0.22); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
-.modal {
-  background: var(--glass-strong);
-  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
-  border: 0.5px solid var(--glass-line); border-radius: 24px;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28), inset 0 1px 0 var(--glass-edge);
-  overflow: hidden;
+.toolbar {
+  background: transparent !important; border: none !important; box-shadow: none !important;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  padding: 0 12px 0 14px; gap: 10px; z-index: 60;
 }
-.modal-header, .modal-footer { border-color: var(--glass-line); }
-.context-menu {
-  background: var(--glass-strong) !important;
-  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
-  border: 0.5px solid var(--glass-line) !important; border-radius: 14px !important;
-  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-edge) !important;
-  padding: 5px !important;
+.app.mac.no-sidebar .toolbar { padding-left: 84px; }
+.app.mac.has-sidebar .toolbar { padding-left: 14px; }
+.tb-island { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: 999px; min-height: 36px; -webkit-app-region: no-drag; }
+.tb-doc { padding: 3px 6px 3px 3px; gap: 4px; max-width: 100%; min-width: 0; }
+.tb-doc .doc-title { border: none; background: transparent; font-weight: 600; font-size: 13px; box-shadow: none; padding: 4px 6px; min-width: 120px; max-width: 280px; field-sizing: content; flex-shrink: 0; }
+.tb-doc .doc-title:focus { background: var(--c-bg-hover); }
+.tb-tools .icon-btn { width: 32px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.tb-tools .undo-group { background: none !important; border: none !important; box-shadow: none !important; }
+.tb-tools .issues-btn, .tb-tools > button:not(.icon-btn) { border-radius: 999px; }
+
+/* Content: full bleed. The diagram runs under the toolbar and page tabs;
+   a soft scroll-edge blur keeps the floating controls legible. */
+.canvas-area { background: var(--canvas); }
+.app.mode-diagram .canvas-area { grid-row: 1 / 3; }
+.app.mode-diagram .diagram-wrap .diagram { position: absolute; inset: 0; }
+.app.mode-diagram .page-tabs { position: absolute; z-index: 20; top: 58px; left: 12px; max-width: calc(100% - 24px); border-radius: 999px; padding: 4px !important; gap: 2px; }
+.app.mode-diagram .react-flow__panel.top { top: 104px; }
+.app.mode-diagram .canvas-area::before {
+  content: ''; position: absolute; z-index: 10; left: 0; right: 0; top: 0; height: 120px; pointer-events: none;
+  -webkit-backdrop-filter: blur(8px) saturate(150%); backdrop-filter: blur(8px) saturate(150%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent); mask-image: linear-gradient(to bottom, #000 30%, transparent);
 }
-.toasts .toast { border-radius: 999px; padding: 8px 8px 8px 18px; background: rgba(30, 30, 34, 0.78); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); border: 0.5px solid rgba(255, 255, 255, 0.12); }
+.react-flow { background: transparent !important; --xy-background-color: transparent; }
+.app.insp-float .inspector { top: var(--float-top, 170px); right: 12px; bottom: 12px; border-radius: 28px; }
+.app.insp-float .panel-resizer { top: var(--float-top, 170px); bottom: 12px; }
+.app:not(.insp-float) .inspector { margin: 8px 8px 8px 0; border-radius: 26px; background: linear-gradient(var(--g-tint-strong), var(--g-tint-strong)) padding-box, var(--g-rim) border-box; border: 1px solid transparent; box-shadow: var(--g-inner), var(--g-shadow); -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur); }
+
+/* ── Buttons: capsules with a glass face ─────────────────────────────────── */
+button {
+  border-radius: 999px; padding: 4px 14px;
+  background: linear-gradient(var(--c-bg), var(--c-bg)) padding-box, var(--g-rim) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.1), 0 1px 4px rgba(0, 0, 0, 0.04);
+  transition: background 0.18s var(--ease), box-shadow 0.18s var(--ease), transform 0.25s var(--ease-spring), filter 0.18s, color 0.18s;
+}
+button:hover:not(:disabled):not(.on):not(.primary) { background: linear-gradient(var(--c-bg-hover), var(--c-bg-hover)) padding-box, var(--g-rim) border-box; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 3px 10px rgba(0, 0, 0, 0.06); }
+button:active:not(:disabled) { transform: scale(0.96); transition-duration: 0.06s; }
+button.mini { border-radius: 999px; padding: 1px 10px; }
+button.primary, .chip.on, .lib-chips button.on, .schedule-tabs button.on, .view-editor .ve-chips button.on, .fb.on, .format-bar .fb.on, .size-bar button.on {
+  background: var(--accent-glass) padding-box, linear-gradient(150deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.1) 45%, rgba(255, 255, 255, 0.35)) border-box !important;
+  border: 1px solid transparent !important; color: #fff !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 14px rgba(10, 132, 255, 0.32) !important;
+}
+button.primary:hover:not(:disabled), button.on:hover:not(:disabled) { filter: brightness(1.07) saturate(1.05); }
+button.danger { color: var(--danger); }
+/* Plain (borderless) buttons inside glass: a soft highlight appears on hover. */
+.icon-btn, button.link, .gp-icon, .dn-hide, .autosave-chip, .toast-close, .context-menu button, .lib-tabs button, .norm, .page-tabs button, .segmented button, .size-bar button, .app-mark, .react-flow__controls-button {
+  background: transparent; border: 1px solid transparent; box-shadow: none;
+}
+.icon-btn:hover:not(:disabled), .autosave-chip:hover, .page-tabs button:hover:not(.on), .app-mark:hover { background: var(--c-hover) !important; box-shadow: none !important; }
+.icon-btn.on { background: var(--c-press) !important; }
+button.link { padding: 0; } button.link:hover:not(:disabled) { background: none; text-decoration: underline; box-shadow: none; }
+.context-menu { border-radius: 16px !important; padding: 6px !important; }
+.context-menu button { border-radius: 9px; padding: 6px 12px; }
+.context-menu button:hover:not(:disabled) { background: var(--accent) !important; color: #fff; }
+.norm, .lib-tabs button { border-radius: 0; }
+
+/* ── Segmented: glass track + sliding lens ───────────────────────────────── */
+.segmented { position: relative; isolation: isolate; border-radius: 999px; padding: 3px; gap: 0; background: rgba(118, 118, 128, 0.12); }
+.segmented button { position: relative; z-index: 1; border-radius: 999px; padding: 4px 14px; color: var(--text-2); transition: color 0.2s var(--ease); }
+.segmented button.on { color: var(--text); font-weight: 600; }
+.segmented button:hover:not(.on) { color: var(--text); background: transparent !important; }
+.segmented:not(.has-thumb) button.on { background: var(--lens) !important; box-shadow: var(--lens-shadow) !important; }
+.seg-thumb {
+  position: absolute; z-index: 0; top: 3px; bottom: 3px; left: 0; border-radius: 999px;
+  background: var(--lens); box-shadow: var(--lens-shadow);
+  transition: transform 0.42s var(--ease-spring), width 0.42s var(--ease-spring);
+}
+.toolbar .segmented { padding: 3px; min-height: 36px; }
+.toolbar .segmented button { padding: 5px 16px; }
+
+/* Tabs → capsules (selected = lens) */
+.page-tabs button { border-radius: 999px; padding: 4px 12px; }
+.page-tabs button.on { background: var(--lens) !important; box-shadow: var(--lens-shadow) !important; border-color: transparent !important; }
+.schedule-tabs { gap: 6px; padding: 10px 14px 8px; border-bottom: none; background: transparent; }
+.schedule-tabs button { border-radius: 999px; border-bottom: 1px solid transparent; padding: 5px 16px; }
+.tpl-tabs button, .ip-tabs button { border-radius: 999px; }
+.size-bar { border-radius: 999px; padding: 3px; }
+.size-bar button { border-radius: 999px; }
+
+/* ── Fields ──────────────────────────────────────────────────────────────── */
+input, select, textarea {
+  border-radius: 11px; border: 1px solid var(--g-hairline);
+  background: var(--g-tint-strong); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.18s var(--ease), border-color 0.18s;
+}
+select { border-radius: 999px; padding: 4px 26px 4px 12px; background: linear-gradient(var(--c-bg), var(--c-bg)) padding-box, var(--g-rim) border-box; border: 1px solid transparent; box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.1); }
+input[type=search], .search { border-radius: 999px; padding-left: 14px; }
+input[type=checkbox], input[type=radio], input[type=range] { box-shadow: none; background: none; border: none; }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.xsheet input, .xsheet select, .pb-cell input, .tb-doc .doc-title { border-radius: 6px; }
+
+/* ── Floating panels ─────────────────────────────────────────────────────── */
+.diagram-tools, .picked-panel, .wiring-hint { border-radius: 999px !important; padding: 4px 6px; }
+.groups-panel, .hint-panel { border-radius: 22px !important; }
+.react-flow__minimap { border-radius: 20px !important; overflow: hidden; }
+.react-flow__controls { border-radius: 999px !important; overflow: hidden; padding: 4px; }
+.react-flow__controls-button { border-radius: 999px; width: 28px; height: 28px; }
+.react-flow__controls-button:hover { background: var(--c-hover) !important; }
+
+/* Dialogs: glass sheets that spring in */
+.modal-backdrop { background: rgba(10, 12, 18, 0.18); -webkit-backdrop-filter: blur(4px) saturate(120%); backdrop-filter: blur(4px) saturate(120%); animation: glass-fade 0.2s var(--ease); }
+.modal { border-radius: 30px; overflow: hidden; animation: glass-in 0.36s var(--ease-spring); }
+.modal-header { border-bottom: none; padding: 16px 20px 8px; }
+.modal-header h2 { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.modal-footer { border-top: none; padding: 12px 18px 16px; }
+.context-menu { animation: glass-pop 0.22s var(--ease-spring); transform-origin: top left; }
+.toasts .toast {
+  border-radius: 999px; padding: 8px 8px 8px 18px;
+  background: linear-gradient(rgba(28, 28, 32, 0.72), rgba(28, 28, 32, 0.72)) padding-box, linear-gradient(150deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.04) 50%, rgba(255, 255, 255, 0.16)) border-box;
+  border: 1px solid transparent; -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur);
+  animation: glass-in 0.4s var(--ease-spring);
+}
 .toast-action { border-radius: 999px; }
 
-/* MARK: Cards & lists */
-.device-node.card { border-radius: 16px; border: 0.5px solid var(--card-line); box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06); }
-.device-node.card.selected { box-shadow: 0 0 0 3px var(--accent-soft), 0 8px 24px rgba(10, 132, 255, 0.18); }
-.dn-sec { border-radius: 12px; }
-.dn-pill { border-radius: 999px; }
-.dn-chip { border-radius: 999px; }
-.lib-row, .lib-item { border-radius: 10px; margin: 0 6px; }
-.lib-row:hover, .lib-item:hover { background: var(--hover); }
+@keyframes glass-in { from { opacity: 0; transform: translateY(8px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes glass-pop { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
+@keyframes glass-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── Content: cards, lists, sheets ───────────────────────────────────────── */
+.device-node.card { border-radius: 18px; border: 1px solid var(--card-line); box-shadow: 0 8px 24px rgba(17, 24, 39, 0.08), 0 1px 2px rgba(17, 24, 39, 0.06); }
+.device-node.card.selected { box-shadow: 0 0 0 3px var(--accent-soft), 0 10px 30px rgba(10, 132, 255, 0.2); }
+.dn-sec { border-radius: 13px; }
+.dn-pill, .dn-chip, .chip, .badge { border-radius: 999px; }
+.lib-row, .lib-item { border-radius: 12px; margin: 0 8px; transition: background 0.15s var(--ease); }
+.lib-row:hover, .lib-item:hover { background: var(--c-hover); }
 .lib-row.on { background: var(--accent-soft); }
-.chip, .badge { border-radius: 999px; }
-.xsheet { border-radius: 0; }
-.undo-group { border-radius: 999px !important; border: 0.5px solid var(--btn-line) !important; background: var(--btn-bg) !important; overflow: hidden; }
-.undo-group .icon-btn { border-radius: 999px; }
-.react-flow__minimap svg { border-radius: 12px; }
-.react-flow__minimap { background: var(--glass) !important; }
+.lib-filters select { width: 100%; }
+.schedule { background: transparent; }
+.schedule-bar { background: transparent; border-bottom: none; padding: 4px 14px 10px; }
+.xsheet { background: var(--bg); border-top: 1px solid var(--g-hairline); }
+
+@media (prefers-reduced-motion: reduce) {
+  .seg-thumb, .modal, .context-menu, .toasts .toast, .modal-backdrop, button { transition: none !important; animation: none !important; }
+}
+
+/* ── Toolbar: the document island never collapses; tabs stay centred when there's room ── */
+.toolbar-left { flex: 1 0 auto; }
+.toolbar-right { flex: 1 1 0; min-width: max-content; }
+.tb-doc { flex-shrink: 0; }
+
+/* ── Destructive buttons: red glass so they read in both themes ── */
+button.danger:not(.link) {
+  color: var(--danger) !important;
+  background: linear-gradient(color-mix(in srgb, var(--danger) 12%, var(--c-bg)), color-mix(in srgb, var(--danger) 12%, var(--c-bg))) padding-box, var(--g-rim) border-box !important;
+}
+button.danger:not(.link):hover:not(:disabled) { background: var(--danger) !important; color: #fff !important; }
+[data-theme=dark] button.danger:not(.link) { color: #ff6b6b !important; }
+
+/* ── Patch-bay templates: glass sheet that follows the theme ── */
+.templates-panel { color: var(--text); border-left: none; }
+.templates-panel .tp-head, .templates-panel .tp-foot, .templates-panel .tp-note { background: transparent; border-color: var(--g-hairline); }
+.templates-panel .tp-head { padding: 12px 14px 8px; border-bottom: none; }
+.templates-panel .tp-head h3 { font-size: 13px; }
+.templates-panel .tp-filters { padding: 4px 10px 8px; gap: 6px; }
+.templates-panel .tp-filters input, .templates-panel .tp-filters select { background: var(--c-bg); color: var(--text); border-color: var(--g-hairline); }
+.templates-panel .tp-filters button, .templates-panel .tp-foot button:not(.primary) { background: linear-gradient(var(--c-bg), var(--c-bg)) padding-box, var(--g-rim) border-box; color: var(--text); }
+.templates-panel .tp-table-wrap { margin: 0 6px; }
+.templates-panel .tp-table { border-collapse: separate; border-spacing: 0 1px; }
+.templates-panel .tp-table th { background: var(--g-tint-strong); backdrop-filter: blur(12px); color: color-mix(in srgb, var(--text) 60%, transparent); font-size: 11px; font-weight: 600; border-bottom: 1px solid var(--g-hairline); }
+.templates-panel .tp-table td { background: transparent; }
+.templates-panel .tp-table tr:nth-child(even) td { background: color-mix(in srgb, var(--text) 4%, transparent); }
+.templates-panel .tp-table tr td:first-child { border-radius: 10px 0 0 10px; }
+.templates-panel .tp-table tr td:last-child { border-radius: 0 10px 10px 0; }
+.templates-panel .tp-table tr:hover td { background: var(--c-hover); }
+.templates-panel .tp-table tr.sel td { background: var(--accent); color: #fff; }
+.templates-panel .tp-table tr.sel .tp-type { color: rgba(255, 255, 255, 0.8); }
+.templates-panel .tp-table .tp-add { border-radius: 999px; padding: 2px 10px; background: var(--accent-glass); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+.templates-panel .tp-foot { border-top: 1px solid var(--g-hairline); padding: 10px; border-radius: 0 0 28px 28px; }
