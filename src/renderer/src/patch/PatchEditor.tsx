@@ -107,9 +107,9 @@ function FormatBar() {
         <button className={`fb ${st?.strike ? 'on' : ''}`} disabled={!has} onClick={() => toggle('strike')} title="Strikethrough"><s>S</s></button>
       </div>
       <div className="fb-group">
-        <Select value={st?.fontFamily ?? ''} width={120} onChange={(f) => styleSel('Font', { fontFamily: f || undefined })}
+        <Select value={st?.fontFamily ?? ''} width={136} onChange={(f) => styleSel('Font', { fontFamily: f || undefined })}
           options={[{ value: '', label: 'Default font' }, ...FONTS.map((f) => ({ value: f, label: fontLabel(f) }))]} />
-        <Select value={st?.sizePt ?? 0} width={70} onChange={(n) => styleSel('Font Size', { sizePt: n || undefined })}
+        <Select value={st?.sizePt ?? 0} width={80} onChange={(n) => styleSel('Font Size', { sizePt: n || undefined })}
           options={[{ value: 0, label: 'Auto' }, ...[4, 5, 6, 7, 8, 9, 10, 12].map((n) => ({ value: n, label: `${n} pt` }))]} />
       </div>
       <div className="fb-group">
@@ -164,7 +164,7 @@ function FormatBar() {
         <button className="fb" disabled={!has} title="Clear formatting" onClick={() => editSelection('Clear Formatting', (b, s) => clearFormatting(b, s))}>⌫ Fmt</button>
         {bay && (
           <>
-            <Select value="" width={118} onChange={(name) => { const p = FORMAT_PRESETS.find((x) => x.name === name); if (p) editBay(bay.id, 'Label Format', (b) => { b.format = { ...p.format } }) }}
+            <Select value="" width={148} onChange={(name) => { const p = FORMAT_PRESETS.find((x) => x.name === name); if (p) editBay(bay.id, 'Label Format', (b) => { b.format = { ...p.format } }) }}
               options={[{ value: '', label: 'Wiring format…' }, ...FORMAT_PRESETS.map((x) => ({ value: x.name, label: x.name }))]} />
             <button className={`fb ${stale ? 'accent' : ''}`} title="Fill every non-typed cell from the cables wired to this bay's rear ports"
               onClick={() => editBay(bay.id, 'Refresh from Wiring', (b) => refreshLabels(b, useStore.getState().project))}>⟳ From wiring{stale ? ` (${stale})` : ''}</button>

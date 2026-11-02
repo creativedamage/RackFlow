@@ -29,6 +29,8 @@ export function LedView() {
   const walls = useStore((s) => s.project.ledWalls ?? NO_WALLS)
   const sel = useStore((s) => s.selectedLedWall)
   const set = useStore((s) => s.set)
+  const showList = useStore((s) => s.showSidebar)
+  const showSettings = useStore((s) => s.showInspector)
   const apply = useStore((s) => s.apply)
   const [view, setView] = useState<View>('data')
   const picking = useStore((s) => s.ledPicking)
@@ -45,8 +47,8 @@ export function LedView() {
   })
 
   return (
-    <div className="led-view">
-      <aside className="led-list">
+    <div className={`led-view ${showList ? '' : 'no-list'} ${showSettings && wall ? '' : 'no-settings'}`}>
+      {showList && <aside className="led-list">
         <div className="led-list-head">
           <h3>LED Walls</h3>
           <button className="primary mini" onClick={() => setPicking(true)}>＋ New Wall</button>
@@ -62,7 +64,7 @@ export function LedView() {
             </button>
           )
         })}
-      </aside>
+      </aside>}
 
       {!wall ? (
         <div className="led-canvas">
@@ -75,7 +77,7 @@ export function LedView() {
         <Canvas wall={wall} view={view} setView={setView} onToggle={(k) => update('Toggle Panel', (w) => {
           w.removed = w.removed.includes(k) ? w.removed.filter((x) => x !== k) : [...w.removed, k]
         })} onPrint={() => setPrinting(true)} />
-        <Settings wall={wall} view={view} update={update} />
+        {showSettings && <Settings wall={wall} view={view} update={update} />}
       </>)}
 
       {picking && <PanelPicker onClose={() => setPicking(false)} onPick={(p, c, r) => { setPicking(false); createLedWall(p, c, r) }} />}

@@ -20,7 +20,7 @@ function createWindow() {
     width: 1440, height: 900, minWidth: 1000, minHeight: 640, show: false,
     title: 'RackFlow',
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
-    trafficLightPosition: { x: 14, y: 14 },
+    trafficLightPosition: { x: 20, y: 19 },
     // Liquid Glass: the sidebar and toolbar are translucent over the window's vibrancy.
     ...(isMac ? { vibrancy: 'sidebar' as const, visualEffectState: 'followWindow' as const, backgroundColor: '#00000000' } : { backgroundColor: nativeTheme.shouldUseDarkColors ? '#161618' : '#f5f5f7' }),
     webPreferences: {
@@ -203,6 +203,7 @@ function buildMenu() {
         cmd('Tidy Up Wiring Diagram', 'tidy', 'Alt+CmdOrCtrl+L'),
         { type: 'separator' },
         cmd('Zoom to Fit', 'zoomFit', 'CmdOrCtrl+0'),
+        cmd('Toggle Sidebar', 'toggleSidebar', 'Ctrl+CmdOrCtrl+S'),
         cmd('Toggle Inspector', 'toggleInspector', 'Alt+CmdOrCtrl+I'),
         { label: 'Units', submenu: [cmd('Imperial (in, ft, lb)', 'units:imperial'), cmd('Metric (mm, m, kg)', 'units:metric')] },
         {

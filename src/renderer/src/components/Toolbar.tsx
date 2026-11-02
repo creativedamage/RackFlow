@@ -1,4 +1,5 @@
 import { openDocument, saveDocument, newDocument, useStore, type Mode } from '../store'
+import { SidebarButton } from '../panels'
 import { isElectron } from '../platform'
 import { setAutoSave } from '../autosave'
 import { quickPrint, quickPrintTarget } from '../quickprint'
@@ -17,7 +18,8 @@ export function Toolbar() {
   const undo = useStore((s) => s.undo)
   const redo = useStore((s) => s.redo)
   const apply = useStore((s) => s.apply)
-  const showInspector = useStore((s) => s.showInspector)
+  const sidebarShown = useStore((s) => s.showSidebar && s.mode !== 'sheet' && s.mode !== 'led')
+  const canSidebar = useStore((s) => s.mode !== 'sheet')
   const theme = useStore((s) => s.theme)
 
   const undoLabel = useStore((s) => s.past[s.past.length - 1]?.label ?? '')
@@ -26,6 +28,7 @@ export function Toolbar() {
   return (
     <header className="toolbar">
       <div className="toolbar-left">
+        {canSidebar && !sidebarShown && <div className="tb-island tb-sb"><SidebarButton /></div>}
         <div className="tb-island tb-doc">
         <AppMenuButton />
         <TextInput className="doc-title" value={name} onCommit={(v) => apply('Rename Project', (d) => { d.info.name = v || 'Untitled Project' })} />
@@ -75,9 +78,7 @@ export function Toolbar() {
               ? <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"><path d="M16 12.5A6.5 6.5 0 017.5 4a6.5 6.5 0 108.5 8.5z" /></svg>
               : <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="10" cy="10" r="7" /><path d="M10 3a7 7 0 010 14z" fill="currentColor" /></svg>}
         </button>
-        <button className={`icon-btn ${showInspector ? 'on' : ''}`} onClick={() => set({ showInspector: !showInspector })} title="Toggle inspector (⌥⌘I)" aria-label="Inspector">
-          <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="2.5" y="3.5" width="15" height="13" rx="3" /><path d="M12.5 3.5v13" /></svg>
-        </button>
+        <SidebarButton side="right" />
         </div>
       </div>
     </header>

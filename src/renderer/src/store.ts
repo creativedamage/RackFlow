@@ -76,6 +76,8 @@ export interface AppState {
   /** Display units (data is always stored metric). */
   units: 'imperial' | 'metric'
   showInspector: boolean
+  /** Left sidebar (Library, LED wall list) shown or collapsed – remembered between launches. */
+  showSidebar: boolean
   issues: ValidationIssue[]
   /** Bumped to ask the diagram to fit view. */
   fitRequest: number
@@ -147,6 +149,7 @@ export const useStore = create<AppState>((set, get) => ({
   theme: 'system',
   units: 'imperial',
   showInspector: true,
+  showSidebar: (() => { try { return localStorage.getItem('rackflow.sidebar') !== 'off' } catch { return true } })(),
   issues: [],
   fitRequest: 0,
 

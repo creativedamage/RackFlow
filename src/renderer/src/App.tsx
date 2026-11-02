@@ -31,6 +31,7 @@ import { applyUnits } from './units'
 import { isLightLogo } from './rack/AccessoryInspector'
 import { usePatchUI } from './patch/patchState'
 import { Inspector } from './inspector/Inspector'
+import { toggleSidebar } from './panels'
 import { ProductEditor } from './product/ProductEditor'
 import { TemplateEditor } from './patch/TemplateEditor'
 
@@ -136,6 +137,7 @@ export function App() {
       case 'theme:system': case 'theme:light': case 'theme:dark': showTheme(cmd.slice(6) as 'system' | 'light' | 'dark'); break
       case 'zoomFit': s.set({ mode: 'diagram', fitRequest: s.fitRequest + 1 }); break
       case 'toggleInspector': s.set({ showInspector: !s.showInspector }); break
+      case 'toggleSidebar': toggleSidebar(); break
       case 'newProduct': s.set({ editingProduct: newCustomProduct() }); break
       case 'editDevice': editSelection(); break
       case 'tidy': s.set({ mode: 'diagram' }); setTimeout(() => { const n = tidyDiagram({ selectionOnly: s.selection.length > 1 }); if (n) useStore.getState().notify(`Tidied ${n} devices`, { undo: true, kind: 'success' }) }, 0); break
@@ -154,14 +156,16 @@ export function App() {
   // The right panel shows only when there's something to inspect (design checks live in the ⚠︎ notifications).
   const hasSubject = useStore((s) => s.selection.length > 0 || !!s.selectedCable || (s.mode === 'rack' && (!!s.selectedRack || !!s.selectedAccessory)))
   const rightPanel = showInspector && mode !== 'sheet' && mode !== 'led' && (mode === 'patch' || hasSubject)
+  const showSidebar = useStore((s) => s.showSidebar)
+  const sidebarOn = showSidebar && mode !== 'sheet' && mode !== 'led'
   const inspW = usePanelWidth('insp')
   const tpW = usePanelWidth('tp')
 
   return (
     <ReactFlowProvider>
-      <div key={units} className={`app ${isMac ? 'mac' : ''} ${rightPanel && mode !== 'diagram' ? '' : 'no-inspector'} ${rightPanel && mode === 'diagram' ? 'insp-float' : ''} mode-${mode} ${mode !== 'sheet' && mode !== 'led' ? 'has-sidebar' : 'no-sidebar'}`} style={{ ['--insp-w' as string]: `${inspW}px`, ['--tp-w' as string]: `${tpW}px` }}>
+      <div key={units} className={`app ${isMac ? 'mac' : ''} ${rightPanel && mode !== 'diagram' ? '' : 'no-inspector'} ${rightPanel && mode === 'diagram' ? 'insp-float' : ''} mode-${mode} ${sidebarOn ? 'has-sidebar' : 'no-sidebar'} ${mode !== 'sheet' ? 'can-sidebar' : ''}`} style={{ ['--insp-w' as string]: `${inspW}px`, ['--tp-w' as string]: `${tpW}px` }}>
         <Toolbar />
-        {mode !== 'sheet' && mode !== 'led' && <Sidebar />}
+        {sidebarOn && <Sidebar />}
         <main className="canvas-area">
           {mode === 'diagram' && <DiagramView />}
           {mode === 'rack' && <RackView />}

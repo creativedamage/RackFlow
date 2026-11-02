@@ -4,6 +4,7 @@ import {
   BUILT_IN_KEYS, viewMembers, viewsOf, makeFiberProduct, newFiberSpec, makePlateProduct, newPlateSpec, CATEGORIES, CATEGORY_KEYS, DOMAINS, FORMATS, addRack, groupsOf, newCustomProduct, newCustomTemplate, productDomains, templateName, totalChannels,
   type EquipmentCategory, type PlateKind, type ProductDefinition, type SignalDomain, panelDescription } from '@core/index'
 import { useStore } from '../store'
+import { SidebarButton } from '../panels'
 import { addBayToProject } from '../patch/addBay'
 import { addProductToDiagram } from '../diagram/placement'
 import { showContextMenu } from './ContextMenu'
@@ -120,7 +121,7 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="sb-drag" aria-hidden />
+      <div className="sb-drag"><SidebarButton /></div>
       <div className="sidebar-head">
         <div className="lib-heading-row">
           <h2>Library</h2>
