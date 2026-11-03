@@ -160,7 +160,9 @@ function ProjectView({ id, me }: { id: string; me: Session }) {
   }, [id])
 
   const sheets = useMemo(() => (project ? drawingSet(project) : []), [project])
+  const [schedule, setSchedule] = useState(false)
   const cur = sheets.find((s) => s.id === sheetId) ?? sheets[0]
+  // Keep the selection on a real drawing if the one picked disappears (the owner removed it).
   useEffect(() => { if (cur && cur.id !== sheetId) setSheetId(cur.id) }, [cur, sheetId])
   const pages = useMemo(() => { try { return cur ? cur.render() : [] } catch (e) { return [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 40"><text x="10" y="24" font-size="8">Couldn’t draw this sheet: ${String(e).replace(/</g, '')}</text></svg>`] } }, [cur])
   useEffect(() => { if (page >= pages.length) setPage(0) }, [pages, page])
@@ -186,7 +188,7 @@ function ProjectView({ id, me }: { id: string; me: Session }) {
             <section key={g}>
               <h4>{g}</h4>
               {list.map((s) => (
-                <button key={s.id} className={`sheet-item ${cur?.id === s.id ? 'on' : ''}`} onClick={() => { setSheetId(s.id); setPage(0); setFocus(null) }}>
+                <button key={s.id} className={`sheet-item ${!schedule && cur?.id === s.id ? 'on' : ''}`} onClick={() => { setSchedule(false); setSheetId(s.id); setPage(0); setFocus(null) }}>
                   <span>{s.title}</span>{openCount(s.id) > 0 && <em>{openCount(s.id)}</em>}
                 </button>
               ))}
@@ -194,10 +196,10 @@ function ProjectView({ id, me }: { id: string; me: Session }) {
           ))}
           <section>
             <h4>Schedules</h4>
-            <button className={`sheet-item ${sheetId === 'sched:cables' ? 'on' : ''}`} onClick={() => setSheetId('sched:cables')}><span>Cable schedule</span></button>
+            <button className={`sheet-item ${schedule ? 'on' : ''}`} onClick={() => setSchedule(true)}><span>Cable schedule</span></button>
           </section>
         </aside>
-        {sheetId === 'sched:cables' ? <CableTable project={project} /> : cur && (
+        {schedule ?<CableTable project={project} /> : cur && (
           <SheetCanvas key={`${cur.id}#${page}`} svg={pages[page] ?? ''} notes={notes.filter((n) => n.sheet === noteKey)} me={me} isOwner={isOwner} focus={focus}
             pager={pages.length > 1 ? <div className="pager">{pages.map((_, i) => <button key={i} className={i === page ? 'on' : ''} onClick={() => setPage(i)}>{i + 1}</button>)}</div> : null}
             onAdd={(x, y, body) => addNote({ project_id: id, sheet: noteKey, sheet_title: `${cur.title}${pages.length > 1 ? ` (${page + 1})` : ''}`, x, y, body }).then((n) => setNotes((c) => c.some((x2) => x2.id === n.id) ? c : [...c, n]))} />
@@ -211,7 +213,7 @@ function ProjectView({ id, me }: { id: string; me: Session }) {
           <ul>
             {shown.slice().reverse().map((n) => (
               <NoteItem key={n.id} n={n} me={me} isOwner={isOwner} num={notes.filter((x) => x.sheet === n.sheet).indexOf(n) + 1}
-                onShow={() => { const [sid, pg] = n.sheet.split('#'); setSheetId(sid); setPage(Number(pg) || 0); setFocus(n.id) }} />
+                onShow={() => { const [sid, pg] = n.sheet.split('#'); setSchedule(false); setSheetId(sid); setPage(Number(pg) || 0); setFocus(n.id) }} />
             ))}
           </ul>
         </aside>
