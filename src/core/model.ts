@@ -162,7 +162,7 @@ export interface PlateLayout {
   w: number
   h: number
   shape?: 'rect' | 'round'
-  finish: 'white' | 'ivory' | 'black' | 'stainless' | 'aluminum'
+  finish: 'white' | 'ivory' | 'black' | 'blackAnodized' | 'stainless' | 'aluminum' | 'clearAnodized'
   /** Snap grid (mm); 0 = off. */
   grid: number
   labelPos: 'below' | 'above' | 'none'

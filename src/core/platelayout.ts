@@ -47,12 +47,18 @@ export const PLATE_STYLE_LIST: Record<PlateKind, string[]> = {
   rackPanel: ['1RU', '2RU', '3RU', '4RU'],
 }
 
-export const FINISHES: { value: PlateFinish; label: string; fill: string; ink: string; edge: string }[] = [
-  { value: 'white', label: 'White', fill: '#f6f6f2', ink: '#111', edge: '#b9b9b3' },
-  { value: 'ivory', label: 'Ivory', fill: '#efe7d2', ink: '#111', edge: '#bdb39b' },
-  { value: 'black', label: 'Black', fill: '#262628', ink: '#f2f2f2', edge: '#000' },
-  { value: 'stainless', label: 'Stainless', fill: '#cdd0d4', ink: '#111', edge: '#8d9196' },
-  { value: 'aluminum', label: 'Brushed aluminum', fill: '#dcdee1', ink: '#111', edge: '#9a9da2' },
+/**
+ * Panel finishes. `fab` is the call-out on the fabrication drawing; `dark`
+ * finishes get white-filled engraving, light ones black.
+ */
+export const FINISHES: { value: PlateFinish; label: string; fill: string; ink: string; edge: string; dark: boolean; fab: string }[] = [
+  { value: 'black', label: 'Black powder-coat', fill: '#232325', ink: '#f2f2f2', edge: '#000', dark: true, fab: 'BLACK POWDER-COAT, FINE TEXTURE (RAL 9005 OR EQUAL)' },
+  { value: 'blackAnodized', label: 'Black anodized', fill: '#2e3034', ink: '#f2f2f2', edge: '#0b0c0e', dark: true, fab: 'BLACK ANODIZED ALUMINUM, TYPE II, MATTE' },
+  { value: 'white', label: 'White powder-coat', fill: '#f6f6f2', ink: '#111', edge: '#b9b9b3', dark: false, fab: 'WHITE POWDER-COAT, FINE TEXTURE (RAL 9016 OR EQUAL)' },
+  { value: 'ivory', label: 'Ivory', fill: '#efe7d2', ink: '#111', edge: '#bdb39b', dark: false, fab: 'IVORY POWDER-COAT, FINE TEXTURE' },
+  { value: 'stainless', label: 'Stainless', fill: '#cdd0d4', ink: '#111', edge: '#8d9196', dark: false, fab: 'STAINLESS STEEL, #4 BRUSHED' },
+  { value: 'aluminum', label: 'Brushed aluminum', fill: '#dcdee1', ink: '#111', edge: '#9a9da2', dark: false, fab: 'BRUSHED ALUMINUM, UNCOATED' },
+  { value: 'clearAnodized', label: 'Clear anodized', fill: '#d3d6da', ink: '#111', edge: '#8e9297', dark: false, fab: 'CLEAR ANODIZED ALUMINUM, TYPE II, SATIN' },
 ]
 export const finishOf = (f: PlateFinish) => FINISHES.find((x) => x.value === f) ?? FINISHES[0]
 

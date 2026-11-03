@@ -214,8 +214,8 @@ export function fabricationSheets(p: Project, o: FabricationOptions = defaultFab
       'MARK EACH PANEL ON THE BACK WITH ITS TAG SO IDENTICAL-LOOKING PANELS GO TO THE RIGHT LOCATION.',
       `TYPE: ${KIND[spec.kind].toUpperCase()} – ${spec.style.toUpperCase()}${size.gangs ? ` (${size.gangs}-GANG${size.decora ? ' DECORA' : ''})` : ''}${size.ru ? ` (${size.ru}RU, EIA-310)` : ''}`,
       `FACE: ${fmt(L.w)} W × ${fmt(L.h)} H${L.shape === 'round' ? ', ROUND' : ''}`,
-      `FINISH: ${finishOf(L.finish).label.toUpperCase()}`,
-      `ENGRAVING: ${L.labelPos === 'none' ? 'NONE ON JACKS' : `JACK NAMES ${L.labelPos === 'above' ? 'ABOVE' : 'BELOW'} EACH CONNECTOR, 2.8 MM BOLD SANS, FILLED`}`,
+      `FINISH: ${finishOf(L.finish).fab}`,
+      `ENGRAVING: ${L.labelPos === 'none' ? 'NONE ON JACKS' : `JACK NAMES ${L.labelPos === 'above' ? 'ABOVE' : 'BELOW'} EACH CONNECTOR, 2.8 MM BOLD SANS, FILLED ${finishOf(L.finish).dark ? 'WHITE' : 'BLACK'}`}`,
       ...(free.length ? [`ADDITIONAL ENGRAVING: ${free.join(' · ').toUpperCase()}`] : []),
       ...(spec.power ? [`RECEPTACLE CIRCUIT: ${spec.power.volts} V / ${spec.power.amps} A`] : []),
       ...(() => {
