@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom'
-import { ExportAllDialog } from './print/ExportAllDialog'
+import { ExportAllDialog, openExport } from './print/ExportAllDialog'
 import { PanelResizer, usePanelWidth } from './components/PanelResizer'
 import { tidyDiagram } from './diagram/tidy'
 import { DeviceFinder } from './product/DeviceFinder'
@@ -23,7 +23,6 @@ import { ScheduleView } from './sheet/ScheduleView'
 import { LedView } from './led/LedView'
 import { ViewEditor } from './diagram/ViewEditor'
 import { setAutoSave } from './autosave'
-import { quickPrint } from './quickprint'
 import { SheetNumbersDialog } from './diagram/SheetNumbers'
 import { NumberingDialog } from './components/NumberingDialog'
 import { initTheme, showTheme } from './theme'
@@ -104,7 +103,7 @@ export function App() {
       case 'save': await saveDocument(); break
       case 'saveAs': await saveDocument(true); break
       case 'autosave:toggle': setAutoSave(!s.autoSave); break
-      case 'quickPrint': await quickPrint(); break
+      case 'quickPrint': openExport(); break
       case 'save-and-close': if (await saveDocument()) api.closeWindow(); break
       // ⌘Z inside a text field is the field's own undo, not the document's.
       case 'undo': if (s.editingPlate && !inTextField()) { window.dispatchEvent(new Event('designer:undo')); break } if (fieldHasEdits()) document.execCommand('undo'); else docUndo(false); break
@@ -142,7 +141,7 @@ export function App() {
       case 'newProduct': s.set({ editingProduct: newCustomProduct() }); break
       case 'editDevice': editSelection(); break
       case 'tidy': s.set({ mode: 'diagram' }); setTimeout(() => { const n = tidyDiagram({ selectionOnly: s.selection.length > 1 }); if (n) useStore.getState().notify(`Tidied ${n} devices`, { undo: true, kind: 'success' }) }, 0); break
-      case 'exportAll': s.set({ exportingAll: true }); break
+      case 'exportAll': openExport(true); break
       case 'numbering': s.set({ editingNumbering: true }); break
       case 'units:imperial': case 'units:metric': applyUnits(cmd === 'units:metric' ? 'metric' : 'imperial'); break
       case 'findDevice': s.set({ finding: { query: '' } }); break

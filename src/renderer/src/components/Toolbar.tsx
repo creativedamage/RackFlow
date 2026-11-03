@@ -2,7 +2,7 @@ import { openDocument, saveDocument, newDocument, useStore, type Mode } from '..
 import { SidebarButton } from '../panels'
 import { isElectron } from '../platform'
 import { setAutoSave } from '../autosave'
-import { quickPrint, quickPrintTarget } from '../quickprint'
+import { openExport } from '../print/ExportAllDialog'
 import { Segmented, TextInput } from './ui'
 import { IssuesButton } from './IssuesButton'
 import { AppMenuButton, UpdatePill } from './UpdatePill'
@@ -58,8 +58,8 @@ export function Toolbar() {
       <div className="toolbar-right">
         <UpdatePill />
         <div className="tb-island tb-tools">
-        <button className="icon-btn qp-btn" onClick={() => void quickPrint()} onMouseEnter={(e) => { e.currentTarget.title = `Quick Print (⌘P): ${quickPrintTarget()}, with your last print settings` }} aria-label="Quick Print">
-          <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"><path d="M6 7V3h8v4" /><rect x="3" y="7" width="14" height="7" rx="1.5" /><path d="M6 12h8v5H6z" /></svg>
+        <button className="icon-btn qp-btn" onClick={() => openExport()} title="Export / Print (⌘P) – choose the drawings and schedules to save, starting with what you're looking at" aria-label="Export">
+          <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M10 12.5V3" /><path d="M6.5 6.5L10 3l3.5 3.5" /><path d="M4 10.5v4.5a1.5 1.5 0 001.5 1.5h9a1.5 1.5 0 001.5-1.5v-4.5" /></svg>
         </button>
         <div className="undo-group">
           <button className="icon-btn" disabled={!canUndo} onClick={undo} title={canUndo ? `Undo ${undoLabel} (⌘Z)` : 'Nothing to undo'} aria-label="Undo">

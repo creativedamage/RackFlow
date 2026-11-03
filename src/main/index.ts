@@ -166,7 +166,7 @@ function buildMenu() {
         cmd('Save As…', 'saveAs', 'Shift+CmdOrCtrl+S'),
         cmd('Auto Save On / Off', 'autosave:toggle'),
         { type: 'separator' },
-        cmd('Quick Print', 'quickPrint', 'CmdOrCtrl+P'),
+        cmd('Export / Print…', 'quickPrint', 'CmdOrCtrl+P'),
         cmd('Export Everything…', 'exportAll', 'Shift+CmdOrCtrl+E'),
         { type: 'separator' },
         cmd('Find Device…', 'findDevice', 'Shift+CmdOrCtrl+F'),

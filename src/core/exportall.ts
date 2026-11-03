@@ -12,12 +12,15 @@ import { cablesToCSV } from './schedule'
 import { pullScheduleCSV } from './pullschedule'
 import { networkRows, rowSwitch, rowSwitchPort, rowVlan, switchPortRows } from './network'
 import { CATEGORIES } from './model'
+import { groupsOf } from './groups'
+import { GENERAL_PAGE } from './sheetnumbers'
+import { viewsOf } from './views'
 
 export type ExportPart = 'wiring' | 'racks' | 'panels' | 'labels' | 'led' | 'cables' | 'pull' | 'equipment' | 'network' | 'switchports'
 export const EXPORT_PARTS: { key: ExportPart; name: string; file: string }[] = [
-  { key: 'wiring', name: 'Wiring diagram (every page)', file: 'Wiring Diagram.pdf' },
+  { key: 'wiring', name: 'Wiring diagram (pages & views)', file: 'Wiring Diagram.pdf' },
   { key: 'racks', name: 'Rack elevations (front & rear)', file: 'Rack Elevations.pdf' },
-  { key: 'panels', name: 'Wall plate & panel fabrication drawings (for fabricators)', file: 'Panel Fabrication.pdf' },
+  { key: 'panels', name: 'Wall box & plate fabrication drawings', file: 'Panel Fabrication.pdf' },
   { key: 'labels', name: 'Patch bay labels', file: 'Patch Labels.pdf' },
   { key: 'led', name: 'LED wall maps (data & power)', file: 'LED Wall Maps.pdf' },
   { key: 'cables', name: 'Cable schedule (CSV)', file: 'Cable Schedule.csv' },
@@ -27,35 +30,55 @@ export const EXPORT_PARTS: { key: ExportPart; name: string; file: string }[] = [
   { key: 'switchports', name: 'Switch ports & VLANs (CSV)', file: 'Switch Ports VLANs.csv' },
 ]
 
+/** Which items of each part to export (undefined = all). */
+export interface ExportSelection { sheets?: string[]; racks?: string[]; panels?: string[]; bays?: string[]; walls?: string[]; panelsPerBox?: boolean }
+
+/** What can be picked inside each part, for the Export dialog. */
+export function exportChoices(p: Project): Partial<Record<ExportPart, { id: string; label: string }[]>> {
+  const groups = groupsOf(p)
+  const loose = p.equipment.some((e) => !e.groupId || !groups.some((g) => g.id === e.groupId))
+  return {
+    wiring: [
+      ...(groups.length ? groups.map((g) => ({ id: g.id, label: `Page: ${g.name}` })) : [{ id: GENERAL_PAGE, label: 'Main diagram' }]),
+      ...(groups.length && loose ? [{ id: GENERAL_PAGE, label: 'Page: General (not on a page)' }] : []),
+      ...viewsOf(p).map((v) => ({ id: v.id, label: `View: ${v.name}` })),
+    ],
+    racks: p.racks.map((r) => ({ id: r.id, label: r.name })),
+    panels: p.equipment.filter((e) => e.product.plate).sort((a, b) => a.tag.localeCompare(b.tag, undefined, { numeric: true })).map((e) => ({ id: e.id, label: `${e.tag}${e.room?.trim() ? ` · ${e.room.trim()}` : ''}` })),
+    labels: p.patchBays.map((b) => ({ id: b.id, label: b.name })),
+    led: (p.ledWalls ?? []).map((w) => ({ id: w.id, label: w.name })),
+  }
+}
+
 export interface ExportFile { name: string; kind: 'pdf' | 'text'; content: string; count: number }
 
 const csv = (rows: string[][]) => rows.map((r) => r.map((v) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)).join(',')).join('\n')
 
 /** Builds every requested file (PDFs as print-ready HTML, schedules as CSV). Parts with nothing in them are skipped. */
-export function buildExport(p: Project, parts: ExportPart[], sheet = 'ansiB'): ExportFile[] {
+export function buildExport(p: Project, parts: ExportPart[], sheet = 'ansiB', sel: ExportSelection = {}): ExportFile[] {
   const out: ExportFile[] = []
   const name = (k: ExportPart) => EXPORT_PARTS.find((x) => x.key === k)!.file
   if (parts.includes('wiring') && p.equipment.length) {
-    const o = { ...defaultSchematic(p), sheet: sheet === 'ansiB' ? 'archD' : sheet, split: p.groups?.length ? 'group' as const : 'none' as const }
+    const o = { ...defaultSchematic(p), sheet: sheet === 'ansiB' ? 'archD' : sheet, split: p.groups?.length ? 'group' as const : 'none' as const, onlySheets: sel.sheets }
     const pages = schematicSheets(p, o)
     if (pages.length) out.push({ name: name('wiring'), kind: 'pdf', content: sheetsToHTML(pages, sheetSize(o)), count: pages.length })
   }
   if (parts.includes('racks') && p.racks.length) {
-    const o = { ...defaultRackPrint(), sheet, face: 'both' as const }
+    const o = { ...defaultRackPrint(), sheet, face: 'both' as const, ...(sel.racks ? { racks: sel.racks } : {}) }
     const pages = rackElevationSheets(p, o)
     if (pages.length) out.push({ name: name('racks'), kind: 'pdf', content: sheetsToHTML(pages, sheetSize(o)), count: pages.length })
   }
   if (parts.includes('panels')) {
-    const o = { ...defaultFabrication(), sheet }
+    const o = { ...defaultFabrication(), sheet, only: sel.panels, perBox: sel.panelsPerBox !== false }
     const pages = fabricationSheets(p, o)
     if (pages.length) out.push({ name: name('panels'), kind: 'pdf', content: sheetsToHTML(pages, sheetSize(o)), count: pages.length })
   }
   if (parts.includes('labels') && p.patchBays.length) {
-    const pages = layoutLabels(p.patchBays, defaultPrintOptions())
+    const pages = layoutLabels(sel.bays ? p.patchBays.filter((b) => sel.bays!.includes(b.id)) : p.patchBays, defaultPrintOptions())
     if (pages.length) out.push({ name: name('labels'), kind: 'pdf', content: pagesToPrintHTML(pages), count: pages.length })
   }
   if (parts.includes('led') && p.ledWalls?.length) {
-    const o = { ...defaultLedPrint(), sheet }
+    const o = { ...defaultLedPrint(), sheet, walls: sel.walls }
     const pages = ledSheets(p, o)
     if (pages.length) out.push({ name: name('led'), kind: 'pdf', content: sheetsToHTML(pages, sheetSize(o)), count: pages.length })
   }

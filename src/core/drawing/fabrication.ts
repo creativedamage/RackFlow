@@ -14,6 +14,8 @@ export interface FabricationOptions extends SheetOptions {
   units: 'mm' | 'in'
   /** Only these devices (ids); default every plate, box and panel. */
   only?: string[]
+  /** One sheet per box (default) – else identical boxes share a sheet with a table of where each goes. */
+  perBox?: boolean
 }
 
 export const defaultFabrication = (): FabricationOptions => ({ sheet: 'ansiB', titleBlock: true, title: 'PANEL FABRICATION', units: 'in' })
@@ -37,12 +39,12 @@ export function cutoutOf(module: string): string {
 interface Design { spec: PlateSpec; eqs: EquipmentInstance[]; model: string }
 
 /** Plates with the same face and engraving share one sheet (quantity and tags listed). */
-function designs(p: Project, only?: string[]): Design[] {
+function designs(p: Project, only?: string[], perBox = true): Design[] {
   const out = new Map<string, Design>()
   for (const e of p.equipment) {
     const spec = e.product.plate
     if (!spec || (only && !only.includes(e.id))) continue
-    const key = JSON.stringify(withLayout(spec))
+    const key = perBox ? e.id : JSON.stringify(withLayout(spec))
     const d = out.get(key)
     if (d) d.eqs.push(e)
     else out.set(key, { spec: withLayout(spec), eqs: [e], model: `${e.product.manufacturer} ${e.product.model}`.trim() })
@@ -65,7 +67,9 @@ function engravings(spec: PlateSpec): Map<string, string> {
 }
 
 export function fabricationSheets(p: Project, o: FabricationOptions = defaultFabrication()): string[] {
-  const list = designs(p, o.only)
+  const list = designs(p, o.only, o.perBox !== false)
+  const page = (e: EquipmentInstance) => p.groups?.find((g) => g.id === e.groupId)?.name ?? ''
+  const where = (e: EquipmentInstance) => e.room?.trim() || ''
   const fmt = (mm: number) => {
     const inch = mm / 25.4
     return o.units === 'in' ? `${inch.toFixed(3)}" (${mm.toFixed(1)})` : `${mm.toFixed(1)} (${inch.toFixed(2)}")`
@@ -73,12 +77,13 @@ export function fabricationSheets(p: Project, o: FabricationOptions = defaultFab
   const short = (mm: number) => (o.units === 'in' ? (mm / 25.4).toFixed(3) : mm.toFixed(1))
   return list.map((d, i) => {
     const tags = d.eqs.map((e) => e.tag)
-    const { svg, area } = newSheet(p, o, i + 1, list.length, `${tags[0]}${tags.length > 1 ? ` (+${tags.length - 1})` : ''}`)
+    const one = d.eqs.length === 1 ? d.eqs[0] : null
+    const { svg, area } = newSheet(p, o, i + 1, list.length, `${tags[0]}${tags.length > 1 ? ` (+${tags.length - 1})` : ''}${one && where(one) ? ` – ${where(one)}` : ''}`)
     const spec = d.spec, L = spec.layout!
     const size = plateSize(spec)
     // Zones: drawing (left), schedule + notes (right).
     const tableW = Math.min(170, area.w * 0.42)
-    const draw = { x: area.x + 6, y: area.y + 14, w: area.w - tableW - 18, h: area.h - 20 }
+    const draw = { x: area.x + 6, y: area.y + 24, w: area.w - tableW - 18, h: area.h - 30 }
     // Room for ordinate dimensions (top / left) and overall dims (bottom / right).
     const dimTop = 30, dimLeft = 30, dimRight = 16, dimBottom = 16
     // Fit the face and anything sticking out of it (a jack placed past the edge is drawn, and flagged).
@@ -92,6 +97,14 @@ export function fabricationSheets(p: Project, o: FabricationOptions = defaultFab
     const X = (mm: number) => ox + mm * s, Y = (mm: number) => oy + mm * s
 
     svg.text(area.x + 4, area.y + 5, `${KIND[spec.kind].toUpperCase()} – ${tags.join(', ')}`.toUpperCase(), { size: 4.2, weight: 'bold', maxWidth: area.w - tableW - 20 })
+    // Where it goes – boxes often look alike, so this is big and boxed.
+    if (one) {
+      const loc = where(one), pg = page(one)
+      const text = loc ? `INSTALL AT: ${loc}${pg ? `  ·  ${pg}` : ''}`.toUpperCase() : 'INSTALL LOCATION NOT SET – ADD A ROOM / LOCATION TO THIS BOX'
+      const w = Math.min(area.w - tableW - 20, text.length * 2.05 + 8)
+      svg.rect(area.x + 4, area.y + 14, w, 8, { lw: 0.5, fill: '#fff', stroke: '#000', rx: 1 })
+      svg.text(area.x + 8, area.y + 18, text, { size: 3.4, weight: 'bold', maxWidth: w - 8 })
+    }
     svg.text(area.x + 4, area.y + 10.5, `FRONT VIEW · SCALE ${scaleName(s)} ON ${o.sheet === 'ansiB' ? 'ANSI B' : o.sheet.toUpperCase()} · DATUM: TOP-LEFT CORNER OF FACE · DO NOT SCALE – USE DIMENSIONS`, { size: 2.4, fill: '#333', maxWidth: area.w - tableW - 20 })
 
     // The face, drawn by the same code as the designer, at true scale.
@@ -178,12 +191,27 @@ export function fabricationSheets(p: Project, o: FabricationOptions = defaultFab
     })
     if (jacks.length > maxRows) { svg.text(tx, y + 3, `+ ${jacks.length - maxRows} MORE – SEE SCHEDULE EXPORT`, { size: 2.2, fill: '#555' }); y += 5 }
 
+    // Where each one goes (grouped sheets).
+    if (!one) {
+      y += 6
+      svg.text(tx, y, 'INSTALL LOCATIONS', { size: 3, weight: 'bold' }); y += 3
+      const lc = [{ t: 'TAG', w: 0.2 }, { t: 'LOCATION / ROOM', w: 0.45 }, { t: 'PAGE', w: 0.35 }]
+      const lrow = (vals: string[], head: boolean) => {
+        let x = tx
+        svg.rect(tx, y, tableW, rowH, { lw: head ? 0.35 : 0.2, fill: head ? '#eee' : undefined })
+        lc.forEach((c, k) => { svg.text(x + 1.2, y + rowH / 2, vals[k], { size: head ? 2.1 : 2.4, weight: head || k === 0 ? 'bold' : 'normal', maxWidth: tableW * c.w - 2.4 }); x += tableW * c.w; if (k < lc.length - 1) svg.line(x, y, x, y + rowH, { lw: 0.15 }) })
+        y += rowH
+      }
+      lrow(lc.map((c) => c.t), true)
+      for (const e of d.eqs) lrow([e.tag, (where(e) || '— NOT SET —').toUpperCase(), page(e).toUpperCase()], false)
+    }
     // Notes.
     y += 6
     svg.text(tx, y, 'NOTES', { size: 3, weight: 'bold' }); y += 4.5
     const free = (L.texts ?? []).map((t) => t.text.replace(/\n/g, ' / ')).filter(Boolean)
     const notes = [
-      `QTY ${d.eqs.length}: ${tags.join(', ')}`,
+      one ? `TAG: ${one.tag} – ${(where(one) || 'LOCATION NOT SET').toUpperCase()}` : `QTY ${d.eqs.length}: ${tags.join(', ')} (SEE INSTALL LOCATIONS)`,
+      'MARK EACH PANEL ON THE BACK WITH ITS TAG SO IDENTICAL-LOOKING PANELS GO TO THE RIGHT LOCATION.',
       `TYPE: ${KIND[spec.kind].toUpperCase()} – ${spec.style.toUpperCase()}${size.gangs ? ` (${size.gangs}-GANG${size.decora ? ' DECORA' : ''})` : ''}${size.ru ? ` (${size.ru}RU, EIA-310)` : ''}`,
       `FACE: ${fmt(L.w)} W × ${fmt(L.h)} H${L.shape === 'round' ? ', ROUND' : ''}`,
       `FINISH: ${finishOf(L.finish).label.toUpperCase()}`,

@@ -26,6 +26,8 @@ export interface SchematicOptions extends SheetOptions {
   /** Quick print: just this page's sheet (group id, null = devices on no page) – or just this signal view. */
   onlyPage?: string | null
   onlyView?: string
+  /** Export: just these pages (page id, or GENERAL_PAGE) and views (view id). */
+  onlySheets?: string[]
 }
 
 export const defaultSchematic = (p?: Project): SchematicOptions => ({
@@ -87,8 +89,8 @@ export function schematicSheets(pIn: Project, o: SchematicOptions): string[] {
     ...extra.map(({ v }, i) => nums.get(v.id) ?? byIndex(pages.length + i)),
   ]
   // Quick print draws just one page or view (numbered as in the full set).
-  const mainOk = (pg: Page) => !o.onlyView && (o.onlyPage === undefined || (pg.pageId ?? null) === o.onlyPage)
-  const viewOk = (id: string) => (o.onlyView ? id === o.onlyView : o.onlyPage === undefined)
+  const mainOk = (pg: Page) => !o.onlyView && (o.onlyPage === undefined || (pg.pageId ?? null) === o.onlyPage) && (!o.onlySheets || o.onlySheets.includes(pg.pageId ?? GENERAL_PAGE))
+  const viewOk = (id: string) => (o.onlyView ? id === o.onlyView : o.onlyPage === undefined) && (!o.onlySheets || o.onlySheets.includes(id))
   return [
     ...pages.flatMap((pg, i) => (mainOk(pg) ? [drawPage(p, o, pg, i + 1, total, sheetOf, labels)] : [])),
     // Wires leaving a view end in arrows naming the device and the main sheet it's on.

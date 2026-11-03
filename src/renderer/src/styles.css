@@ -1149,3 +1149,11 @@ input.mono { font-family: var(--mono); }
 .dn-vlan.trunk { background: #7048e8; }
 .multi-cables { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; margin: 6px 0 12px; max-height: 50vh; overflow: auto; }
 .multi-cables button { font-size: 12px; text-align: left; }
+
+.export-part { border-bottom: 1px solid var(--line-2); padding: 2px 0; }
+.export-row .mini { flex: none; }
+.export-row > :first-child { flex: 1; }
+.export-picks { display: flex; flex-direction: column; gap: 3px; padding: 4px 4px 8px 28px; max-height: 220px; overflow: auto; }
+.export-picks-bar { display: flex; gap: 12px; margin-bottom: 2px; }
+.export-picks .check { font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
+.export-sub { padding: 0 0 6px 28px; font-size: 12px; }
