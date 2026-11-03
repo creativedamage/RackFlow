@@ -24,6 +24,7 @@ export function openExport(all = false) {
     case 'rack': preset = { parts: ['racks'], picks: s.selectedRack ? { racks: [s.selectedRack] } : {} }; break
     case 'patch': preset = { parts: ['labels'], picks: s.selectedBay ? { labels: [s.selectedBay] } : {} }; break
     case 'led': preset = { parts: ['led'], picks: s.selectedLedWall ? { led: [s.selectedLedWall] } : {} }; break
+    case 'boxes': { const b = s.selectedBox ?? s.project.equipment.find((e) => e.product.plate)?.id; preset = { parts: ['panels'], picks: b ? { panels: [b] } : {} }; break }
     case 'sheet': {
       const tab = document.querySelector('.schedule-tabs button.on')?.textContent ?? ''
       const part: ExportPart = /pull/i.test(tab) ? 'pull' : /device/i.test(tab) ? 'equipment' : /switch/i.test(tab) ? 'switchports' : /network/i.test(tab) ? 'network' : /box/i.test(tab) ? 'panels' : 'cables'

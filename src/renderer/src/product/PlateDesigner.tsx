@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { produce } from 'immer'
-import { BUILT_IN_KEYS, footprint, makePlateProduct, newPlateText, nextPid, PLATE_MODULE_KEYS, PLATE_MODULES, PLATE_SIZES, PLATE_STYLE_LIST, plateInner, withLayout, FINISHES, finishOf, type PlateFinish, autoArrange, type PlateInsert, type PlateKind, type PlateLayout, type PlateSpec, type ProductDefinition, imperial, fmtLen, fmtLenPair, refreshBoxPorts, withoutPortNumbers, isMultipin, MULTIPIN_CHANNELS, summarizeLabels, tiedTo, keepInViews } from '@core/index'
+import { BUILT_IN_KEYS, footprint, makePlateProduct, newPlateText, nextPid, PLATE_MODULE_KEYS, PLATE_MODULES, PLATE_SIZES, PLATE_STYLE_LIST, plateInner, withLayout, FINISHES, type PlateFinish, autoArrange, type PlateInsert, type PlateKind, type PlateLayout, type PlateSpec, type ProductDefinition, imperial, fmtLen, fmtLenPair, refreshBoxPorts, withoutPortNumbers, isMultipin, MULTIPIN_CHANNELS, summarizeLabels, tiedTo, keepInViews } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
 import { addProductToDiagram } from '../diagram/placement'
@@ -43,7 +43,6 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
   const isBuiltIn = BUILT_IN_KEYS.has(initial.key.split('@')[0])
   const close = () => useStore.getState().set({ editingPlate: null })
   const L = spec.layout!
-  const fin = finishOf(L.finish)
   const setSpec = useCallback((next: PlateSpec, record = true) => { if (record) setPast((p) => [...p.slice(-60), spec]); setSpecRaw(next) }, [spec])
   const edit = (fn: (d: PlateSpec) => void, record = true) => setSpec(produce(spec, fn), record)
   const editL = (fn: (l: PlateLayout) => void, record = true) => edit((d) => fn(d.layout!), record)
@@ -408,10 +407,7 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
               onDrop={(e) => { const k = e.dataTransfer.getData('text/x-plate-module'); if (k && svgRef.current) { e.preventDefault(); addJack(k, toMM(e)) } }}>
               <svg ref={svgRef} viewBox={`${-pad} ${-pad} ${L.w + pad * 2} ${L.h + pad * 2}`} style={{ width: `${zoom * 100}%`, height: `${zoom * 100}%` }}
                 onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
-                {L.shape === 'round'
-                  ? <circle cx={L.w / 2} cy={L.h / 2} r={Math.min(L.w, L.h) / 2} fill={fin.fill} />
-                  : <rect x={0} y={0} width={L.w} height={L.h} rx={spec.kind === 'rackPanel' ? 0.8 : spec.kind === 'floorBox' ? 6 : 3} fill={fin.fill} />}
-                <g style={{ color: fin.ink }} dangerouslySetInnerHTML={{ __html: plateInner(spec, { selected: sel, interactive: true, grid: snap ? L.grid : 0 }) }} />
+                <g dangerouslySetInnerHTML={{ __html: plateInner(spec, { selected: sel, interactive: true, grid: snap ? L.grid : 0 }) }} />
                 {marquee && <rect x={Math.min(marquee.x0, marquee.x1)} y={Math.min(marquee.y0, marquee.y1)} width={Math.abs(marquee.x1 - marquee.x0)} height={Math.abs(marquee.y1 - marquee.y0)} fill="rgba(10,132,255,0.1)" stroke="#0a84ff" strokeWidth={0.4} />}
               </svg>
             </div>

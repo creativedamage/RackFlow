@@ -52,7 +52,7 @@ export function rackElevationSheets(p: Project, o: RackPrintOptions): string[] {
     const js = jobs.filter((j) => j.face === f)
     for (let i = 0; i < js.length; i += perSheet) chunks.push(js.slice(i, i + perSheet))
   }
-  return chunks.map((chunk, i) => {
+  const sheets: string[] & { names?: string[] } = chunks.map((chunk, i) => {
     const sub = o.face === 'both' ? `${chunk[0].face.toUpperCase()} VIEW` : ''
     const { svg, area } = newSheet(p, o, i + 1, chunks.length, sub)
     const k = chunk.length
@@ -64,6 +64,13 @@ export function rackElevationSheets(p: Project, o: RackPrintOptions): string[] {
     })
     return svg.toString()
   })
+  // Page names for viewers: "Front", "Rear" (numbered when a face needs several sheets).
+  sheets.names = chunks.map((chunk, i) => {
+    const face = chunk[0].face === 'front' ? 'Front' : 'Rear'
+    const same = chunks.filter((c) => c[0].face === chunk[0].face)
+    return same.length > 1 ? `${face} ${same.indexOf(chunks[i]) + 1}` : face
+  })
+  return sheets
 }
 
 function drawRack(svg: Svg, p: Project, rack: Rack, face: RackFace, x: number, y: number, tallest: number, o: RackPrintOptions) {

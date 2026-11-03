@@ -205,30 +205,74 @@ export function fabricationSheets(p: Project, o: FabricationOptions = defaultFab
       lrow(lc.map((c) => c.t), true)
       for (const e of d.eqs) lrow([e.tag, (where(e) || '— NOT SET —').toUpperCase(), page(e).toUpperCase()], false)
     }
-    // Notes.
+    // Notes – the box's own list if it has one (edited in the Wall Boxes tab), else the automatic set.
     y += 6
-    svg.text(tx, y, 'NOTES', { size: 3, weight: 'bold' }); y += 4.5
-    const free = (L.texts ?? []).map((t) => t.text.replace(/\n/g, ' / ')).filter(Boolean)
-    const notes = [
-      one ? `TAG: ${one.tag} – ${(where(one) || 'LOCATION NOT SET').toUpperCase()}` : `QTY ${d.eqs.length}: ${tags.join(', ')} (SEE INSTALL LOCATIONS)`,
-      'MARK EACH PANEL ON THE BACK WITH ITS TAG SO IDENTICAL-LOOKING PANELS GO TO THE RIGHT LOCATION.',
-      `TYPE: ${KIND[spec.kind].toUpperCase()} – ${spec.style.toUpperCase()}${size.gangs ? ` (${size.gangs}-GANG${size.decora ? ' DECORA' : ''})` : ''}${size.ru ? ` (${size.ru}RU, EIA-310)` : ''}`,
-      `FACE: ${fmt(L.w)} W × ${fmt(L.h)} H${L.shape === 'round' ? ', ROUND' : ''}`,
-      `FINISH: ${finishOf(L.finish).fab}`,
-      `ENGRAVING: ${L.labelPos === 'none' ? 'NONE ON JACKS' : `JACK NAMES ${L.labelPos === 'above' ? 'ABOVE' : 'BELOW'} EACH CONNECTOR, 2.8 MM BOLD SANS, FILLED ${finishOf(L.finish).dark ? 'WHITE' : 'BLACK'}`}`,
-      ...(free.length ? [`ADDITIONAL ENGRAVING: ${free.join(' · ').toUpperCase()}`] : []),
-      ...(spec.power ? [`RECEPTACLE CIRCUIT: ${spec.power.volts} V / ${spec.power.amps} A`] : []),
-      ...(() => {
-        const out = jacks.map((j, k) => ({ k: k + 1, c: L.jacks[j.pid], f: footprint(j.module) })).filter((q) => q.c.x - q.f.w / 2 < 0 || q.c.y - q.f.h / 2 < 0 || q.c.x + q.f.w / 2 > L.w || q.c.y + q.f.h / 2 > L.h)
-        return out.length ? [`⚠ ITEM${out.length > 1 ? 'S' : ''} ${out.map((q) => q.k).join(', ')} EXTEND${out.length > 1 ? '' : 'S'} PAST THE FACE – MOVE ${out.length > 1 ? 'THEM' : 'IT'} IN THE PLATE DESIGNER OR USE A LARGER PLATE BEFORE RELEASING`] : []
-      })(),
-      'ALL DIMENSIONS TO CONNECTOR CENTRES FROM DATUM (TOP-LEFT OF FACE). TOL ±0.2 MM UNLESS NOTED.',
-      'VERIFY CUT-OUTS AGAINST CONNECTOR MANUFACTURER DRAWINGS BEFORE MACHINING.',
-      `MODEL: ${d.model.toUpperCase()}`,
-    ]
-    notes.forEach((t, k) => { svg.text(tx, y, `${k + 1}. ${t}`, { size: 2.3, maxWidth: tableW }); y += 4 })
+    const custom = one?.fabNotes
+    svg.text(tx, y, (one?.fabNotesTitle?.trim() || 'NOTES').toUpperCase(), { size: 3, weight: 'bold' }); y += 4.5
+    const overflow = (() => {
+      const out = jacks.map((j, k) => ({ k: k + 1, c: L.jacks[j.pid], f: footprint(j.module) })).filter((q) => q.c.x - q.f.w / 2 < 0 || q.c.y - q.f.h / 2 < 0 || q.c.x + q.f.w / 2 > L.w || q.c.y + q.f.h / 2 > L.h)
+      return out.length ? [`⚠ ITEM${out.length > 1 ? 'S' : ''} ${out.map((q) => q.k).join(', ')} EXTEND${out.length > 1 ? '' : 'S'} PAST THE FACE – MOVE ${out.length > 1 ? 'THEM' : 'IT'} IN THE PLATE DESIGNER OR USE A LARGER PLATE BEFORE RELEASING`] : []
+    })()
+    const notes = [...(custom ?? autoNotes(d, o)).filter((t) => t.trim()), ...overflow]
+    // Wrap to the column; ~0.55 × font size per character for Arial.
+    const perLine = Math.max(20, Math.floor(tableW / (2.3 * 0.55)))
+    const bottom = area.y + area.h - 2
+    for (const [k, t] of notes.entries()) {
+      const lines = wrap(`${k + 1}. ${t}`, perLine)
+      for (const [n, line] of lines.entries()) {
+        if (y > bottom) break
+        svg.text(tx + (n ? 3 : 0), y, line, { size: 2.3, maxWidth: tableW - (n ? 3 : 0) }); y += 3.4
+      }
+      y += 0.8
+    }
     return svg.toString()
   })
 }
 
+/** Greedy word wrap at `n` characters. */
+function wrap(text: string, n: number): string[] {
+  const out: string[] = []
+  for (const para of text.split('\n')) {
+    let line = ''
+    for (const w of para.split(/\s+/)) {
+      if (!line) line = w
+      else if ((line + ' ' + w).length <= n) line += ' ' + w
+      else { out.push(line); line = w }
+    }
+    out.push(line)
+  }
+  return out
+}
 
+/** The automatic notes for a sheet (what a box shows until its notes are edited). */
+function autoNotes(d: Design, o: FabricationOptions): string[] {
+  const spec = d.spec, L = spec.layout!, size = plateSize(spec)
+  const one = d.eqs.length === 1 ? d.eqs[0] : null
+  const where = (e: EquipmentInstance) => e.room?.trim() || ''
+  const fmt = (mm: number) => (o.units === 'in' ? `${(mm / 25.4).toFixed(3)}" (${mm.toFixed(1)})` : `${mm.toFixed(1)} (${(mm / 25.4).toFixed(2)}")`)
+  const free = (L.texts ?? []).map((t) => t.text.replace(/\n/g, ' / ')).filter(Boolean)
+  return [
+    one ? `TAG: ${one.tag} – ${(where(one) || 'LOCATION NOT SET').toUpperCase()}` : `QTY ${d.eqs.length}: ${d.eqs.map((e) => e.tag).join(', ')} (SEE INSTALL LOCATIONS)`,
+    'MARK EACH PANEL ON THE BACK WITH ITS TAG SO IDENTICAL-LOOKING PANELS GO TO THE RIGHT LOCATION.',
+    `TYPE: ${KIND[spec.kind].toUpperCase()} – ${spec.style.toUpperCase()}${size.gangs ? ` (${size.gangs}-GANG${size.decora ? ' DECORA' : ''})` : ''}${size.ru ? ` (${size.ru}RU, EIA-310)` : ''}`,
+    `FACE: ${fmt(L.w)} W × ${fmt(L.h)} H${L.shape === 'round' ? ', ROUND' : ''}`,
+    `FINISH: ${finishOf(L.finish).fab}`,
+    `ENGRAVING: ${L.labelPos === 'none' ? 'NONE ON JACKS' : `JACK NAMES ${L.labelPos === 'above' ? 'ABOVE' : 'BELOW'} EACH CONNECTOR, 2.8 MM BOLD SANS, FILLED ${finishOf(L.finish).dark ? 'WHITE' : 'BLACK'}`}`,
+    ...(free.length ? [`ADDITIONAL ENGRAVING: ${free.join(' · ').toUpperCase()}`] : []),
+    ...(spec.power ? [`RECEPTACLE CIRCUIT: ${spec.power.volts} V / ${spec.power.amps} A`] : []),
+    'ALL DIMENSIONS TO CONNECTOR CENTRES FROM DATUM (TOP-LEFT OF FACE). TOL ±0.2 MM UNLESS NOTED.',
+    'VERIFY CUT-OUTS AGAINST CONNECTOR MANUFACTURER DRAWINGS BEFORE MACHINING.',
+    `MODEL: ${d.model.toUpperCase()}`,
+  ]
+}
+
+/** The automatic notes for one box – the starting point when its notes are customised. */
+export function fabricationNotes(p: Project, eqId: string, o: FabricationOptions = defaultFabrication()): string[] {
+  const d = designs(p, [eqId], true)[0]
+  return d ? autoNotes(d, o) : []
+}
+
+/** Page names for fabrication sheets (box tags), in sheet order. */
+export function fabricationPageNames(p: Project, o: FabricationOptions = defaultFabrication()): string[] {
+  return designs(p, o.only, o.perBox !== false).map((d) => d.eqs.map((e) => e.tag).join(', '))
+}

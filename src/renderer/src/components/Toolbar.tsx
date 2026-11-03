@@ -19,7 +19,7 @@ export function Toolbar() {
   const undo = useStore((s) => s.undo)
   const redo = useStore((s) => s.redo)
   const apply = useStore((s) => s.apply)
-  const sidebarShown = useStore((s) => s.showSidebar && s.mode !== 'sheet' && s.mode !== 'led')
+  const sidebarShown = useStore((s) => s.showSidebar && s.mode !== 'sheet' && s.mode !== 'led' && s.mode !== 'boxes')
   const canSidebar = useStore((s) => s.mode !== 'sheet')
   const theme = useStore((s) => s.theme)
 
@@ -53,6 +53,7 @@ export function Toolbar() {
           { value: 'patch', label: 'Patch Labels', title: '⌘3' },
           { value: 'sheet', label: 'Schedule', title: '⌘4 · spreadsheet of every cable and device' },
           { value: 'led', label: 'LED Walls', title: '⌘5 · LED wall data & power mapping' },
+          { value: 'boxes', label: 'Wall Boxes', title: '⌘6 · wall boxes, plates & panels – fabrication sheets and notes' },
         ]}
       />
 

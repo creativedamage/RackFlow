@@ -1183,3 +1183,26 @@ input.mono { font-family: var(--mono); }
 .share-btn { position: relative; }
 .share-btn .share-dot { position: absolute; right: 4px; bottom: 4px; width: 6px; height: 6px; }
 .share-badge { position: absolute; top: -3px; right: -4px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 9.5px; font-weight: 700; line-height: 15px; }
+
+/* Wall Boxes tab */
+.boxes-view { display: grid; grid-template-columns: 250px minmax(0, 1fr) 340px; height: 100%; min-height: 0; background: var(--bg); }
+.boxes-view.no-list { grid-template-columns: 0 minmax(0, 1fr) 340px; }
+.boxes-view.no-settings { grid-template-columns: 250px minmax(0, 1fr) 0; }
+.boxes-view.no-list.no-settings { grid-template-columns: 0 minmax(0, 1fr) 0; }
+.boxes-search { margin: 0 12px 6px; width: calc(100% - 24px); border-radius: 999px; padding: 5px 12px; }
+.boxes-group { margin: 12px 14px 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); }
+.boxes-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-left: 6px; vertical-align: middle; }
+.boxes-canvas { background: var(--bg-2); }
+.boxes-desk { flex: 1; min-height: 0; overflow: auto; padding: 24px; display: flex; justify-content: center; align-items: flex-start; background: #8e9096; }
+.boxes-paper { background: #fff; box-shadow: 0 6px 30px rgba(0, 0, 0, 0.35); flex: none; max-width: none; }
+.boxes-paper svg { display: block; width: 100%; height: auto; }
+.boxes-notes { padding-bottom: 28px; }
+.boxes-notes-head { display: flex; align-items: center; gap: 8px; }
+.boxes-notes-head .badge { margin-top: 10px; }
+.boxes-notes .badge.on { background: var(--accent); color: #fff; }
+.boxes-note-list { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.boxes-note-list li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 4px 6px; align-items: start; }
+.boxes-note-n { font-size: 11px; font-weight: 700; color: var(--text-2); padding-top: 6px; text-align: right; }
+.boxes-note { width: 100%; font-size: 12px; resize: vertical; field-sizing: content; min-height: 30px; }
+.boxes-note-tools { grid-column: 2; display: flex; gap: 4px; justify-content: flex-end; opacity: 0.55; }
+.boxes-note-list li:hover .boxes-note-tools, .boxes-note-list li:focus-within .boxes-note-tools { opacity: 1; }

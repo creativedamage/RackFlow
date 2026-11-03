@@ -164,7 +164,7 @@ function ProjectView({ id, me }: { id: string; me: Session }) {
   const cur = sheets.find((s) => s.id === sheetId) ?? sheets[0]
   // Keep the selection on a real drawing if the one picked disappears (the owner removed it).
   useEffect(() => { if (cur && cur.id !== sheetId) setSheetId(cur.id) }, [cur, sheetId])
-  const pages = useMemo(() => { try { return cur ? cur.render() : [] } catch (e) { return [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 40"><text x="10" y="24" font-size="8">Couldn’t draw this sheet: ${String(e).replace(/</g, '')}</text></svg>`] } }, [cur])
+  const pages = useMemo(() => { try { return cur ? cur.render() : [] } catch (e) { return [{ name: '', svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 40"><text x="10" y="24" font-size="8">Couldn’t draw this sheet: ${String(e).replace(/</g, '')}</text></svg>` }] } }, [cur])
   useEffect(() => { if (page >= pages.length) setPage(0) }, [pages, page])
   const noteKey = cur ? `${cur.id}#${page}` : ''
   const groups = useMemo(() => {
@@ -200,9 +200,9 @@ function ProjectView({ id, me }: { id: string; me: Session }) {
           </section>
         </aside>
         {schedule ?<CableTable project={project} /> : cur && (
-          <SheetCanvas key={`${cur.id}#${page}`} svg={pages[page] ?? ''} notes={notes.filter((n) => n.sheet === noteKey)} me={me} isOwner={isOwner} focus={focus}
-            pager={pages.length > 1 ? <div className="pager">{pages.map((_, i) => <button key={i} className={i === page ? 'on' : ''} onClick={() => setPage(i)}>{i + 1}</button>)}</div> : null}
-            onAdd={(x, y, body) => addNote({ project_id: id, sheet: noteKey, sheet_title: `${cur.title}${pages.length > 1 ? ` (${page + 1})` : ''}`, x, y, body }).then((n) => setNotes((c) => c.some((x2) => x2.id === n.id) ? c : [...c, n]))} />
+          <SheetCanvas key={`${cur.id}#${page}`} svg={pages[page]?.svg ?? ''} notes={notes.filter((n) => n.sheet === noteKey)} me={me} isOwner={isOwner} focus={focus}
+            pager={pages.length > 1 ? <div className="pager">{pages.map((pg, i) => <button key={i} className={i === page ? 'on' : ''} onClick={() => setPage(i)}>{pg.name || i + 1}</button>)}</div> : null}
+            onAdd={(x, y, body) => addNote({ project_id: id, sheet: noteKey, sheet_title: `${cur.title}${pages.length > 1 ? ` (${pages[page]?.name || page + 1})` : ''}`, x, y, body }).then((n) => setNotes((c) => c.some((x2) => x2.id === n.id) ? c : [...c, n]))} />
         )}
         <aside className="notes">
           <div className="seg">

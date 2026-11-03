@@ -202,6 +202,7 @@ function buildMenu() {
         cmd('Patch Labels', 'mode:patch', 'CmdOrCtrl+3'),
         cmd('Schedule (Spreadsheet)', 'mode:sheet', 'CmdOrCtrl+4'),
         cmd('LED Walls', 'mode:led', 'CmdOrCtrl+5'),
+        cmd('Wall Boxes', 'mode:boxes', 'CmdOrCtrl+6'),
         { type: 'separator' },
         cmd('Tidy Up Wiring Diagram', 'tidy', 'Alt+CmdOrCtrl+L'),
         { type: 'separator' },

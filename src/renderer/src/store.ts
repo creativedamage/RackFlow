@@ -11,7 +11,7 @@ import {
 } from '@core/index'
 import { api } from './platform'
 
-export type Mode = 'diagram' | 'rack' | 'patch' | 'sheet' | 'led'
+export type Mode = 'diagram' | 'rack' | 'patch' | 'sheet' | 'led' | 'boxes'
 
 interface HistoryEntry { project: Project; label: string }
 
@@ -64,6 +64,8 @@ export interface AppState {
   diagramPage: string | null
   exportingAll: boolean
   selectedLedWall: string | null
+  /** Wall Boxes tab: the box whose sheet is shown. */
+  selectedBox: string | null
   ledPicking: boolean
   /** Signal view shown on the diagram (null = normal pages). */
   diagramView: string | null
@@ -150,6 +152,7 @@ export const useStore = create<AppState>((set, get) => ({
   diagramPage: null,
   exportingAll: false,
   selectedLedWall: null,
+  selectedBox: null,
   ledPicking: false,
   diagramView: null,
   editingView: null,

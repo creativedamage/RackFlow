@@ -222,6 +222,10 @@ export interface EquipmentInstance {
   rackPlacement: RackPlacement | null
   room: string
   notes: string
+  /** Wall boxes / plates: this box's fabrication-sheet notes (replaces the automatic ones when set). */
+  fabNotes?: string[]
+  /** Heading over those notes (default "NOTES"). */
+  fabNotesTitle?: string
   /** Power sources only: panel / circuit / breaker. */
   circuit?: CircuitInfo
   /** Diagram group (system) this device belongs to. */

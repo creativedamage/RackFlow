@@ -4,6 +4,7 @@
 // in the designer, as the preview on the wiring-diagram card and in print.
 
 import { summarizeLabels, tiedTo } from './multipin'
+import { NEUTRIK_FACES } from './neutrikfaces'
 import type { PlateInsert, PlateKind, PlateLayout, PlateSpec, PlateText, ProductDefinition } from './model'
 import { fiberFaceSize, fiberInner, lcPort } from './fiber'
 import { PLATE_MODULES } from './plates'
@@ -75,7 +76,7 @@ const FOOT: Record<string, { w: number; h: number; shape: Shape; icon: string }>
   nl4: { w: 26, h: 31, shape: 'd', icon: 'nl4' }, ethercon: { w: 26, h: 31, shape: 'd', icon: 'ethercon' }, opticalcon: { w: 26, h: 31, shape: 'd', icon: 'oc' },
   bnc: { w: 26, h: 31, shape: 'd', icon: 'bnc' }, hdmi: { w: 26, h: 31, shape: 'd', icon: 'hdmi' }, usbA: { w: 26, h: 31, shape: 'd', icon: 'usbA' },
   usbB: { w: 26, h: 31, shape: 'd', icon: 'usbB' }, usbc: { w: 26, h: 31, shape: 'd', icon: 'usbC' }, dp: { w: 26, h: 31, shape: 'd', icon: 'dp' },
-  trs: { w: 26, h: 31, shape: 'd', icon: 'trs' }, fiber: { w: 26, h: 31, shape: 'd', icon: 'lc' }, pwrTrue1: { w: 32, h: 38, shape: 'd', icon: 'true1' },
+  trs: { w: 26, h: 31, shape: 'd', icon: 'trs' }, fiber: { w: 26, h: 31, shape: 'd', icon: 'lc' }, pwrTrue1: { w: 35.4, h: 35.4, shape: 'd', icon: 'true1' },
   rj45: { w: 14.5, h: 16, shape: 'keystone', icon: 'rj45' }, mini: { w: 14.5, h: 16, shape: 'keystone', icon: 'mini' }, rca: { w: 14.5, h: 16, shape: 'keystone', icon: 'rca' },
   vga: { w: 31, h: 12.5, shape: 'block', icon: 'de15' }, db9: { w: 31, h: 12.5, shape: 'block', icon: 'de9' }, euro: { w: 22, h: 10, shape: 'block', icon: 'euro' },
   binding: { w: 32, h: 14, shape: 'block', icon: 'posts' },
@@ -209,6 +210,13 @@ export function jackSVG(module: string): string {
     L(`M ${n(cx - x)} ${n(cy + y)} A ${r} ${r} 0 1 0 ${n(cx + x)} ${n(cy + y)} Z`)
   }
   if (f.shape === 'd') {
+    // The real thing: Neutrik's own front-view drawing where we have one.
+    const nf = NEUTRIK_FACES[f.icon]
+    if (nf) {
+      if (f.icon === 'usbB') { R(-hw, -hh, f.w, f.h, 3.5, 0.3); for (const [x, y] of [[-9.5, -12], [9.5, 12]]) { C(x, y, 1.75, 0.2); C(x, y, 3, 0.2) }; for (const [x, y] of [[9.5, -12], [-9.5, 12]]) C(x, y, 3, 0.2) }
+      P.push(`<path d="${nf.d}" fill="none" stroke="currentColor" stroke-width="0.16" stroke-linecap="round" stroke-linejoin="round"/>`)
+      return P.join('')
+    }
     if (f.icon === 'true1') {
       R(-hw, -hh, f.w, f.h, 2, 0.5); C(-hw + 3.5, -hh + 3.5, 1.6); C(hw - 3.5, hh - 3.5, 1.6)
       C(0, 0, 12.5); C(0, 0, 10); R(-1.5, -12.5, 3, 2.5)
@@ -216,8 +224,9 @@ export function jackSVG(module: string): string {
       return P.join('')
     }
     // Neutrik D flange: 26 × 31, Ø3.2 holes at (±9.5, ∓12), Ø24 cutout.
-    R(-hw, -hh, f.w, f.h, 1.5, 0.5)
-    C(-9.5, -12, 1.6); C(9.5, 12, 1.6)
+    R(-hw, -hh, f.w, f.h, 3.5, 0.3)
+    for (const [x, y] of [[-9.5, -12], [9.5, 12]]) { C(x, y, 1.75, 0.2); C(x, y, 3, 0.2) }
+    for (const [x, y] of [[9.5, -12], [-9.5, 12]]) C(x, y, 3, 0.2)
     switch (f.icon) {
       case 'xlrF': case 'xlr5': {
         D(0, 0, 10); C(0, 0, 9)

@@ -8,7 +8,7 @@ import type { Manufacturer } from '../core/manufacturers'
 export type MenuCommand =
   | 'new' | 'open' | 'save' | 'saveAs' | 'save-and-close' | 'autosave:toggle' | 'quickPrint'
   | 'undo' | 'redo' | 'delete' | 'selectAll' | 'zoomFit'
-  | 'mode:diagram' | 'mode:rack' | 'mode:patch' | 'mode:sheet' | 'mode:led'
+  | 'mode:diagram' | 'mode:rack' | 'mode:patch' | 'mode:sheet' | 'mode:led' | 'mode:boxes'
   | 'newProduct' | 'newTemplate' | 'toggleInspector' | 'toggleSidebar' | 'share' | 'editDevice' | 'findDevice' | 'tidy' | 'exportAll' | 'numbering' | 'units:imperial' | 'units:metric' | 'theme:system' | 'theme:light' | 'theme:dark'
 
 export interface AiStatus { hasKey: boolean; model: string; canEncrypt: boolean }
