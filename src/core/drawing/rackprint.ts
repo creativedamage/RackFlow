@@ -157,19 +157,23 @@ function drawOccupant(svg: Svg, p: Project, rack: Rack, occ: RackOccupant, x: nu
     svg.text(inner.x + 2, inner.y + 3.2, eq.tag, { size: 4.2, baseline: 'middle', weight: 'bold' })
     return
   }
-  // Patch panels: draw their jacks.
+  // Patch panels: draw their jacks – the real connector type, rows and count from the bay's template.
   if (eq.product.category === 'patchBay') {
+    const bay = p.patchBays.find((b) => b.equipment === eq.id)
     const front = eq.product.ports.filter((q) => q.face !== 'rear')
-    const rows = Math.max(1, Math.min(4, Math.round(h / U) * 2 >= 2 ? 2 : 1))
-    const per = Math.max(1, Math.ceil((front.length || eq.product.ports.length) / rows))
-    const colW = (inner.w - 16) / per
-    const r = Math.min(4.2, colW * 0.36, (inner.h / rows) * 0.28)
-    for (let row = 0; row < rows; row++) for (let c = 0; c < per; c++) {
-      const cx = inner.x + 8 + colW * (c + 0.5), cy = inner.y + (inner.h / rows) * (row + 0.5)
-      svg.circle(cx, cy, r, { lw: 0.3 })
-      svg.circle(cx, cy, r * 0.45, { lw: 0.2 })
-      svg.rect(cx - colW * 0.42, cy - (inner.h / rows) * 0.42, colW * 0.84, 2.6, { lw: 0.15 })
-    }
+    const rows = bay?.template.rows.length ? bay.template.rows.map((r) => r.strip.channelCount) : (() => {
+      const n = Math.max(1, Math.round(h / U) >= 1 ? 2 : 1), per = Math.ceil((front.length || eq.product.ports.length) / n)
+      return Array.from({ length: n }, () => per)
+    })()
+    const format = bay?.template.format ?? guessFormat(front[0]?.connector ?? eq.product.ports[0]?.connector)
+    const bandH = inner.h / rows.length
+    rows.forEach((per, row) => {
+      const colW = (inner.w - 16) / Math.max(1, per)
+      const cy = inner.y + bandH * (row + 0.58)
+      // Designation strip above the jacks.
+      svg.rect(inner.x + 8, inner.y + bandH * row + 0.6, inner.w - 16, Math.min(2.6, bandH * 0.18), { lw: 0.15 })
+      for (let c = 0; c < per; c++) jack(svg, format, inner.x + 8 + colW * (c + 0.5), cy, colW, bandH)
+    })
     svg.text(inner.x + 3, inner.y + 4, eq.tag, { size: 5, baseline: 'middle' })
     return
   }
@@ -187,3 +191,57 @@ function drawOccupant(svg: Svg, p: Project, rack: Rack, occ: RackOccupant, x: nu
 
 /** Sheet size for the HTML / PDF wrapper. */
 export const rackSheetSize = (o: RackPrintOptions) => sheetSize(o)
+
+type JackFormat = 'ttBantam' | 'longFrame' | 'quarterInchTRS' | 'bncVideo' | 'bnc12G' | 'midsizeVideo' | 'rj45' | 'fiberLC' | 'xlr'
+function guessFormat(c: string | undefined): JackFormat {
+  if (!c) return 'ttBantam'
+  if (/bnc|din1\.0|hdbnc/i.test(c)) return 'bncVideo'
+  if (/rj45|ethercon/i.test(c)) return 'rj45'
+  if (/lc|sc|st|fiber/i.test(c)) return 'fiberLC'
+  if (/xlr/i.test(c)) return 'xlr'
+  if (/trs6|quarter|1\/4/i.test(c)) return 'quarterInchTRS'
+  return 'ttBantam'
+}
+
+/** One front jack, drawn to look like its connector so TT, video, network and fiber bays read differently. */
+function jack(svg: Svg, f: JackFormat, cx: number, cy: number, colW: number, bandH: number) {
+  const lim = (k: number) => Math.min(colW * k, bandH * k)
+  switch (f) {
+    case 'bncVideo': case 'bnc12G': case 'midsizeVideo': {
+      const r = lim(f === 'midsizeVideo' ? 0.3 : 0.36)
+      svg.circle(cx, cy, r, { lw: 0.35 })
+      svg.circle(cx, cy, r * 0.55, { lw: 0.2 })
+      svg.circle(cx, cy, r * 0.14, { fill: '#000', lw: 0 })
+      svg.line(cx - r * 1.25, cy, cx - r, cy, { lw: 0.4 }); svg.line(cx + r, cy, cx + r * 1.25, cy, { lw: 0.4 })
+      return
+    }
+    case 'rj45': {
+      const w = lim(0.62), hh = w * 0.82
+      svg.rect(cx - w / 2, cy - hh / 2, w, hh, { lw: 0.3, rx: 0.3 })
+      svg.rect(cx - w * 0.22, cy + hh / 2 - hh * 0.28, w * 0.44, hh * 0.28, { lw: 0.2 })
+      for (let k = 0; k < 4; k++) svg.line(cx - w * 0.3 + k * w * 0.2, cy - hh * 0.3, cx - w * 0.3 + k * w * 0.2, cy - hh * 0.1, { lw: 0.12 })
+      return
+    }
+    case 'fiberLC': {
+      const w = lim(0.32), hh = w * 1.3
+      for (const dx of [-w * 0.62, w * 0.62]) { svg.rect(cx + dx - w / 2, cy - hh / 2, w, hh, { lw: 0.25 }); svg.circle(cx + dx, cy, w * 0.18, { fill: '#000', lw: 0 }) }
+      return
+    }
+    case 'xlr': {
+      const r = lim(0.4)
+      svg.circle(cx, cy, r, { lw: 0.35 })
+      for (const [dx, dy] of [[-0.38, -0.18], [0.38, -0.18], [0, 0.38]]) svg.circle(cx + dx * r, cy + dy * r, r * 0.12, { fill: '#000', lw: 0 })
+      svg.rect(cx - r * 0.12, cy - r * 1.02, r * 0.24, r * 0.2, { lw: 0.15 })
+      return
+    }
+    case 'quarterInchTRS': {
+      const r = lim(0.3)
+      svg.circle(cx, cy, r, { lw: 0.35 }); svg.circle(cx, cy, r * 0.45, { lw: 0.25 })
+      return
+    }
+    default: { // TT / Bantam, long-frame: small barrel
+      const r = lim(f === 'longFrame' ? 0.3 : 0.24)
+      svg.circle(cx, cy, r, { lw: 0.3 }); svg.circle(cx, cy, r * 0.42, { fill: '#000', lw: 0 })
+    }
+  }
+}

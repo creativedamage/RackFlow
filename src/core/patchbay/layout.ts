@@ -108,6 +108,11 @@ export function layoutLabels(bays: PatchBay[], o: PrintOptions): LabelPage[] {
         const arrow = arrowGlyph(bay.arrows?.[String(row.id)])
         const tabs = !!bay.rowTabs?.on
         const mode = tabs ? rowMode(bay, row.id) : null
+        // With strip-end tabs, bands and dividers stop at the tabs – nothing runs under the row letters.
+        const lastCh = cellSpanMM(g, g.channelCount - 1)
+        const tabL = tabs && seg.first === 0 && cellSpanMM(g, 0).x >= 3.5 ? cellSpanMM(g, 0).x : 0
+        const tabR = tabs && seg.last === g.channelCount - 1 && g.stripWidthMM - (lastCh.x + lastCh.width) >= 3.5 ? g.stripWidthMM - (lastCh.x + lastCh.width) : 0
+        const bx0 = x0 + tabL, bx1 = x0 + seg.width - tabR
 
         // Group titles (spanning, PatchCAD-style bracket line with centred text).
         for (const t of bay.spans ?? []) {
@@ -117,7 +122,7 @@ export function layoutLabels(bays: PatchBay[], o: PrintOptions): LabelPage[] {
           const tx = xOf(a), tw = xOf(b) + cellSpanMM(g, b).width - tx
           items.push(...titlePrims(t.text, { x: tx, y: sy, w: tw, h: titleH }, t.style, bay.style.fontFamily))
         }
-        if (titleH > 0) items.push({ t: 'line', x1: x0, y1: cellY, x2: x0 + seg.width, y2: cellY, stroke: '#000000', lw: 0.06 })
+        if (titleH > 0) items.push({ t: 'line', x1: bx0, y1: cellY, x2: bx1, y2: cellY, stroke: '#000000', lw: 0.06 })
 
         for (let ch = seg.first; ch <= seg.last; ch++) {
           const span = cellSpanMM(g, ch)
@@ -131,10 +136,10 @@ export function layoutLabels(bays: PatchBay[], o: PrintOptions): LabelPage[] {
           if (bay.style.showChannelNumbers) lines = [String(ch + 1), ...lines]
           lines = lines.slice(0, g.linesPerCell + (bay.style.showChannelNumbers ? 1 : 0))
           if (!lines.some((l) => l.trim())) continue
-          // ▲ / ▼ on each port label, pointing at the jacks it names (in its own little column on the left).
-          const aw = arrow ? Math.min(2, span.width * 0.22) : 0
-          if (arrow) items.push({ t: 'text', lines: [arrow], r: { x: cx + 0.2, y: cellY + cellH - Math.min(cellH, 2.4) - 0.1, w: aw, h: Math.min(cellH, 2.4) }, font: 'Helvetica, Arial, sans-serif', sizePt: Math.min(5, aw * PT_PER_MM * 0.9), color: '#000000', bold: false, align: 'center' })
-          const r = { x: cx + 0.4 + aw, y: cellY + 0.3, w: span.width - 0.8 - aw, h: cellH - 0.6 }
+          // ▲ / ▼ on each port label: always under the text, centred over the jack it names.
+          const ah = arrow ? Math.min(2.2, cellH * 0.3) : 0
+          if (arrow) items.push({ t: 'text', lines: [arrow], r: { x: cx, y: cellY + cellH - ah - 0.1, w: span.width, h: ah }, font: 'Helvetica, Arial, sans-serif', sizePt: Math.min(5, ah * PT_PER_MM * 0.95), color: '#000000', bold: false, align: 'center' })
+          const r = { x: cx + 0.4, y: cellY + 0.3, w: span.width - 0.8, h: cellH - 0.6 - ah }
           items.push({
             t: 'text', lines, r, font: st?.fontFamily ?? bay.style.fontFamily,
             sizePt: st?.sizePt ?? fittedFontPt(lines, r, bay.style), color: st?.color ?? '#000000',
@@ -145,7 +150,7 @@ export function layoutLabels(bays: PatchBay[], o: PrintOptions): LabelPage[] {
         // Normalling symbols along the bottom edge.
         if (normH > 0) {
           const band = bay.normals.find((n) => n.afterRow === row.id)!
-          items.push({ t: 'line', x1: x0, y1: sy + h - normH, x2: x0 + seg.width, y2: sy + h - normH, stroke: '#000000', lw: 0.06 })
+          items.push({ t: 'line', x1: bx0, y1: sy + h - normH, x2: bx1, y2: sy + h - normH, stroke: '#000000', lw: 0.06 })
           for (let ch = seg.first; ch <= seg.last; ch++) {
             // With strip-end words, the row's own mode is printed once at the end; only the odd ones out get a symbol.
             if (tabs && (band.modes[ch] ?? 'none') === rowMode(bay, row.id)) continue
@@ -161,14 +166,15 @@ export function layoutLabels(bays: PatchBay[], o: PrintOptions): LabelPage[] {
           const leftW = cellSpanMM(g, 0).x, lastSpan = cellSpanMM(g, n - 1)
           const rightW = g.stripWidthMM - (lastSpan.x + lastSpan.width)
           const word = mode ? NORMAL_WORDS[mode] : ''
+          // Stacked and centred: letter, then the arrow under it, then the word under that.
           const end = (x: number, w: number) => {
             if (w < 3.5) return
-            const letterH = word ? h * 0.62 : h * 0.9
-            items.push({ t: 'text', lines: [rowLetter(bay, row.id)], r: { x, y: sy + 0.2, w, h: letterH }, font: bay.style.fontFamily, sizePt: Math.min(letterH * 0.95, w * 0.9) * PT_PER_MM, color: '#000000', bold: false, align: 'center' })
-            if (word) {
-              const tail = `${arrow || '▼'} ${word}`
-              items.push({ t: 'text', lines: [tail], r: { x: x + 0.3, y: sy + letterH, w: w - 0.6, h: h - letterH - 0.3 }, font: bay.style.fontFamily, sizePt: Math.min((h - letterH) * 0.6 * PT_PER_MM, ((w - 0.6) / (tail.length * AVG_ADVANCE_EM)) * PT_PER_MM, 6), color: '#000000', bold: false, align: 'center' })
-            }
+            const glyph = word ? (arrow || '▼') : ''
+            const wordH = word ? Math.min(h * 0.2, 2.2) : 0, glyphH = glyph ? Math.min(h * 0.2, 2.2) : 0
+            const letterH = h - wordH - glyphH - 0.4
+            items.push({ t: 'text', lines: [rowLetter(bay, row.id)], r: { x, y: sy + 0.2, w, h: letterH }, font: bay.style.fontFamily, sizePt: Math.min(letterH * 0.9, w * 0.85) * PT_PER_MM, color: '#000000', bold: true, align: 'center' })
+            if (glyph) items.push({ t: 'text', lines: [glyph], r: { x, y: sy + 0.2 + letterH, w, h: glyphH }, font: 'Helvetica, Arial, sans-serif', sizePt: Math.min(glyphH * 0.95 * PT_PER_MM, 6), color: '#000000', bold: false, align: 'center' })
+            if (word) items.push({ t: 'text', lines: [word], r: { x: x + 0.15, y: sy + 0.2 + letterH + glyphH, w: w - 0.3, h: wordH }, font: bay.style.fontFamily, sizePt: Math.min(wordH * 0.9 * PT_PER_MM, ((w - 0.6) / (word.length * AVG_ADVANCE_EM * 1.12)) * PT_PER_MM, 6), color: '#000000', bold: true, align: 'center' })
           }
           if (seg.first === 0) { end(x0, leftW); if (leftW >= 3.5) items.push({ t: 'line', x1: x0 + leftW, y1: sy, x2: x0 + leftW, y2: sy + h, stroke: '#000000', lw: 0.1 }) }
           if (seg.last === n - 1) { const rx = x0 + lastSpan.x + lastSpan.width - seg.origin; end(rx, rightW); if (rightW >= 3.5) items.push({ t: 'line', x1: rx, y1: sy, x2: rx, y2: sy + h, stroke: '#000000', lw: 0.1 }) }

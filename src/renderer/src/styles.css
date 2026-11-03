@@ -1114,9 +1114,14 @@ input.mono { font-family: var(--mono); }
 
 /* Patch labels: row letters / arrows */
 .pb-strip { position: relative; }
-.pb-rowtag { position: absolute; right: 4px; top: 1px; z-index: 2; font-size: 9px; color: #333; background: rgba(255, 255, 255, 0.85); border: 1px solid #ddd; border-radius: 4px; padding: 0 5px; pointer-events: none; letter-spacing: 0.04em; }
-.pb-rowtag b { font-size: 11px; }
-.pb-arrow { font-style: normal; font-size: 0.75em; margin-right: 2px; opacity: 0.8; }
+.pb-strip.has-tabs { display: flex; align-items: stretch; }
+.pb-strip-body { flex: 1; min-width: 0; }
+.pb-rowtab { flex: none; width: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; color: #111; border-right: 1px solid rgba(0,0,0,.35); line-height: 1.05; user-select: none; }
+.pb-rowtab:last-child { border-right: none; border-left: 1px solid rgba(0,0,0,.35); }
+.pb-rowtab b { font-size: 20px; font-weight: 800; }
+.pb-rowtab i { font-style: normal; font-size: 9px; }
+.pb-rowtab span { font-size: 7.5px; font-weight: 700; letter-spacing: 0.02em; }
+.pb-arrow { font-style: normal; font-size: 8px; line-height: 1; display: block; text-align: center; opacity: 0.85; margin-top: 1px; }
 .fb-check { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; white-space: nowrap; padding: 0 4px; }
 .fb-letter { width: 34px; text-align: center; font-weight: 700; }
 .format-bar .fb.on, .format-bar button.fb.on { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -1133,3 +1138,14 @@ input.mono { font-family: var(--mono); }
 .bp-off { margin: 6px 12px 0; padding: 7px 12px; border-radius: 8px; background: var(--accent-soft); font-size: 12px; }
 .bp-off .link { margin: 0 4px; }
 .bp-lock { cursor: pointer; }
+
+/* Strip-end tabs: the channel ruler and normalling rows line up with the cells between the tabs. */
+.pb-main.tabbed .pb-ruler, .pb-main.tabbed .pb-normals { margin: 0 46px; }
+
+/* VLANs */
+.vlan-chip { display: inline-block; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; background: color-mix(in srgb, var(--ok) 16%, transparent); color: color-mix(in srgb, var(--ok) 80%, var(--text)); }
+.vlan-chip.trunk { background: color-mix(in srgb, #7048e8 18%, transparent); color: color-mix(in srgb, #7048e8 85%, var(--text)); }
+.dn-vlan { flex: none; margin-left: 4px; padding: 0 5px; border-radius: 999px; font-size: 9px; font-weight: 700; line-height: 14px; background: #2f9e44; color: #fff; white-space: nowrap; max-width: 70px; overflow: hidden; text-overflow: ellipsis; }
+.dn-vlan.trunk { background: #7048e8; }
+.multi-cables { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; margin: 6px 0 12px; max-height: 50vh; overflow: auto; }
+.multi-cables button { font-size: 12px; text-align: left; }

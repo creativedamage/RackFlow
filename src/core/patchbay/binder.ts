@@ -64,6 +64,38 @@ export function refreshLabels(bay: PatchBay, p: Project, overwriteManual = false
     cell.manual = false
     cell.fill = bay.style.colorByDomain && b?.signal ? domainFill(b.signal) : null
   }
+  if (bay.autoTitles !== false) autoGroupTitles(bay, p)
+}
+
+const BOXES = new Set(['wallBox', 'wallPlate', 'floorBox', 'connectorPanel'])
+
+/**
+ * Group titles from the wiring: each run of channels wired to the same wall
+ * box, plate, floor box or connector panel gets a title naming it ("WP-001 ·
+ * STAGE LEFT"). Titles you made or edited are kept; auto titles never cover them.
+ */
+export function autoGroupTitles(bay: PatchBay, p: Project) {
+  const own = (bay.spans ?? []).filter((s) => !s.auto)
+  const out = [...own]
+  for (const row of bay.template.rows) {
+    let run: { key: string; text: string; start: number; end: number } | null = null
+    const flush = () => {
+      if (run && !own.some((s) => s.row === row.id && s.start <= run!.end && s.end >= run!.start)) {
+        out.push({ id: `auto.${row.id}.${run.start}`, row: row.id, start: run.start, end: run.end, text: run.text, auto: true })
+      }
+      run = null
+    }
+    for (let ch = 1; ch <= row.strip.channelCount; ch++) {
+      const b = binding(bay, row.id, ch, p)
+      const e = b && BOXES.has(b.remote.equipment.product.category) ? b.remote.equipment : null
+      const key = e ? e.id : ''
+      if (run && run.key === key && key) { run.end = ch; continue }
+      flush()
+      if (e) run = { key, text: [e.tag, e.room?.trim()].filter(Boolean).join(' · ').toUpperCase(), start: ch, end: ch }
+    }
+    flush()
+  }
+  bay.spans = out.sort((x, y) => x.row - y.row || x.start - y.start)
 }
 
 const domainFill = (s: SignalType) => DOMAINS[SIGNALS[s].domain].color

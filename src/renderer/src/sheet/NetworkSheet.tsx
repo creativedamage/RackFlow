@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { autoAssignIps, duplicateIps, networkRows, rowSwitch, rowSwitchPort, setNet, validIp, type NetworkRow } from '@core/index'
+import { autoAssignIps, duplicateIps, networkRows, rowSwitch, rowSwitchPort, rowVlan, setNet, validIp, type NetworkRow } from '@core/index'
 import { useStore } from '../store'
 import { Modal, Toggle } from '../components/ui'
 import { Sheet, type SheetColumn } from './Sheet'
@@ -50,7 +50,8 @@ export function NetworkSheet() {
       render: (r) => r.isSwitch ? <span className="muted">—</span> : <span className={r.info.switchTag ? 'net-manual' : ''} title={r.link ? `Traced from the wiring${r.link.via.length ? ` via ${r.link.via.join(' → ')}` : ''}${r.link.direct ? ' (not a switch)' : ''}` : r.info.switchTag ? 'Typed in (not wired)' : 'Not wired to a switch yet – type one in or cable it on the diagram'}>{rowSwitch(r)}{r.link?.direct && !r.info.switchTag ? ' (direct)' : ''}</span> },
     { key: 'port', title: 'Switch Port', width: 110, get: (r) => (r.isSwitch ? '' : rowSwitchPort(r)), set: () => {},
       render: (r) => r.isSwitch ? '' : <span className={r.info.switchPort ? 'net-manual' : ''}>{rowSwitchPort(r)}</span> },
-    { key: 'vlan', title: 'VLAN', width: 70, get: (r) => r.info.vlan ?? '', set: () => {} },
+    { key: 'vlan', title: 'VLAN', width: 70, get: (r) => r.info.vlan ?? '', set: () => {},
+      render: (r) => { const v = rowVlan(r); return <span className={v.inherited ? 'muted' : ''} title={v.inherited && v.vlan ? `From ${rowSwitch(r)} ${rowSwitchPort(r)} (switch port VLAN) – type to set this interface’s own` : undefined}>{v.vlan}</span> } },
     { key: 'cable', title: 'Cable', width: 90, get: (r) => r.link?.cable ?? '' },
     { key: 'notes', title: 'Notes', width: 260, get: (r) => r.info.notes ?? '', set: () => {} },
   ], [dupes])

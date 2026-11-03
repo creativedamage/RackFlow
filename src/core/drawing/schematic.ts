@@ -10,7 +10,7 @@ import { DOMAINS } from '../signals'
 import { portDomain } from '../project'
 import { planChannels, type ChannelWire } from '../autolayout'
 import { cardLayout, cardPortLabel, FACE_H, headerHeight, NODE_WIDTH, nodeGeom, SEC_HEAD, splitPorts } from '../diagramgeom'
-import { crossings, route, WIRE_CLEAR, type Pt, type Rect } from '../wireroute'
+import { crossings, nudgeWires, route, WIRE_CLEAR, type Pt, type Rect } from '../wireroute'
 import { groupsOf } from '../groups'
 import { newSheet, sheetSize, type SheetOptions } from './sheet'
 import { Svg, textWidth } from './svg'
@@ -306,6 +306,18 @@ function drawWires(svg: Svg, p: Project, o: SchematicOptions, eqs: EquipmentInst
     if (s.dir > 0 && t.dir < 0 && t.pt.x > s.pt.x) wires.push({ id: c.id, sx: s.pt.x, sy: s.pt.y, tx: t.pt.x, ty: t.pt.y, sourceRight: s.eq.position.x + NODE_WIDTH + BADGE })
   }
   const plan = planChannels(wires)
+  // Route every wire drawn in full first, then pull apart wires sharing a run.
+  const full = new Map<string, Pt[]>()
+  for (const c of cables) {
+    const a = endOf(p, c.from), b = endOf(p, c.to)
+    if (!a || !b || !onPage.has(a.eq.id) || !onPage.has(b.eq.id)) continue
+    const pts = route(a.pt, a.dir, b.pt, b.dir, rects, 0, plan.get(c.id))
+    const len = pts.slice(1).reduce((s, q, i) => s + Math.abs(q.x - pts[i].x) + Math.abs(q.y - pts[i].y), 0)
+    const ends = rects.filter((r) => r.id === a.eq.id || r.id === b.eq.id)
+    if (o.wires === 'stubs' || (o.wires === 'smart' && (len > SMART_LEN || crossings(pts, rects, ends) > 0))) continue
+    full.set(c.id, pts)
+  }
+  const nudged = nudgeWires(full, undefined, undefined, rects)
   const bundles = new Map<string, { here: End; there: End; label: string; tags: string; ref: string; sht: string; stroke: string }[]>()
   for (const c of cables) {
     const a = endOf(p, c.from), b = endOf(p, c.to)
@@ -315,12 +327,7 @@ function drawWires(svg: Svg, p: Project, o: SchematicOptions, eqs: EquipmentInst
     const tags = `${compactTag(a.eq.tag)}-${compactTag(b.eq.tag)}`
     const both = onPage.has(a.eq.id) && onPage.has(b.eq.id)
     let pts: Pt[] | null = null
-    if (both) {
-      pts = route(a.pt, a.dir, b.pt, b.dir, rects, 0, plan.get(c.id))
-      const len = pts.slice(1).reduce((s, q, i) => s + Math.abs(q.x - pts![i].x) + Math.abs(q.y - pts![i].y), 0)
-      const ends = rects.filter((r) => r.id === a.eq.id || r.id === b.eq.id)
-      if (o.wires === 'stubs' || (o.wires === 'smart' && (len > SMART_LEN || crossings(pts, rects, ends) > 0))) pts = null
-    }
+    if (both) pts = nudged.get(c.id) ?? null
     if (pts) {
       svg.polyline(pts, { lw: 1, stroke })
       endLabel(svg, a, c.label, tags, stroke)

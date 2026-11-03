@@ -75,7 +75,7 @@ export const BayGrid = memo(function BayGrid({ bay, index, count }: { bay: Patch
           setSel(null)
         }}>✕</button>
       </div>
-      <div className="pb-main">
+      <div className={`pb-main ${bay.rowTabs?.on ? 'tabbed' : ''}`}>
         {header}
         {ruler(maxCh)}
         {t.rows.map((row) => (
@@ -109,13 +109,9 @@ function Strip({ bay, row, bank, sel, title, onSel, onEdit }: {
   const enter = (ch: number) => { if (dragging && sel && sel.bay === bay.id && sel.row === row.id) onSel({ ...sel, b: ch }) }
 
   return (
-    <div className="pb-strip" style={{ background: bay.rowFill[String(row.id)] }}>
-      {(bay.rowTabs?.on || bay.arrows?.[String(row.id)]) && (() => {
-        const m = rowMode(bay, row.id), a = arrowGlyph(bay.arrows?.[String(row.id)])
-        return <div className="pb-rowtag" title="Printed on the strip ends (Row letters) · arrow printed on every label of this row">
-          {bay.rowTabs?.on && <b>{rowLetter(bay, row.id)}</b>}{bay.rowTabs?.on && m ? ` ${a || '▼'} ${NORMAL_WORDS[m]}` : a ? ` ${a} on labels` : ''}
-        </div>
-      })()}
+    <div className={`pb-strip ${bay.rowTabs?.on ? 'has-tabs' : ''}`} style={{ background: bay.rowFill[String(row.id)] }}>
+      {bay.rowTabs?.on && <RowTab bay={bay} rowId={row.id} />}
+      <div className="pb-strip-body">
       <div className="pb-titles" style={cols}>
         {titles.map((s: LabelSpan) => (
           <div key={s.id} className={`pb-title ${title === s.id ? 'sel' : ''}`} style={{ gridColumn: `${s.start} / ${s.end + 1}`, ...cssFor(s.style), background: s.style?.fill }}
@@ -139,11 +135,14 @@ function Strip({ bay, row, bank, sel, title, onSel, onEdit }: {
               onMouseDown={(e) => down(e, ch)} onMouseEnter={() => enter(ch)}
               onDoubleClick={() => onEdit({ bay: bay.id, row: row.id, channel: ch })}
               title={cell?.text ? `${row.name} ${ch}: ${cell.text.replace(/\n/g, ' / ')}${cell.manual ? ' (typed)' : ' (from wiring)'}` : `${row.name} ${ch}`}>
-              {cell?.text ? lines.map((l, k) => <span key={k}>{k === lines.length - 1 && bay.arrows?.[String(row.id)] ? <><i className="pb-arrow">{arrowGlyph(bay.arrows[String(row.id)])}</i>{l}</> : l}</span>) : <span className="ch-num">{ch}</span>}
+              {cell?.text ? lines.map((l, k) => <span key={k}>{l}</span>) : <span className="ch-num">{ch}</span>}
+              {cell?.text && bay.arrows?.[String(row.id)] && <i className="pb-arrow">{arrowGlyph(bay.arrows[String(row.id)])}</i>}
             </div>
           )
         })}
       </div>
+      </div>
+      {bay.rowTabs?.on && <RowTab bay={bay} rowId={row.id} />}
     </div>
   )
 }
@@ -189,7 +188,7 @@ export function CellEditorPopover() {
   const close = () => { set({ editing: null }); requestAnimationFrame(() => (document.querySelector('.patch-grid') as HTMLElement | null)?.focus()) }
   const commit = (move: 0 | 1 | -1 = 0) => {
     if ('title' in editing) {
-      editBay(bay.id, 'Rename Title', (b) => { const s = b.spans.find((x) => x.id === editing.title); if (s) s.text = text })
+      editBay(bay.id, 'Rename Title', (b) => { const s = b.spans.find((x) => x.id === editing.title); if (s) { s.text = text; delete s.auto } })
       close()
       return
     }
@@ -218,6 +217,18 @@ export function CellEditorPopover() {
           else if (e.key === 'Escape') { e.preventDefault(); close() }
         }} />
       <div className="muted small">Enter to save · ⇧Enter new line · Tab next · Esc cancel</div>
+    </div>
+  )
+}
+
+/** Strip end, as printed: the row letter, the arrow under it, the normalling word under that. */
+function RowTab({ bay, rowId }: { bay: PatchBay; rowId: number }) {
+  const m = rowMode(bay, rowId), a = arrowGlyph(bay.arrows?.[String(rowId)])
+  return (
+    <div className="pb-rowtab" title="Strip end: row letter, arrow and the row's normalling (printed on both ends)">
+      <b>{rowLetter(bay, rowId)}</b>
+      {m && <i>{a || '▼'}</i>}
+      {m && <span>{NORMAL_WORDS[m]}</span>}
     </div>
   )
 }

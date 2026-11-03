@@ -5,23 +5,26 @@ import type { Project } from './model'
 import { schematicSheets, defaultSchematic } from './drawing/schematic'
 import { rackElevationSheets, defaultRackPrint } from './drawing/rackprint'
 import { ledSheets, defaultLedPrint } from './drawing/ledmap'
+import { defaultFabrication, fabricationSheets } from './drawing/fabrication'
 import { sheetsToHTML, sheetSize } from './drawing/sheet'
 import { defaultPrintOptions, layoutLabels, pagesToPrintHTML } from './patchbay/layout'
 import { cablesToCSV } from './schedule'
 import { pullScheduleCSV } from './pullschedule'
-import { networkRows, rowSwitch, rowSwitchPort } from './network'
+import { networkRows, rowSwitch, rowSwitchPort, rowVlan, switchPortRows } from './network'
 import { CATEGORIES } from './model'
 
-export type ExportPart = 'wiring' | 'racks' | 'labels' | 'led' | 'cables' | 'pull' | 'equipment' | 'network'
+export type ExportPart = 'wiring' | 'racks' | 'panels' | 'labels' | 'led' | 'cables' | 'pull' | 'equipment' | 'network' | 'switchports'
 export const EXPORT_PARTS: { key: ExportPart; name: string; file: string }[] = [
   { key: 'wiring', name: 'Wiring diagram (every page)', file: 'Wiring Diagram.pdf' },
   { key: 'racks', name: 'Rack elevations (front & rear)', file: 'Rack Elevations.pdf' },
+  { key: 'panels', name: 'Wall plate & panel fabrication drawings (for fabricators)', file: 'Panel Fabrication.pdf' },
   { key: 'labels', name: 'Patch bay labels', file: 'Patch Labels.pdf' },
   { key: 'led', name: 'LED wall maps (data & power)', file: 'LED Wall Maps.pdf' },
   { key: 'cables', name: 'Cable schedule (CSV)', file: 'Cable Schedule.csv' },
   { key: 'pull', name: 'Pull schedule (CSV, incl. unwired ports)', file: 'Pull Schedule.csv' },
   { key: 'equipment', name: 'Equipment list (CSV)', file: 'Equipment List.csv' },
   { key: 'network', name: 'Network / IP schedule (CSV)', file: 'Network Schedule.csv' },
+  { key: 'switchports', name: 'Switch ports & VLANs (CSV)', file: 'Switch Ports VLANs.csv' },
 ]
 
 export interface ExportFile { name: string; kind: 'pdf' | 'text'; content: string; count: number }
@@ -41,6 +44,11 @@ export function buildExport(p: Project, parts: ExportPart[], sheet = 'ansiB'): E
     const o = { ...defaultRackPrint(), sheet, face: 'both' as const }
     const pages = rackElevationSheets(p, o)
     if (pages.length) out.push({ name: name('racks'), kind: 'pdf', content: sheetsToHTML(pages, sheetSize(o)), count: pages.length })
+  }
+  if (parts.includes('panels')) {
+    const o = { ...defaultFabrication(), sheet }
+    const pages = fabricationSheets(p, o)
+    if (pages.length) out.push({ name: name('panels'), kind: 'pdf', content: sheetsToHTML(pages, sheetSize(o)), count: pages.length })
   }
   if (parts.includes('labels') && p.patchBays.length) {
     const pages = layoutLabels(p.patchBays, defaultPrintOptions())
@@ -65,7 +73,14 @@ export function buildExport(p: Project, parts: ExportPart[], sheet = 'ansiB'): E
     const rows = networkRows(p)
     if (rows.length) out.push({ name: name('network'), kind: 'text', count: rows.length, content: csv([
       ['IP Address', 'Device ID', 'Interface', 'Manufacturer', 'Model', 'Location', 'Switch', 'Switch Port', 'VLAN', 'Notes'],
-      ...rows.map((r) => [r.info.ip ?? '', r.eq.tag, r.interface, r.eq.product.manufacturer, r.eq.product.model, r.eq.room, r.isSwitch ? '' : rowSwitch(r), r.isSwitch ? '' : rowSwitchPort(r), r.info.vlan ?? '', r.info.notes ?? '']),
+      ...rows.map((r) => [r.info.ip ?? '', r.eq.tag, r.interface, r.eq.product.manufacturer, r.eq.product.model, r.eq.room, r.isSwitch ? '' : rowSwitch(r), r.isSwitch ? '' : rowSwitchPort(r), rowVlan(r).vlan, r.info.notes ?? '']),
+    ]) })
+  }
+  if (parts.includes('switchports')) {
+    const sp = switchPortRows(p)
+    if (sp.length) out.push({ name: name('switchports'), kind: 'text', count: sp.length, content: csv([
+      ['Switch', 'Port', 'Mode', 'VLAN (untagged)', 'Tagged VLANs', 'Connected Device', 'Device Interface', 'Via', 'Notes'],
+      ...sp.map((r) => [r.sw.tag, r.port.label, r.info.mode === 'trunk' ? 'Trunk' : r.info.vlan ? 'Access' : '', r.info.vlan ?? '', r.info.tagged ?? '', r.device?.eq.tag ?? '', r.device?.interface ?? '', r.device?.link?.via.join(' > ') ?? '', r.info.notes ?? '']),
     ]) })
   }
   return out

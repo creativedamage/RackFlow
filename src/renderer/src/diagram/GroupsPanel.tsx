@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Panel } from '@xyflow/react'
 import { create } from 'zustand'
-import { autoGroupBySystem, createGroup, deleteView, duplicateView, layoutView, pageNumbers, GENERAL_PAGE, DOMAINS, groupColor, groupsOf, membersOf, moveToPage, nodeGeom, setInView, ungroup, viewMembers, viewsOf, type DeviceGroup, type SignalDomain } from '@core/index'
+import { autoGroupBySystem, createGroup, deleteView, duplicateView, layoutView, pageNumbers, GENERAL_PAGE, DOMAINS, groupColor, groupsOf, membersOf, moveToPage, nodeGeom, setInView, ungroup, removeViewConnections, viewMembers, viewsOf, type DeviceGroup, type SignalDomain } from '@core/index'
 import { showContextMenu } from '../components/ContextMenu'
 import { tidyDiagram } from './tidy'
 import type { MenuItem } from '../components/ContextMenu'
@@ -146,6 +146,7 @@ export function PageTabs() {
             { label: 'Sheet Numbers…', onClick: () => set({ editingNumbers: true }) },
             { label: 'Tidy This View', onClick: () => { openView(v.id); tidyDiagram() } },
             'sep',
+            { label: 'Remove All Connections in This View…', danger: true, onClick: () => clearViewWires(v.id) },
             { label: 'Delete View', danger: true, onClick: () => { useStore.getState().apply('Delete View', (d) => deleteView(d, v.id)); useStore.getState().notify(`Deleted view “${v.name}” – the devices are still on the diagram`, { undo: true }) } },
           ])}
           title={`Signal view: only ${v.domains.map((d) => DOMAINS[d].name).join(', ')} ports. Double-click or right-click to edit.`}>
@@ -234,4 +235,14 @@ export function GroupsPanel() {
       </>}
     </Panel>
   )
+}
+
+/** Deletes the cables on a view (only the ones drawn there), with Undo. */
+export function clearViewWires(viewId: string) {
+  const s = useStore.getState()
+  const v = viewsOf(s.project).find((x) => x.id === viewId)
+  if (!v) return
+  let n = 0
+  s.apply('Remove View Connections', (d) => { n = removeViewConnections(d, viewId) })
+  s.notify(n ? `Removed ${n} connection${n === 1 ? '' : 's'} from “${v.name}” – other cables are untouched` : `“${v.name}” has no connections`, { undo: n > 0, kind: n ? 'success' : 'info' })
 }

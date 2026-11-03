@@ -17,7 +17,7 @@ import { pickIndex } from './wiring'
 import { DeviceNode, NODE_WIDTH, type DeviceNodeType } from './DeviceNode'
 import { GroupFrame, type GroupFrameType } from './GroupFrame'
 import { CableEdge, type CableEdgeType } from './CableEdge'
-import { GroupsPanel, PageTabs, addToViewItems, moveDevicesToPage, pageMenuItems, useGroupFocus, viewMenuItems } from './GroupsPanel'
+import { GroupsPanel, PageTabs, addToViewItems, clearViewWires, moveDevicesToPage, pageMenuItems, useGroupFocus, viewMenuItems } from './GroupsPanel'
 import { NoteNode, type NoteNodeType } from './NoteNode'
 import { useWiring } from './wiring'
 import { tidyDiagram } from './tidy'
@@ -43,6 +43,7 @@ export function DiagramView() {
   const project = useStore((s) => s.project)
   const selection = useStore((s) => s.selection)
   const selectedCable = useStore((s) => s.selectedCable)
+  const selectedCables = useStore((s) => s.selectedCables)
   const issues = useStore((s) => s.issues)
   const fitRequest = useStore((s) => s.fitRequest)
   const apply = useStore((s) => s.apply)
@@ -171,6 +172,7 @@ export function DiagramView() {
 
   const edges: CableEdgeType[] = useMemo(() => {
     const sel = new Set(selection)
+    const multi = new Set(selectedCables)
     const lanes = new Map<string, number>()
     return shown.cables.map((c) => {
       const from = resolve(shown, c.from)
@@ -178,7 +180,7 @@ export function DiagramView() {
       const d = from ? portDomain(from.port) : null
       const sev = cableSeverity.get(c.id)
       const color = sev === 'error' ? '#e03131' : d ? DOMAINS[d].color : '#888'
-      const isSel = c.id === selectedCable
+      const isSel = c.id === selectedCable || multi.has(c.id)
       // Wires touching a selected (or dragged) device draw above other devices.
       const lifted = isSel || sel.has(c.from.equipment) || sel.has(c.to.equipment)
       const pair = `${c.from.equipment}>${c.to.equipment}`
@@ -192,7 +194,7 @@ export function DiagramView() {
           toPort: to?.port.label, fromPort: from?.port.label, toName: to ? `${to.equipment.tag} · ${to.equipment.product.model}` : undefined, fromName: from ? `${from.equipment.tag} · ${from.equipment.product.model}` : undefined },
       }
     })
-  }, [shown, cableSeverity, selectedCable, selection, select, wireMode])
+  }, [shown, cableSeverity, selectedCable, selectedCables, selection, select, wireMode])
 
   // "Fit" requests (open a file, save a view…) – only new ones, so coming back from another tab doesn't re-fit.
   useEffect(() => {
@@ -328,10 +330,71 @@ export function DiagramView() {
   const startWiring = useWiring((s) => s.start)
   const endWiring = useWiring((s) => s.end)
   const onConnectStart: OnConnectStart = useCallback((_, { nodeId, handleId }) => {
-    if (!nodeId || !handleId) return
+    if (!nodeId || !handleId || rewire.current) return
     const origin: PortAddress = { equipment: nodeId as EquipmentId, port: handleId }
     startWiring(origin, findCandidates(useStore.getState().project, origin))
   }, [startWiring])
+
+  // Grab either end of a wire and drop it on another port to rewire it (same cable number).
+  const rewire = useRef<{ id: string; fixed: PortAddress; moving: 'from' | 'to' } | null>(null)
+  const onReconnectStart = useCallback((_: unknown, edge: CableEdgeType, handleType: 'source' | 'target') => {
+    const p = useStore.getState().project
+    const c = p.cables.find((x) => x.id === edge.id)
+    if (!c) return
+    // React Flow reports the end that stays put.
+    const moving = handleType === 'source' ? 'to' : 'from'
+    const fixed = moving === 'from' ? c.to : c.from
+    rewire.current = { id: c.id, fixed, moving }
+    // Candidates as if this cable weren't there, so its own ports count as free.
+    startWiring(fixed, findCandidates({ ...p, cables: p.cables.filter((x) => x.id !== c.id) }, fixed))
+  }, [startWiring])
+  const onReconnect = useCallback((_old: CableEdgeType, c: Connection) => {
+    const r = rewire.current
+    if (!r || !c.sourceHandle || !c.targetHandle) return
+    const a = { equipment: c.source as EquipmentId, port: c.sourceHandle }, b = { equipment: c.target as EquipmentId, port: c.targetHandle }
+    const next = a.equipment === r.fixed.equipment && a.port === r.fixed.port ? b : a
+    let label = ''
+    apply('Rewire Cable', (d) => {
+      const cab = d.cables.find((x) => x.id === r.id)
+      if (!cab) return
+      cab[r.moving] = next
+      label = cab.label
+    })
+    const e = useStore.getState().project.equipment.find((x) => x.id === next.equipment)
+    useStore.getState().notify(`Rewired ${label} to ${e?.tag ?? ''} ${e?.product.ports.find((q) => q.id === next.port)?.label ?? ''}`, { undo: true, kind: 'success' })
+    select([], r.id as CableId)
+  }, [apply, select])
+  const onReconnectEnd = useCallback(() => { rewire.current = null; endWiring() }, [endWiring])
+
+  // Lasso: wires the selection box crosses get selected too.
+  const lassoFrom = useRef<{ x: number; y: number } | null>(null)
+  const onSelectionStart = useCallback((e: React.MouseEvent) => { lassoFrom.current = { x: e.clientX, y: e.clientY } }, [])
+  const onSelectionEnd = useCallback((e: React.MouseEvent) => {
+    const s0 = lassoFrom.current
+    lassoFrom.current = null
+    if (!s0 || (Math.abs(e.clientX - s0.x) < 4 && Math.abs(e.clientY - s0.y) < 4)) return
+    const p0 = screenToFlowPosition(s0), p1 = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+    const box = { x0: Math.min(p0.x, p1.x), y0: Math.min(p0.y, p1.y), x1: Math.max(p0.x, p1.x), y1: Math.max(p0.y, p1.y) }
+    const hits = new Set<string>()
+    document.querySelectorAll<SVGGElement>('.react-flow__edge').forEach((g) => {
+      const id = g.getAttribute('data-id')
+      if (!id) return
+      for (const path of g.querySelectorAll<SVGPathElement>('path.react-flow__edge-path')) {
+        const len = path.getTotalLength()
+        for (let t = 0; t <= len; t += 6) {
+          const q = path.getPointAtLength(t)
+          if (q.x >= box.x0 && q.x <= box.x1 && q.y >= box.y0 && q.y <= box.y1) { hits.add(id); return }
+        }
+      }
+    })
+    if (!hits.size) return
+    // After React Flow has applied its own (device) selection.
+    setTimeout(() => {
+      const ids = [...hits] as CableId[]
+      useStore.getState().set({ selectedCables: ids, selectedCable: ids.length === 1 ? ids[0] : null })
+      useStore.getState().notify(`${ids.length} wire${ids.length === 1 ? '' : 's'} selected – Delete removes ${ids.length === 1 ? 'it' : 'them'}`, { kind: 'info' })
+    }, 0)
+  }, [screenToFlowPosition])
 
   const isValidConnection = useCallback((c: Connection | Edge) => {
     const { origin, candidates } = useWiring.getState()
@@ -419,6 +482,13 @@ export function DiagramView() {
           if (ids !== cur) select(ids)
           showContextMenu(ev, [...deviceMenu(n.id), ...(view ? viewMenuItems(ids, view.id) : [...pageMenuItems(ids), ...addToViewItems(ids)])])
         }}
+        edgesReconnectable
+        reconnectRadius={14}
+        onReconnectStart={onReconnectStart}
+        onReconnect={onReconnect}
+        onReconnectEnd={onReconnectEnd}
+        onSelectionStart={onSelectionStart}
+        onSelectionEnd={onSelectionEnd}
         onConnectStart={onConnectStart}
         onConnectEnd={endWiring}
         onConnect={onConnect}
@@ -508,6 +578,7 @@ function PickedPanel() {
 /** Top-right tools: Tidy Up, wire drawing mode, auto-tidy. */
 function DiagramTools() {
   const settings = useStore((s) => s.project.diagram)
+  const viewId = useStore((s) => s.diagramView)
   const selection = useStore((s) => s.selection)
   const apply = useStore((s) => s.apply)
   const notify = useStore((s) => s.notify)
@@ -548,6 +619,7 @@ function DiagramTools() {
         { label: 'Note', onClick: () => addNote('note') },
         { label: 'Revision Note (Δ cloud)', onClick: () => addNote('revision') },
       ])} title="Place a callout, note or revision note anywhere on the diagram">＋ Note ▾</button>
+      {viewId && <button className="danger" onClick={() => clearViewWires(viewId)} title="Delete every cable drawn on this view. Cables of other signal types (not on this view) are kept. Undo with ⌘Z.">Remove Connections</button>}
       <button onClick={() => setPrinting(true)} title="Print or export a CAD-style wiring drawing">Print…</button>
       {printing && createPortal(<SchematicPrintDialog onClose={() => setPrinting(false)} />, document.body)}
       <label className="check" title="Re-arrange automatically whenever you add a device or cable">

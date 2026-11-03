@@ -252,3 +252,41 @@ export function spreadCards(p: Project, geom: (e: EquipmentInstance) => { width:
   return moved
 }
 const dims = (g: { width: number; height: number }) => ({ w: g.width, h: g.height })
+
+/**
+ * Runs `change` (e.g. a product edit that rebuilds the device's ports) and then
+ * keeps the device where it was in every view: still a member, and with the
+ * same ports picked – matched by id, else by label. A pick that no longer
+ * matches anything falls back to the view's signal match instead of an empty card.
+ */
+export function keepInViews(p: Project, eqId: string, change: () => void) {
+  const before = p.equipment.find((e) => e.id === eqId)
+  const snap = viewsOf(p).map((v) => ({
+    id: v.id,
+    member: !!before && viewMembers(p, v).some((e) => e.id === eqId),
+    pick: before && v.ports?.[eqId] ? v.ports[eqId].map((id) => ({ id, label: before.product.ports.find((x) => x.id === id)?.label })) : null,
+  }))
+  change()
+  const after = p.equipment.find((e) => e.id === eqId)
+  if (!after) return
+  for (const s of snap) {
+    const v = viewsOf(p).find((x) => x.id === s.id)
+    if (!v) continue
+    if (s.member && !viewMembers(p, v).some((e) => e.id === eqId)) setInView(p, v.id, [eqId], true)
+    if (s.pick) {
+      const ids = s.pick.map((q) => (after.product.ports.some((x) => x.id === q.id) ? q.id : after.product.ports.find((x) => q.label && x.label === q.label)?.id)).filter((x): x is string => !!x)
+      const ports = { ...(v.ports ?? {}) }
+      if (ids.length) ports[eqId] = [...new Set(ids)]; else delete ports[eqId]
+      v.ports = ports
+    }
+  }
+}
+
+/** Deletes the cables drawn on a view (both ends visible there); cables on other signal types are kept. */
+export function removeViewConnections(p: Project, viewId: string): number {
+  const v = viewsOf(p).find((x) => x.id === viewId)
+  if (!v) return 0
+  const ids = new Set(viewProject(p, { ...v, hideUnused: false }).cables.map((c) => c.id))
+  p.cables = p.cables.filter((c) => !ids.has(c.id))
+  return ids.size
+}

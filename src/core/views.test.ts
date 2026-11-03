@@ -102,3 +102,30 @@ describe('duplicate view', () => {
     expect(dupView(p, v.id)!.name).toBe('Audio (copy 2)')
   })
 })
+
+describe('keepInViews', () => {
+  it('keeps an edited plate in a view even when its ports are rebuilt', async () => {
+    const { keepInViews, viewProject } = await import('./views')
+    const p = newProject() as any
+    const ports = (pre: string) => [{ id: `${pre}1`, label: 'MIC 1', direction: 'output', connector: 'xlr3', gender: 'female', signals: ['analogMic'] }, { id: `${pre}2`, label: 'MIC 2', direction: 'output', connector: 'xlr3', gender: 'female', signals: ['analogMic'] }]
+    p.equipment.push({ id: 'wp', tag: 'WP-001', position: { x: 0, y: 0 }, product: { key: 'k', manufacturer: 'x', model: 'y', category: 'wallPlate', ports: ports('a'), physical: {} } })
+    p.views = [{ id: 'v', name: 'Audio', domains: ['audio'], auto: false, include: ['wp'], exclude: [], positions: {}, ports: { wp: ['a2'] } }]
+    keepInViews(p, 'wp', () => { p.equipment[0].product = { ...p.equipment[0].product, ports: ports('b') } })
+    const vp = viewProject(p, p.views[0])
+    expect(vp.equipment.map((e: any) => e.id)).toEqual(['wp'])
+    expect(vp.equipment[0].product.ports.map((x: any) => x.label)).toEqual(['MIC 2'])
+  })
+})
+
+describe('removeViewConnections', () => {
+  it('removes only the cables shown on the view', async () => {
+    const { removeViewConnections } = await import('./views')
+    const p = newProject() as any
+    const ports = [{ id: 'a', label: 'A', direction: 'output', connector: 'xlr3', gender: 'female', signals: ['analogMic'] }, { id: 'n', label: 'LAN', direction: 'bidirectional', connector: 'rj45', gender: 'female', signals: ['ethernet1G'] }]
+    for (const id of ['x', 'y']) p.equipment.push({ id, tag: id, position: { x: 0, y: 0 }, product: { key: id, manufacturer: '', model: '', category: 'other', ports, physical: {} } })
+    p.cables = [{ id: 'c1', label: 'A1', from: { equipment: 'x', port: 'a' }, to: { equipment: 'y', port: 'a' } }, { id: 'c2', label: 'N1', from: { equipment: 'x', port: 'n' }, to: { equipment: 'y', port: 'n' } }]
+    p.views = [{ id: 'v', name: 'Audio', domains: ['audio'], auto: true, include: [], exclude: [], positions: {} }]
+    expect(removeViewConnections(p, 'v')).toBe(1)
+    expect(p.cables.map((c: any) => c.id)).toEqual(['c2'])
+  })
+})

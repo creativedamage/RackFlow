@@ -54,6 +54,8 @@ export interface AppState {
   mode: Mode
   selection: EquipmentId[]
   selectedCable: CableId | null
+  /** Several cables picked at once (lasso across wires). */
+  selectedCables: CableId[]
   selectedRack: RackId | null
   selectedBay: PatchBayId | null
   /** Rack panel (blank, brush, logo…) selected on the Rack page. */
@@ -80,6 +82,8 @@ export interface AppState {
   showSidebar: boolean
   /** A collapsed sidebar shown over the content while the pointer is at that edge. */
   peek: 'left' | 'right' | null
+  /** Ask the Schedule to open a tab (e.g. 'switch' from a switch port's menu). */
+  sheetTab: string | null
   issues: ValidationIssue[]
   /** Bumped to ask the diagram to fit view. */
   fitRequest: number
@@ -136,6 +140,7 @@ export const useStore = create<AppState>((set, get) => ({
   mode: 'diagram',
   selection: [],
   selectedCable: null,
+  selectedCables: [],
   selectedRack: null,
   selectedBay: null,
   selectedAccessory: null,
@@ -152,6 +157,7 @@ export const useStore = create<AppState>((set, get) => ({
   units: 'imperial',
   showInspector: true,
   peek: null,
+  sheetTab: null,
   showSidebar: (() => { try { return localStorage.getItem('rackflow.sidebar') !== 'off' } catch { return true } })(),
   issues: [],
   fitRequest: 0,
@@ -197,7 +203,7 @@ export const useStore = create<AppState>((set, get) => ({
   }) },
   markSaved: (path) => { rememberSaved(get().project); set({ path, dirty: false, lastSaved: Date.now() }) },
   set: (patch) => set(patch),
-  select: (ids, cable = null) => set({ selection: ids, selectedCable: cable, selectedAccessory: null }),
+  select: (ids, cable = null) => set({ selection: ids, selectedCable: cable, selectedCables: [], selectedAccessory: null }),
   focusIssue: (s) => {
     switch (s.kind) {
       case 'equipment': set({ mode: 'diagram', selection: [s.id], selectedCable: null }); break

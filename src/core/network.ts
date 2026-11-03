@@ -125,3 +125,54 @@ export function autoAssignIps(p: Project, keys: string[], start: string, step = 
   }
   return count
 }
+
+// MARK: Switch ports & VLANs
+
+export interface SwitchPortRow {
+  key: string
+  sw: EquipmentInstance
+  port: PortTemplate
+  info: NetInfo
+  /** The device interface this port reaches through the wiring (patch panels and wall plates followed). */
+  device: NetworkRow | null
+}
+
+/** One row per network port on every switch, with what it's wired to. */
+export function switchPortRows(p: Project, rows: NetworkRow[] = networkRows(p)): SwitchPortRow[] {
+  const reach = new Map<string, NetworkRow>()
+  for (const r of rows) if (r.link && !r.link.direct) reach.set(`${r.link.eq.id}/${r.link.port.id}`, r)
+  const out: SwitchPortRow[] = []
+  for (const sw of p.equipment) {
+    if (sw.product.category !== 'networkSwitch') continue
+    for (const port of sw.product.ports.filter(isNetworkPort)) {
+      out.push({ key: `${sw.id}/${port.id}`, sw, port, info: sw.network?.[port.id] ?? {}, device: reach.get(`${sw.id}/${port.id}`) ?? null })
+    }
+  }
+  return out
+}
+
+/** A device interface's VLAN: its own, else the access VLAN of the switch port it's wired to. */
+export function rowVlan(r: NetworkRow): { vlan: string; inherited: boolean } {
+  if (r.info.vlan) return { vlan: r.info.vlan, inherited: false }
+  const sp = r.link && !r.link.direct ? r.link.eq.network?.[r.link.port.id] : undefined
+  return { vlan: sp && sp.mode !== 'trunk' && sp.vlan ? sp.vlan : '', inherited: true }
+}
+
+/** Valid VLAN list: IDs 1–4094, comma separated, ranges allowed ("10,20,100-110"). */
+export function validVlans(s: string): boolean {
+  const t = s.trim()
+  if (!t) return true
+  return t.split(/\s*,\s*/).every((part) => {
+    const m = /^(\d{1,4})(?:\s*-\s*(\d{1,4}))?$/.exec(part)
+    if (!m) return false
+    const a = Number(m[1]), b = m[2] ? Number(m[2]) : a
+    return a >= 1 && b <= 4094 && a <= b
+  })
+}
+
+/** Short tag for a switch port on the diagram: "V10", or "T 10,20" for a trunk. */
+export function vlanTag(info: NetInfo | undefined): string {
+  if (!info) return ''
+  if (info.mode === 'trunk') return info.tagged ? `T ${info.tagged}` : info.vlan ? `T (${info.vlan})` : 'T'
+  return info.vlan ? `V${info.vlan}` : ''
+}

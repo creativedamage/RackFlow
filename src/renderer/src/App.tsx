@@ -155,7 +155,7 @@ export function App() {
   }), [])
 
   // The right panel shows only when there's something to inspect (design checks live in the ⚠︎ notifications).
-  const hasSubject = useStore((s) => s.selection.length > 0 || !!s.selectedCable || (s.mode === 'rack' && (!!s.selectedRack || !!s.selectedAccessory)))
+  const hasSubject = useStore((s) => s.selection.length > 0 || !!s.selectedCable || s.selectedCables.length > 0 || (s.mode === 'rack' && (!!s.selectedRack || !!s.selectedAccessory)))
   const rightAvail = mode !== 'sheet' && mode !== 'led' && (mode === 'patch' || hasSubject)
   const rightPanel = showInspector && rightAvail
   const peek = useStore((s) => s.peek)

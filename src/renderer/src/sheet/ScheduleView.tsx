@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   addToGroup, createGroup, groupColor, groupsOf, removeFromGroup, CABLE_CATALOG, cableRows, cablesToCSV, cableSpec, CATEGORIES, defaultSchemes, DOMAINS, findRack, fittingCables, renumberCables, resolve, type CableId, type CableRow, type EquipmentInstance, type NumberScheme, type RenumberOrder, type SignalDomain, longUnit, toLong, fromLong,
 } from '@core/index'
@@ -8,13 +8,17 @@ import { Sheet, type SheetColumn } from './Sheet'
 import { NetworkSheet } from './NetworkSheet'
 import { PullSheet } from './PullSheet'
 import { BoxPortsSheet } from './BoxPortsSheet'
+import { SwitchPortsSheet } from './SwitchPortsSheet'
 import { colorColumn } from './colorColumn'
 
-type Tab = 'cables' | 'pull' | 'ports' | 'devices' | 'network'
+type Tab = 'cables' | 'pull' | 'ports' | 'devices' | 'network' | 'switch'
 
 /** Spreadsheet view of the whole project: every cable and every device, editable in bulk. */
 export function ScheduleView() {
-  const [tab, setTab] = useState<Tab>('cables')
+  const [tab, setTabState] = useState<Tab>(() => (useStore.getState().sheetTab as Tab | null) ?? 'cables')
+  const setTab = (t: Tab) => { setTabState(t); useStore.getState().set({ sheetTab: null }) }
+  const want = useStore((s) => s.sheetTab)
+  useEffect(() => { if (want) { setTabState(want as Tab); useStore.getState().set({ sheetTab: null }) } }, [want])
   return (
     <div className="schedule">
       <div className="schedule-tabs">
@@ -23,9 +27,10 @@ export function ScheduleView() {
         <button className={tab === 'ports' ? 'on' : ''} onClick={() => setTab('ports')}>Box Ports</button>
         <button className={tab === 'devices' ? 'on' : ''} onClick={() => setTab('devices')}>Devices</button>
         <button className={tab === 'network' ? 'on' : ''} onClick={() => setTab('network')}>Network</button>
+        <button className={tab === 'switch' ? 'on' : ''} onClick={() => setTab('switch')}>Switch Ports / VLANs</button>
         <span className="muted small hint">Click, Shift-click or drag to select · type or Enter to edit · ⌘C / ⌘V with Excel, Numbers or Google Sheets · ⌘D fill down · click a header to sort</span>
       </div>
-      {tab === 'cables' ? <CableSheet /> : tab === 'pull' ? <PullSheet /> : tab === 'ports' ? <BoxPortsSheet /> : tab === 'devices' ? <DeviceSheet /> : <NetworkSheet />}
+      {tab === 'cables' ? <CableSheet /> : tab === 'pull' ? <PullSheet /> : tab === 'ports' ? <BoxPortsSheet /> : tab === 'devices' ? <DeviceSheet /> : tab === 'switch' ? <SwitchPortsSheet /> : <NetworkSheet />}
     </div>
   )
 }

@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   clearFormatting, clearRange, copyRange, defaultPrintOptions, fillSeries, findCell, FORMAT_PRESETS, layoutLabels, mergeTitle,
   NORMAL_SYMBOLS, pagesToPrintHTML, pageToSVG, pasteAt, refreshLabels, removeTitles, setNormals, staleCells, STOCKS, styleRange,
-  toggleStyle, arrowGlyph, rowLetter, type CellStyle, type NormalMode, type PatchBay, type PrintOptions, type RowArrow,
-} from '@core/index'
+  toggleStyle, arrowGlyph, rowLetter, type CellStyle, type NormalMode, type PatchBay, type PrintOptions, type RowArrow, autoGroupTitles} from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
 import { Empty, Modal, Select, TextInput, Toggle } from '../components/ui'
@@ -84,13 +83,13 @@ function FormatBar() {
   const styleSel = (label: string, patch: CellStyle) => editSelection(label, (b, s) => {
     const t = usePatchUI.getState().title
     const span = t && b.spans.find((x) => x.id === t)
-    if (span) span.style = { ...span.style, ...patch }
+    if (span) { span.style = { ...span.style, ...patch }; delete span.auto }
     else styleRange(b, s, patch)
   })
   const toggle = (k: 'bold' | 'italic' | 'underline' | 'strike') => editSelection('Format', (b, s) => {
     const t = usePatchUI.getState().title
     const span = t && b.spans.find((x) => x.id === t)
-    if (span) span.style = { ...span.style, [k]: !span.style?.[k] }
+    if (span) { span.style = { ...span.style, [k]: !span.style?.[k] }; delete span.auto }
     else toggleStyle(b, s, k)
   })
   const normals = (m: NormalMode) => editSelection('Change Normalling', (b, s) => {
@@ -168,6 +167,12 @@ function FormatBar() {
               options={[{ value: '', label: 'Wiring format…' }, ...FORMAT_PRESETS.map((x) => ({ value: x.name, label: x.name }))]} />
             <button className={`fb ${stale ? 'accent' : ''}`} title="Fill every non-typed cell from the cables wired to this bay's rear ports"
               onClick={() => editBay(bay.id, 'Refresh from Wiring', (b) => refreshLabels(b, useStore.getState().project))}>⟳ From wiring{stale ? ` (${stale})` : ''}</button>
+            <label className="fb-check" title="Title each run of channels wired to the same wall box, plate or floor box with its tag and room. Rename or restyle a title to make it your own; untick to remove the automatic ones.">
+              <input type="checkbox" checked={bay.autoTitles !== false} onChange={(e) => editBay(bay.id, 'Group by Box', (b) => {
+                b.autoTitles = e.target.checked
+                if (e.target.checked) autoGroupTitles(b, useStore.getState().project); else b.spans = b.spans.filter((x) => !x.auto)
+              })} /> Group by box
+            </label>
           </>
         )}
       </div>

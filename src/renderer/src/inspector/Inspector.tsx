@@ -11,6 +11,7 @@ export function Inspector({ peek = false }: { peek?: boolean } = {}) {
   const project = useStore((s) => s.project)
   const selection = useStore((s) => s.selection)
   const selectedCable = useStore((s) => s.selectedCable)
+  const selectedCables = useStore((s) => s.selectedCables)
   const selectedRack = useStore((s) => s.selectedRack)
   const mode = useStore((s) => s.mode)
 
@@ -23,7 +24,7 @@ export function Inspector({ peek = false }: { peek?: boolean } = {}) {
 
   return (
     <aside className={`inspector ${peek ? 'peek' : ''}`}>
-      {acc && accRack ? <AccessoryInspector rack={accRack} acc={acc} /> : cable ? <CableInspector cable={cable} /> : eq ? <EquipmentInspector eq={eq} /> : rack ? <RackSettings rack={rack} /> : selection.length > 1 ? <MultiInspector ids={selection} /> : <IssuesList />}
+      {acc && accRack ? <AccessoryInspector rack={accRack} acc={acc} /> : selectedCables.length > 1 && !selection.length ? <MultiCableInspector ids={selectedCables} /> : cable ? <CableInspector cable={cable} /> : eq ? <EquipmentInspector eq={eq} /> : rack ? <RackSettings rack={rack} /> : selection.length > 1 ? <MultiInspector ids={selection} /> : <IssuesList />}
     </aside>
   )
 }
@@ -255,6 +256,33 @@ function MultiInspector({ ids }: { ids: EquipmentId[] }) {
       <Field label="Room"><TextInput value={rooms.length === 1 ? rooms[0] : ''} placeholder={rooms.length > 1 ? 'Mixed – type to set all' : 'e.g. Main Hall'}
         onCommit={(v) => apply('Set Room', (d) => { for (const e of d.equipment) if (ids.includes(e.id)) e.room = v })} /></Field>
       <div className="multi-groups">{groups.filter((g) => devices.some((d) => d.groupId === g.id)).map((g) => <span key={g.id} className="chip" style={{ background: groupColor(g) }}>{g.name}</span>)}</div>
+    </div>
+  )
+}
+
+/** Several wires picked with the lasso: what they are, and delete them together. */
+function MultiCableInspector({ ids }: { ids: string[] }) {
+  const project = useStore((s) => s.project)
+  const cables = project.cables.filter((c) => ids.includes(c.id))
+  const tag = (a: Cable['from']) => project.equipment.find((e) => e.id === a.equipment)?.tag ?? '?'
+  return (
+    <div className="form">
+      <h3>{cables.length} cables</h3>
+      <p className="muted small">Picked with the selection box. Delete (⌫) removes them; shift-drag again to pick more devices.</p>
+      <div className="multi-cables">
+        {cables.slice(0, 60).map((c) => (
+          <button key={c.id} className="link" onClick={() => useStore.getState().select([], c.id)} title="Show this cable">
+            <b>{c.label}</b> <span className="muted">{tag(c.from)} → {tag(c.to)}</span>
+          </button>
+        ))}
+        {cables.length > 60 && <span className="muted small">+ {cables.length - 60} more</span>}
+      </div>
+      <button className="danger" onClick={() => {
+        const s = useStore.getState()
+        s.apply(`Delete ${cables.length} Cables`, (d) => { const set = new Set(ids); d.cables = d.cables.filter((c) => !set.has(c.id)) })
+        s.select([], null)
+        s.notify(`Deleted ${cables.length} cables`, { undo: true })
+      }}>Delete {cables.length} Cables</button>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { BUILT_IN_KEYS, type ProductDefinition } from '@core/index'
+import { BUILT_IN_KEYS, defaultFabrication, fabricationSheets, sheetsToHTML, sheetSize, type ProductDefinition } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
 import { addProductToDiagram } from '../diagram/placement'
@@ -43,5 +43,10 @@ export function deviceMenu(id: string): MenuItem[] {
     { label: eq.product.category === 'patchBay' ? 'Change Panel Layout…' : 'Edit Device…', hint: '⌘E', onClick: () => editPlacedDevice(id) },
     ...(lib ? [{ label: 'Edit Library Product…', onClick: () => openProductEditor(lib) }] : []),
     { label: 'Duplicate as Custom Product…', onClick: () => duplicateProduct(eq.product), disabled: eq.product.category === 'patchBay' },
+    ...(eq.product.plate ? [{ label: 'Print Fabrication Drawing…', onClick: () => {
+      const st = useStore.getState(), sel = st.selection.filter((x) => st.project.equipment.find((e) => e.id === x)?.product.plate).map(String)
+      const o = { ...defaultFabrication(), only: sel.includes(String(id)) ? sel : [String(id)] }
+      void api.print(sheetsToHTML(fabricationSheets(st.project, o), sheetSize(o)))
+    } }] : []),
   ]
 }

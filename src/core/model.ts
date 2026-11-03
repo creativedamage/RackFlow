@@ -243,7 +243,12 @@ export interface EquipmentInstance {
 /** One network interface's addressing on the Network sheet. */
 export interface NetInfo {
   ip?: string
+  /** VLAN ID: the access (untagged / native) VLAN on a switch port, or the interface's VLAN on a device. */
   vlan?: string
+  /** Switch ports: access (one untagged VLAN) or trunk (tagged VLANs plus an optional native one). */
+  mode?: 'access' | 'trunk'
+  /** Switch trunk ports: tagged VLANs, e.g. "10,20,100-110". */
+  tagged?: string
   /** Manual switch / port when the cable path doesn't reach a switch (yet). */
   switchTag?: string
   switchPort?: string
@@ -470,7 +475,7 @@ export interface LabelCell {
 }
 
 /** A group title spanning channels start…end on one strip (e.g. "TIE LINES"). */
-export interface LabelSpan { id: string; row: number; start: number; end: number; text: string; style?: CellStyle }
+export interface LabelSpan { id: string; row: number; start: number; end: number; text: string; style?: CellStyle; /** Made by “group by box” from the wiring; editing the text makes it yours. */ auto?: true }
 
 /** Normalling between a row and the row below it, per channel (PatchCAD's ↕ / ↓ row). */
 export type NormalMode = 'none' | 'half' | 'full' | 'parallel'
@@ -505,6 +510,8 @@ export interface PatchBay {
   rowTabs?: { on: boolean; letters?: Record<string, string> }
   /** ▲ / ▼ printed on every port label of a row, pointing at the jacks it names (row id → direction). */
   arrows?: Record<string, RowArrow>
+  /** Titles grouping channels that come from the same wall box / plate / floor box (default on). */
+  autoTitles?: boolean
 }
 export type RowArrow = 'up' | 'down'
 

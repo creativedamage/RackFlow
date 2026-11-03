@@ -2,7 +2,7 @@ import { memo, useMemo } from 'react'
 import { Handle, NodeToolbar, Position, type NodeProps, type Node } from '@xyflow/react'
 import {
   cardLayout, cardPortLabel, FACE_H, faceProduct, CATEGORIES, connectorName, DOMAINS, nodeGeom, faceSVG, IO_H, portDomain, previewHeight, SEC_HEAD, SIGNALS, SMALL_HEAD, SMALL_W, viewsOf,
-  setPortsInView, type CardSection, type EquipmentInstance, type PortTemplate, type SignalDomain,
+  setPortsInView, vlanTag, type CardSection, type EquipmentInstance, type PortTemplate, type SignalDomain,
 } from '@core/index'
 import { clickPort, pickIndex, useWiring } from './wiring'
 import { useStore } from '../store'
@@ -66,9 +66,11 @@ export const DeviceNode = memo(function DeviceNode({ data, selected }: NodeProps
         onClick={(e) => { if (folded) return; e.stopPropagation(); clickPort(eq, p.id, e) }}
         onContextMenu={(e) => {
           const s = useStore.getState(), vid = s.diagramView
-          if (!vid) return
+          const vlanItem = eq.product.category === 'networkSwitch' ? [{ label: `VLAN for ${eq.tag} ${p.label}…`, onClick: () => s.set({ mode: 'sheet', sheetTab: 'switch' }) }] : []
+          if (!vid) { if (vlanItem.length) { e.preventDefault(); e.stopPropagation(); showContextMenu(e, vlanItem) } return }
           e.preventDefault(); e.stopPropagation()
           showContextMenu(e, [
+            ...vlanItem,
             { label: `Hide “${p.label}” in This View`, onClick: () => s.apply('Hide Port in View', (d) => setPortsInView(d, vid, eq.id, [p.id], false)) },
             { label: `Hide Unwired Ports of ${eq.tag}`, onClick: () => s.apply('Hide Ports in View', (d) => setPortsInView(d, vid, eq.id, eq.product.ports.filter((x) => !connected.has(x.id)).map((x) => x.id), false)) },
             { label: 'Choose Ports…', onClick: () => s.set({ editingView: vid }) },
@@ -80,6 +82,7 @@ export const DeviceNode = memo(function DeviceNode({ data, selected }: NodeProps
             {side === 'left' && <span className="dn-arrow">{arrow}</span>}
             <span className="port-label">{sec ? cardPortLabel(p.label, sec.name, sec.faces) : p.label}</span>
             {side === 'right' && <span className="dn-arrow">{arrow}</span>}
+            {vlanTag(eq.network?.[p.id]) && <span className={`dn-vlan ${eq.network?.[p.id]?.mode === 'trunk' ? 'trunk' : ''}`} title={`VLAN ${eq.network?.[p.id]?.mode === 'trunk' ? `trunk – tagged ${eq.network?.[p.id]?.tagged || 'none'}${eq.network?.[p.id]?.vlan ? `, native ${eq.network?.[p.id]?.vlan}` : ''}` : eq.network?.[p.id]?.vlan}`}>{vlanTag(eq.network?.[p.id])}</span>}
             {pick >= 0 && <span className="pick-badge">{pick + 1}</span>}
           </div>
         )}

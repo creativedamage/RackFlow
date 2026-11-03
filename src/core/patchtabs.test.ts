@@ -19,8 +19,11 @@ it('strip ends carry the row letter and its normalling word; cells carry the row
   b.arrows = { [String(top)]: 'down', [String(bottom)]: 'up' }
   const svg = layoutLabels([b], defaultPrintOptions()).map(pageToSVG).join('')
   expect(svg).toContain('>S<')
-  expect(svg).toContain('▼ NORMAL')
-  expect(svg).toContain('▲ NORMAL')
+  // Stacked: the arrow and the word are separate lines under the letter.
+  expect(svg).toContain('>▼<')
+  expect(svg).toContain('>▲<')
+  expect(svg).toContain('>NORMAL<')
+  expect(svg.includes('▼ NORMAL')).toBe(false)
   expect(svg).toContain('>A47<')
   // only the odd half-normalled channel still gets a symbol; full is said once at the end
   expect((svg.match(/>↓</g) ?? []).length).toBe(1)

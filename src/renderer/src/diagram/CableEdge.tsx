@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { BaseEdge, EdgeLabelRenderer, Position, useStore as useFlowStore, type Edge, type EdgeProps, type ReactFlowState } from '@xyflow/react'
-import { crossings, labelPoint, planChannels, roundedPath, route, WIRE_CLEAR, type ChannelWire, type EquipmentInstance, type Pt, type Rect, type WireMode } from '@core/index'
+import { crossings, labelPoint, nudgeWires, planChannels, roundedPath, route, WIRE_CLEAR, type ChannelWire, type EquipmentInstance, type Pt, type Rect, type WireMode } from '@core/index'
 import { nodeGeom } from './tidy'
 
 export type CableEdgeData = {
@@ -34,7 +34,7 @@ const sameRects = (a: Rect[], b: Rect[]) => a.length === b.length && a.every((r,
 interface EndInfo { x: number; y: number; dir: number; device: string; far: string }
 /** A bundle of stubs from one device side to the same far device. */
 export interface StubGroup { key: string; ids: string[]; ys: number[]; x: number; dir: number; leader: string; /** Bracket x. */ bx: number }
-interface Plan { channel: Map<string, number>; stub: Map<string, boolean>; groups: Map<string, StubGroup>; labels: Map<string, Pt> }
+interface Plan { channel: Map<string, number>; stub: Map<string, boolean>; groups: Map<string, StubGroup>; labels: Map<string, Pt>; paths: Map<string, Pt[]> }
 
 /**
  * One plan for every wire, rebuilt when a device moves or the wiring changes:
@@ -104,6 +104,15 @@ function planFor(s: ReactFlowState, rects: Rect[]): Plan {
     const g: StubGroup = { key, ids: ms.map((m) => m.id), ys: ms.map((m) => m.end.y), x: ms[0].end.x, dir: ms[0].end.dir, leader: ms[0].id, bx: ms[0].end.x + ms[0].end.dir * (STUB + width + 14) }
     for (const m of ms) groups.set(`${m.id}|${m.end.device}|${m.end.dir}`, g)
   }
+  // Full wires: route each, then pull apart any that share a run so none sit on top of each other.
+  const raw = new Map<string, Pt[]>()
+  for (const e of edges) {
+    const en = ends.get(e.id)
+    if (!en || stub.get(e.id)) continue
+    const [A, B] = en
+    raw.set(e.id, route(A, A.dir, B, B.dir, rects, e.data?.lane ?? 0, channel.get(e.id)))
+  }
+  const paths = nudgeWires(raw, undefined, undefined, rects)
   // Cable-number labels: spread along each wire so labels on parallel runs never sit on top of each other.
   const labels = new Map<string, Pt>()
   const placed: { x0: number; y0: number; x1: number; y1: number }[] = []
@@ -113,9 +122,7 @@ function planFor(s: ReactFlowState, rects: Rect[]): Plan {
   const order = [...edges].filter((e) => ends.has(e.id) && !stub.get(e.id) && e.data?.label).sort((a, b) => (a.data!.label).localeCompare(b.data!.label, undefined, { numeric: true }))
   for (const e of order) {
     const [A, B] = ends.get(e.id)!
-    const raw = route(A, A.dir, B, B.dir, rects, e.data?.lane ?? 0, channel.get(e.id))
-    // Merge straight-through points so a straight wire is one segment (labels line up neatly).
-    const pts = raw.filter((q, i) => i === 0 || i === raw.length - 1 || !((raw[i - 1].x === q.x && q.x === raw[i + 1].x) || (raw[i - 1].y === q.y && q.y === raw[i + 1].y)))
+    const pts = paths.get(e.id) ?? route(A, A.dir, B, B.dir, rects, e.data?.lane ?? 0, channel.get(e.id))
     const w = e.data!.label.length * 6 + 14, h = 15
     const segs = pts.slice(1).map((p, i) => ({ a: pts[i], b: p, len: Math.abs(p.x - pts[i].x) + Math.abs(p.y - pts[i].y) })).filter((s) => s.len > 4).sort((x, y) => y.len - x.len)
     let best: Pt | null = null
@@ -127,9 +134,22 @@ function planFor(s: ReactFlowState, rects: Rect[]): Plan {
     if (!best) { best = labelPoint(pts, rects); placed.push({ x0: best.x - w / 2, y0: best.y - h / 2, x1: best.x + w / 2, y1: best.y + h / 2 }) }
     labels.set(e.id, best)
   }
-  const plan = { channel, stub, groups, labels }
+  const plan = { channel, stub, groups, labels, paths }
   cache = { rects, edges, sel, plan }
   return plan
+}
+
+/** The planned path, pinned exactly onto React Flow's handle points (they can differ by a pixel). */
+function fitEnds(planned: Pt[] | undefined, s: Pt, t: Pt): Pt[] | null {
+  if (!planned || planned.length < 2) return null
+  const a = planned[0], z = planned[planned.length - 1]
+  if (Math.abs(a.x - s.x) > 4 || Math.abs(a.y - s.y) > 4 || Math.abs(z.x - t.x) > 4 || Math.abs(z.y - t.y) > 4) return null
+  const pts = planned.map((p) => ({ ...p }))
+  const n = pts.length
+  if (n > 2 && pts[1].y === a.y) pts[1].y = s.y
+  if (n > 2 && pts[n - 2].y === z.y) pts[n - 2].y = t.y
+  pts[0] = s; pts[n - 1] = t
+  return pts
 }
 
 const dirOf = (p: Position) => (p === Position.Left ? -1 : 1)
@@ -200,7 +220,8 @@ export const CableEdge = memo(function CableEdge(props: EdgeProps<CableEdgeType>
       </>
     )
   }
-  const pts = route({ x: sourceX, y: sourceY }, sDir, { x: targetX, y: targetY }, tDir, rects, data?.lane ?? 0, channel)
+  const pts = fitEnds(plan.paths.get(id), { x: sourceX, y: sourceY }, { x: targetX, y: targetY })
+    ?? route({ x: sourceX, y: sourceY }, sDir, { x: targetX, y: targetY }, tDir, rects, data?.lane ?? 0, channel)
   const path = roundedPath(pts)
   const lp = plan.labels.get(id) ?? labelPoint(pts, rects)
   return (
