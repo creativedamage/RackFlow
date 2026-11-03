@@ -34,7 +34,9 @@
     "vitest": "5.0.4",
     "zustand": "5.0.15"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@supabase/supabase-js": "^2.118.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/creativedamage/RackFlow.git"
