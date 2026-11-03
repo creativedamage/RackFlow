@@ -10,7 +10,7 @@ import { DOMAINS } from '../signals'
 import { portDomain } from '../project'
 import { planChannels, type ChannelWire } from '../autolayout'
 import { cardLayout, cardPortLabel, FACE_H, headerHeight, NODE_WIDTH, nodeGeom, SEC_HEAD, splitPorts } from '../diagramgeom'
-import { crossings, detourBudget, nudgeWires, route, WIRE_CLEAR, type Pt, type Rect } from '../wireroute'
+import { cleanPath, crossings, detourBudget, nudgeWires, route, WIRE_CLEAR, type Pt, type Rect } from '../wireroute'
 import { groupsOf } from '../groups'
 import { newSheet, sheetSize, type SheetOptions } from './sheet'
 import { Svg, textWidth } from './svg'
@@ -332,7 +332,7 @@ function drawWires(svg: Svg, p: Project, o: SchematicOptions, eqs: EquipmentInst
     let pts: Pt[] | null = null
     if (both) pts = nudged.get(c.id) ?? null
     if (pts) {
-      svg.polyline(pts, { lw: 1, stroke })
+      svg.polyline(cleanPath(pts), { lw: 1, stroke })
       endLabel(svg, a, c.label, tags, stroke)
       endLabel(svg, b, c.label, tags, stroke)
     } else {

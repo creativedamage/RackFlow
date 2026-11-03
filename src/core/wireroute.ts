@@ -18,8 +18,10 @@ export function crossings(pts: Pt[], rects: Rect[], ends: Rect[]): number {
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts[i], b = pts[i + 1]
     const stub = i === 0 || i === pts.length - 2
-    for (const r of rects) {
-      if (stub && ends.includes(r)) continue
+    for (const r0 of rects) {
+      // A wire's own device: its port sits inside the keep-out margin, so test the end runs against the
+      // device body only – a wire that doubles back across its own device still counts.
+      const r = stub && ends.includes(r0) ? { ...r0, x0: r0.x0 + CLEAR - 0.5, y0: r0.y0 + CLEAR - 0.5, x1: r0.x1 - CLEAR + 0.5, y1: r0.y1 - CLEAR + 0.5 } : r0
       if (a.y === b.y ? hitsH(a.y, a.x, b.x, r) : hitsV(a.x, a.y, b.y, r)) n++
     }
   }
@@ -176,8 +178,42 @@ function search(s: Pt, sDir: number, t: Pt, tDir: number, rects: Rect[], tight: 
   return simplifyPath([s, ...path, t])
 }
 
+/**
+ * Makes a wire drawable: coordinates snapped to half pixels (so 4811.0001 and 4811
+ * are one line, not a 0.0001 px step that rounds into a loop), any diagonal turned
+ * into an elbow (horizontal out of the first port, horizontal into the last), and
+ * repeated points, straight-through points and doubling back removed.
+ */
+export function cleanPath(pts: Pt[]): Pt[] {
+  if (pts.length < 2) return pts
+  const q = pts.map((p) => ({ x: Math.round(p.x * 2) / 2, y: Math.round(p.y * 2) / 2 }))
+  const o: Pt[] = [q[0]]
+  for (let i = 1; i < q.length; i++) {
+    const a = o[o.length - 1], b = q[i]
+    if (a.x !== b.x && a.y !== b.y) o.push(i === q.length - 1 ? { x: a.x, y: b.y } : { x: b.x, y: a.y })
+    o.push(b)
+  }
+  let cur = o
+  for (let pass = 0; pass < 6; pass++) {
+    const n: Pt[] = []
+    for (const p of cur) {
+      if (n.length && n[n.length - 1].x === p.x && n[n.length - 1].y === p.y) continue
+      if (n.length >= 2) {
+        const a = n[n.length - 2], b = n[n.length - 1]
+        if ((a.x === b.x && b.x === p.x) || (a.y === b.y && b.y === p.y)) n.pop()
+      }
+      n.push(p)
+    }
+    if (n.length === cur.length) { cur = n; break }
+    cur = n
+  }
+  return cur
+}
+
 /** SVG path through orthogonal points with rounded corners. */
-export function roundedPath(pts: Pt[], r = 6): string {
+export function roundedPath(pts0: Pt[], r = 6): string {
+  const pts = cleanPath(pts0)
+  if (pts.length < 2) return ''
   let d = `M ${pts[0].x} ${pts[0].y}`
   for (let i = 1; i < pts.length - 1; i++) {
     const a = pts[i - 1], b = pts[i], c = pts[i + 1]

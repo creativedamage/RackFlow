@@ -186,7 +186,10 @@ const tagW = (s: string) => s.length * 6 + 16
  * As a stub, several wires to the same device are bundled under one tag naming it.
  */
 export const CableEdge = memo(function CableEdge(props: EdgeProps<CableEdgeType>) {
-  const { id, source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected, data } = props
+  const { id, source, target, sourcePosition, targetPosition, selected, data } = props
+  // React Flow hands back measured positions like 4811.0001 – snap them so wires stay square.
+  const snap = (v: number) => Math.round(v * 2) / 2
+  const sourceX = snap(props.sourceX), sourceY = snap(props.sourceY), targetX = snap(props.targetX), targetY = snap(props.targetY)
   const rects = useFlowStore(obstaclesOf, sameRects)
   const plan = useFlowStore((s) => planFor(s, rects))
   const channel = plan.channel.get(id)
