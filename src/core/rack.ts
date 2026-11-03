@@ -77,6 +77,23 @@ export class RackLayout {
     return !this.occupants.some((o) => refKey(o.ref) !== ig && conflict(o, cand, this.rack.spec.mountingDepthMM))
   }
 
+  /**
+   * Nearest legal spot for a device: start unit and, for half-width (½ 1RU) gear,
+   * which half – the preferred side first, then the other, so two halves sit side by side.
+   */
+  nearestSpot(height: number, depthMM: number, proposed: number, face: RackFace, ignoring: RackOccupant['ref'] | undefined, half: boolean, prefer: 'left' | 'right' = 'left'): { start: number; slot: 'left' | 'right' | null } | null {
+    const maxStart = this.rack.spec.rackUnits - height + 1
+    if (maxStart < 1) return null
+    const slots: ('left' | 'right' | null)[] = half ? [prefer, prefer === 'left' ? 'right' : 'left'] : [null]
+    for (let d = 0; d <= this.rack.spec.rackUnits; d++) {
+      for (const c of [proposed - d, proposed + d]) {
+        if (c < 1 || c > maxStart) continue
+        for (const slot of slots) if (this.canPlace(height, depthMM, c, face, ignoring, slot)) return { start: c, slot }
+      }
+    }
+    return null
+  }
+
   /** Nearest valid start unit to `proposed`, searching outward (snap). */
   nearestFreeStart(height: number, depthMM: number, proposed: number, face: RackFace, ignoring?: RackOccupant['ref']): number | null {
     const maxStart = this.rack.spec.rackUnits - height + 1

@@ -80,74 +80,98 @@ export function route(s: Pt, sDir: number, t: Pt, tDir: number, rects: Rect[], l
   return best
 }
 
+/** Detours searched per plan; past this budget wires keep their simple route (stays responsive on big drawings). */
+let budget = { until: 0 }
+/** Gives the next `ms` milliseconds to detour searches (call once per routing pass). */
+export function detourBudget(ms: number) { budget = { until: Date.now() + ms } }
+const detourCache = new Map<string, Pt[] | null>()
+let cacheRects: Rect[] | null = null, cacheKey = ''
+
 /**
  * Shortest orthogonal path between two ports that never enters a device
- * (fewest bends among equals). Runs on a sparse grid of lines through the
- * device edges and the gaps between them, so it hugs the open channels.
+ * (fewest bends among equals): A* over a sparse grid of lines along the
+ * device edges. Results are cached per layout.
  */
 export function routeAround(s: Pt, sDir: number, t: Pt, tDir: number, rects: Rect[], tight = false): Pt[] | null {
+  if (budget.until && Date.now() > budget.until) return null
+  if (rects !== cacheRects) {
+    const key = rects.map((r) => `${r.x0},${r.y0},${r.x1},${r.y1}`).join('|')
+    if (key !== cacheKey) { detourCache.clear(); cacheKey = key }
+    cacheRects = rects
+  }
+  const ck = `${s.x},${s.y},${sDir},${t.x},${t.y},${tDir},${tight ? 1 : 0}`
+  if (detourCache.has(ck)) return detourCache.get(ck)!
+  const res = search(s, sDir, t, tDir, rects, tight)
+  if (detourCache.size > 5000) detourCache.clear()
+  detourCache.set(ck, res)
+  return res
+}
+
+function search(s: Pt, sDir: number, t: Pt, tDir: number, rects: Rect[], tight: boolean): Pt[] | null {
   const a = { x: s.x + sDir * GAP, y: s.y }, z = { x: t.x + tDir * GAP, y: t.y }
   const inR = (p: Pt, r: Rect) => p.x > r.x0 && p.x < r.x1 && p.y > r.y0 && p.y < r.y1
-  const inside = (p: Pt) => rects.some((r) => inR(p, r))
-  if (inside(a) || inside(z)) {
-    // Devices packed tighter than the keep-out margin: route against their bodies instead.
-    // Still boxed in (devices overlap each other): ignore the ones the wire has to start or end inside.
-    if (tight) return routeAround(s, sDir, t, tDir, rects.filter((r) => !inR(a, r) && !inR(z, r)), true)
+  if (rects.some((r) => inR(a, r)) || rects.some((r) => inR(z, r))) {
+    // Devices packed tighter than the keep-out margin: route against their bodies; then ignore the ones the wire starts or ends inside.
+    if (tight) return search(s, sDir, t, tDir, rects.filter((r) => !inR(a, r) && !inR(z, r)), true)
     const m = CLEAR - 3
-    return routeAround(s, sDir, t, tDir, rects.map((r) => ({ ...r, x0: r.x0 + m, y0: r.y0 + m, x1: r.x1 - m, y1: r.y1 - m })), true)
+    return search(s, sDir, t, tDir, rects.map((r) => ({ ...r, x0: r.x0 + m, y0: r.y0 + m, x1: r.x1 - m, y1: r.y1 - m })), true)
   }
-  const lines = (keys: number[], extra: number[]) => {
-    const e = [...new Set(keys.map((v) => Math.round(v)))].sort((p, q) => p - q)
-    const mids = e.slice(1).map((v, i) => (v + e[i]) / 2)
-    return [...new Set([...e, ...mids, ...extra].map((v) => Math.round(v * 2) / 2))].sort((p, q) => p - q)
-  }
+  const uniq = (v: number[]) => [...new Set(v.map((q) => Math.round(q * 2) / 2))].sort((p, q) => p - q)
   const ex = rects.flatMap((r) => [r.x0 - 2, r.x1 + 2]), ey = rects.flatMap((r) => [r.y0 - 2, r.y1 + 2])
-  const xs = lines(ex, [a.x, z.x, Math.min(a.x, z.x, ...ex) - 30, Math.max(a.x, z.x, ...ex) + 30])
-  const ys = lines(ey, [a.y, z.y, Math.min(a.y, z.y, ...ey) - 30, Math.max(a.y, z.y, ...ey) + 30])
-  const W = xs.length, H = ys.length
-  if (W * H > 40000) return null
-  const ok = new Uint8Array(W * H)
-  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) ok[j * W + i] = inside({ x: xs[i], y: ys[j] }) ? 0 : 1
+  const xs = uniq([...ex, a.x, z.x, Math.min(a.x, z.x, ...ex) - 30, Math.max(a.x, z.x, ...ex) + 30])
+  const ys = uniq([...ey, a.y, z.y, Math.min(a.y, z.y, ...ey) - 30, Math.max(a.y, z.y, ...ey) + 30])
+  const W = xs.length, H = ys.length, N = W * H
   const si = xs.indexOf(Math.round(a.x * 2) / 2), sj = ys.indexOf(Math.round(a.y * 2) / 2)
   const ti = xs.indexOf(Math.round(z.x * 2) / 2), tj = ys.indexOf(Math.round(z.y * 2) / 2)
   if (si < 0 || sj < 0 || ti < 0 || tj < 0) return null
+  // Blocked nodes and grid edges, rasterised once per rect (lines run along rect edges, so a
+  // segment between neighbouring lines is either wholly inside a device or wholly outside).
+  const lower = (arr: number[], v: number) => { let lo = 0, hi = arr.length; while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m] <= v) lo = m + 1; else hi = m } return lo } // first index > v
+  const node = new Uint8Array(N), hb = new Uint8Array(N), vb = new Uint8Array(N)
+  for (const r of rects) {
+    const i0 = lower(xs, r.x0), i1 = lower(xs, r.x1 - 1e-9) - 1 // xs strictly inside (x0, x1)
+    const j0 = lower(ys, r.y0), j1 = lower(ys, r.y1 - 1e-9) - 1
+    for (let j = j0; j <= j1; j++) for (let i = Math.max(0, i0 - 1); i <= Math.min(W - 2, i1); i++) hb[j * W + i] = 1
+    for (let i = i0; i <= i1; i++) for (let j = Math.max(0, j0 - 1); j <= Math.min(H - 2, j1); j++) vb[j * W + i] = 1
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) node[j * W + i] = 1
+  }
+  // A* (state = node * 2 + 0 horizontal / 1 vertical), Manhattan heuristic.
   const BEND = 40
-  // state = node * 2 + (0 horizontal, 1 vertical)
-  const N = W * H * 2, dist = new Float64Array(N).fill(Infinity), prev = new Int32Array(N).fill(-1)
-  const heap: [number, number][] = []
-  const push = (d: number, st: number) => {
-    heap.push([d, st]); let k = heap.length - 1
-    while (k > 0) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p }
+  const g = new Float64Array(N * 2).fill(Infinity), prev = new Int32Array(N * 2).fill(-1)
+  const hx = z.x, hy = z.y
+  const hq: number[] = [], hs: number[] = [] // binary heap: priorities, states
+  const push = (f: number, st: number) => {
+    let k = hq.length; hq.push(f); hs.push(st)
+    while (k > 0) { const p = (k - 1) >> 1; if (hq[p] <= hq[k]) break; [hq[p], hq[k]] = [hq[k], hq[p]]; [hs[p], hs[k]] = [hs[k], hs[p]]; k = p }
   }
   const pop = () => {
-    const top = heap[0], last = heap.pop()!
-    if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m } }
-    return top
+    const st = hs[0], lq = hq.pop()!, ls = hs.pop()!
+    if (hq.length) { hq[0] = lq; hs[0] = ls; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < hq.length && hq[l] < hq[m]) m = l; if (r < hq.length && hq[r] < hq[m]) m = r; if (m === k) break; [hq[m], hq[k]] = [hq[k], hq[m]]; [hs[m], hs[k]] = [hs[k], hs[m]]; k = m } }
+    return st
   }
-  const start = (sj * W + si) * 2
-  dist[start] = 0; push(0, start)
-  const goal = (tj * W + ti) * 2
-  while (heap.length) {
-    const [d, st] = pop()
-    if (d > dist[st]) continue
-    if (st === goal) break
-    const node = st >> 1, vert = st & 1, i = node % W, j = (node - i) / W
-    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const ni = i + di, nj = j + dj
-      if (ni < 0 || nj < 0 || ni >= W || nj >= H || !ok[nj * W + ni]) continue
-      const nv = dj !== 0 ? 1 : 0
-      const blocked = nv ? rects.some((r) => hitsV(xs[i], ys[j], ys[nj], r)) : rects.some((r) => hitsH(ys[j], xs[i], xs[ni], r))
-      if (blocked) continue
-      const nd = d + Math.abs(xs[ni] - xs[i]) + Math.abs(ys[nj] - ys[j]) + (nv !== vert ? BEND : 0)
+  const start = (sj * W + si) * 2, goalNode = tj * W + ti
+  g[start] = 0; push(Math.abs(xs[si] - hx) + Math.abs(ys[sj] - hy), start)
+  let end = -1, steps = 0
+  while (hq.length) {
+    const st = pop()
+    const nd = st >> 1, vert = st & 1
+    if (nd === goalNode) { end = st; break }
+    if (++steps > 200000) return null
+    const i = nd % W, j = (nd - i) / W, d = g[st]
+    const step = (ni: number, nj: number, nv: number, blocked: boolean) => {
+      if (blocked || node[nj * W + ni]) return
       const ns = (nj * W + ni) * 2 + nv
-      if (nd < dist[ns]) { dist[ns] = nd; prev[ns] = st; push(nd, ns) }
+      const c = d + Math.abs(xs[ni] - xs[i]) + Math.abs(ys[nj] - ys[j]) + (nv !== vert ? BEND : 0) + (nj * W + ni === goalNode && nv ? BEND : 0)
+      if (c < g[ns]) { g[ns] = c; prev[ns] = st; push(c + Math.abs(xs[ni] - hx) + Math.abs(ys[nj] - hy), ns) }
     }
+    if (i + 1 < W) step(i + 1, j, 0, !!hb[j * W + i])
+    if (i > 0) step(i - 1, j, 0, !!hb[j * W + i - 1])
+    if (j + 1 < H) step(i, j + 1, 1, !!vb[j * W + i])
+    if (j > 0) step(i, j - 1, 1, !!vb[(j - 1) * W + i])
   }
-  // Arriving vertically costs one more bend (the last leg into the port is horizontal).
-  const end = dist[goal] <= dist[goal + 1] + BEND ? goal : goal + 1
-  if (!isFinite(dist[end])) return null
+  if (end < 0) return null
   const path: Pt[] = []
-  for (let st = end; st >= 0; st = prev[st]) { const node = st >> 1, i = node % W; path.push({ x: xs[i], y: ys[(node - i) / W] }) }
+  for (let st = end; st >= 0; st = prev[st]) { const n2 = st >> 1, i = n2 % W; path.push({ x: xs[i], y: ys[(n2 - i) / W] }) }
   path.reverse()
   return simplifyPath([s, ...path, t])
 }

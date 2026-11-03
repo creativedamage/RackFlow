@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { BaseEdge, EdgeLabelRenderer, Position, useStore as useFlowStore, type Edge, type EdgeProps, type ReactFlowState } from '@xyflow/react'
-import { crossings, labelPoint, nudgeWires, planChannels, roundedPath, route, WIRE_CLEAR, type ChannelWire, type EquipmentInstance, type Pt, type Rect, type WireMode } from '@core/index'
+import { crossings, detourBudget, labelPoint, nudgeWires, planChannels, roundedPath, route, WIRE_CLEAR, type ChannelWire, type EquipmentInstance, type Pt, type Rect, type WireMode } from '@core/index'
 import { nodeGeom } from './tidy'
 
 export type CableEdgeData = {
@@ -18,7 +18,15 @@ const STUB = 34
 const SMART_LEN = 1400
 
 /** Device rectangles (not group frames) from React Flow's live, mid-drag positions. */
+// Every wire asks for the device rectangles on every store change: work them out once per change.
+let obs: { nodes: unknown; lookup: unknown; rects: Rect[] } | null = null
 const obstaclesOf = (s: ReactFlowState): Rect[] => {
+  if (obs && obs.nodes === s.nodes && obs.lookup === s.nodeLookup) return obs.rects
+  const rects = computeObstacles(s)
+  obs = { nodes: s.nodes, lookup: s.nodeLookup, rects }
+  return rects
+}
+function computeObstacles(s: ReactFlowState): Rect[] {
   const out: Rect[] = []
   for (const n of s.nodeLookup.values()) {
     if (n.type !== 'device' || n.hidden) continue
@@ -41,7 +49,7 @@ interface Plan { channel: Map<string, number>; stub: Map<string, boolean>; group
  * channel tracks, which wires become stubs, and stub bundles. Uses the cards
  * as drawn (so signal views with filtered ports line up).
  */
-let cache: { rects: Rect[]; edges: unknown; sel: string; plan: Plan } | null = null
+let cache: { rects: Rect[]; edges: unknown; sel: string; plan: Plan; raw: Map<string, { key: string; pts: Pt[] }> } | null = null
 function planFor(s: ReactFlowState, rects: Rect[]): Plan {
   const edges = s.edges as CableEdgeType[]
   const sel = edges.filter((e) => e.selected).map((e) => e.id).join()
@@ -69,6 +77,22 @@ function planFor(s: ReactFlowState, rects: Rect[]): Plan {
     else if (B.dir > 0 && A.dir < 0 && A.x > B.x) wires.push({ id: e.id, sx: B.x, sy: B.y, tx: A.x, ty: A.y, sourceRight: right(rb) })
   }
   const channel = planChannels(wires)
+  // While a device is being dragged only its own wires re-route (everything else keeps its path),
+  // and detours around devices wait until it's dropped – dragging stays smooth on big drawings.
+  const moving = new Set<string>()
+  for (const n of s.nodeLookup.values()) if (n.dragging) moving.add(n.id)
+  detourBudget(moving.size ? 0 : 400)
+  const prevRaw = cache?.raw
+  const rawRoutes = new Map<string, { key: string; pts: Pt[] }>()
+  const routeOf = (e: CableEdgeType, A: EndInfo, B: EndInfo) => {
+    const done = rawRoutes.get(e.id)
+    if (done) return done.pts
+    const key = `${A.x},${A.y},${A.dir},${B.x},${B.y},${B.dir},${channel.get(e.id) ?? ''}`
+    const old = prevRaw?.get(e.id)
+    const pts = old && moving.size && !moving.has(A.device) && !moving.has(B.device) && old.key === key ? old.pts : route(A, A.dir, B, B.dir, rects, e.data?.lane ?? 0, channel.get(e.id))
+    rawRoutes.set(e.id, { key, pts })
+    return pts
+  }
   // Which wires are stubs.
   const stub = new Map<string, boolean>()
   for (const e of edges) {
@@ -77,7 +101,7 @@ function planFor(s: ReactFlowState, rects: Rect[]): Plan {
     if (!en || e.selected || mode === 'all') { stub.set(e.id, false); continue }
     if (mode === 'stubs') { stub.set(e.id, true); continue }
     const [A, B] = en
-    const pts = route(A, A.dir, B, B.dir, rects, e.data?.lane ?? 0, channel.get(e.id))
+    const pts = routeOf(e, A, B)
     const len = pts.slice(1).reduce((t, p, i) => t + Math.abs(p.x - pts[i].x) + Math.abs(p.y - pts[i].y), 0)
     const endRects = rects.filter((r) => r.id === A.device || r.id === B.device)
     stub.set(e.id, len > SMART_LEN || crossings(pts, rects, endRects) > 0)
@@ -110,7 +134,7 @@ function planFor(s: ReactFlowState, rects: Rect[]): Plan {
     const en = ends.get(e.id)
     if (!en || stub.get(e.id)) continue
     const [A, B] = en
-    raw.set(e.id, route(A, A.dir, B, B.dir, rects, e.data?.lane ?? 0, channel.get(e.id)))
+    raw.set(e.id, routeOf(e, A, B))
   }
   const paths = nudgeWires(raw, undefined, undefined, rects)
   // Cable-number labels: spread along each wire so labels on parallel runs never sit on top of each other.
@@ -122,7 +146,7 @@ function planFor(s: ReactFlowState, rects: Rect[]): Plan {
   const order = [...edges].filter((e) => ends.has(e.id) && !stub.get(e.id) && e.data?.label).sort((a, b) => (a.data!.label).localeCompare(b.data!.label, undefined, { numeric: true }))
   for (const e of order) {
     const [A, B] = ends.get(e.id)!
-    const pts = paths.get(e.id) ?? route(A, A.dir, B, B.dir, rects, e.data?.lane ?? 0, channel.get(e.id))
+    const pts = paths.get(e.id) ?? routeOf(e, A, B)
     const w = e.data!.label.length * 6 + 14, h = 15
     const segs = pts.slice(1).map((p, i) => ({ a: pts[i], b: p, len: Math.abs(p.x - pts[i].x) + Math.abs(p.y - pts[i].y) })).filter((s) => s.len > 4).sort((x, y) => y.len - x.len)
     let best: Pt | null = null
@@ -135,7 +159,7 @@ function planFor(s: ReactFlowState, rects: Rect[]): Plan {
     labels.set(e.id, best)
   }
   const plan = { channel, stub, groups, labels, paths }
-  cache = { rects, edges, sel, plan }
+  cache = { rects, edges, sel, plan, raw: rawRoutes }
   return plan
 }
 
@@ -221,7 +245,7 @@ export const CableEdge = memo(function CableEdge(props: EdgeProps<CableEdgeType>
     )
   }
   const pts = fitEnds(plan.paths.get(id), { x: sourceX, y: sourceY }, { x: targetX, y: targetY })
-    ?? route({ x: sourceX, y: sourceY }, sDir, { x: targetX, y: targetY }, tDir, rects, data?.lane ?? 0, channel)
+    ?? (detourBudget(0), route({ x: sourceX, y: sourceY }, sDir, { x: targetX, y: targetY }, tDir, rects, data?.lane ?? 0, channel))
   const path = roundedPath(pts)
   const lp = plan.labels.get(id) ?? labelPoint(pts, rects)
   return (

@@ -188,7 +188,8 @@ export function DiagramView() {
       lanes.set(pair, lane + 1)
       return {
         id: c.id, source: c.from.equipment, sourceHandle: c.from.port, target: c.to.equipment, targetHandle: c.to.port,
-        type: 'cable' as const, selected: isSel, zIndex: lifted ? 1000 : 0,
+        // Only the selected wire shows its grab handles (drag an end to rewire) – handles on every wire slow big drawings down.
+        type: 'cable' as const, selected: isSel, reconnectable: isSel && !multi.size, zIndex: lifted ? 1000 : 0,
         data: { label: c.label, color, dashed: sev === 'error', lane: lane + shown.cables.indexOf(c), onSelect: () => select([], c.id),
           mode: wireMode, toText: to ? `${to.equipment.tag} · ${to.port.label}` : undefined, fromText: from ? `${from.equipment.tag} · ${from.port.label}` : undefined,
           toPort: to?.port.label, fromPort: from?.port.label, toName: to ? `${to.equipment.tag} · ${to.equipment.product.model}` : undefined, fromName: from ? `${from.equipment.tag} · ${from.equipment.product.model}` : undefined },
@@ -375,17 +376,15 @@ export function DiagramView() {
     if (!s0 || (Math.abs(e.clientX - s0.x) < 4 && Math.abs(e.clientY - s0.y) < 4)) return
     const p0 = screenToFlowPosition(s0), p1 = screenToFlowPosition({ x: e.clientX, y: e.clientY })
     const box = { x0: Math.min(p0.x, p1.x), y0: Math.min(p0.y, p1.y), x1: Math.max(p0.x, p1.x), y1: Math.max(p0.y, p1.y) }
+    // Each wire path is straight runs (M/L, with Q corners): test each run against the box.
     const hits = new Set<string>()
-    document.querySelectorAll<SVGGElement>('.react-flow__edge').forEach((g) => {
-      const id = g.getAttribute('data-id')
-      if (!id) return
-      for (const path of g.querySelectorAll<SVGPathElement>('path.react-flow__edge-path')) {
-        const len = path.getTotalLength()
-        for (let t = 0; t <= len; t += 6) {
-          const q = path.getPointAtLength(t)
-          if (q.x >= box.x0 && q.x <= box.x1 && q.y >= box.y0 && q.y <= box.y1) { hits.add(id); return }
-        }
-      }
+    const crosses = (x1: number, y1: number, x2: number, y2: number) =>
+      Math.max(x1, x2) >= box.x0 && Math.min(x1, x2) <= box.x1 && Math.max(y1, y2) >= box.y0 && Math.min(y1, y2) <= box.y1
+    document.querySelectorAll<SVGPathElement>('.react-flow__edge path.react-flow__edge-path').forEach((path) => {
+      const id = path.closest('.react-flow__edge')?.getAttribute('data-id')
+      if (!id || hits.has(id)) return
+      const n = (path.getAttribute('d') ?? '').replace(/[MLQ]/g, ' ').trim().split(/[\s,]+/).map(Number)
+      for (let k = 0; k + 3 < n.length; k += 2) if (crosses(n[k], n[k + 1], n[k + 2], n[k + 3])) { hits.add(id); return }
     })
     if (!hits.size) return
     // After React Flow has applied its own (device) selection.
@@ -482,7 +481,7 @@ export function DiagramView() {
           if (ids !== cur) select(ids)
           showContextMenu(ev, [...deviceMenu(n.id), ...(view ? viewMenuItems(ids, view.id) : [...pageMenuItems(ids), ...addToViewItems(ids)])])
         }}
-        edgesReconnectable
+        edgesReconnectable={false}
         reconnectRadius={14}
         onReconnectStart={onReconnectStart}
         onReconnect={onReconnect}

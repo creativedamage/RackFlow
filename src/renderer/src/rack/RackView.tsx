@@ -71,7 +71,7 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
   const select = useStore((s) => s.select)
   const setState = useStore((s) => s.set)
   const layout = useMemo(() => RackLayout.of(project, rack.id), [project, rack.id])
-  const [ghost, setGhost] = useState<{ start: number; height: number; ok: boolean } | null>(null)
+  const [ghost, setGhost] = useState<{ start: number; height: number; ok: boolean; slot?: 'left' | 'right' | null } | null>(null)
   if (!layout) return null
 
   const total = rack.spec.rackUnits
@@ -85,7 +85,7 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
     useStore.getState().notify(n ? `Added ${n} blank panel${n === 1 ? '' : 's'}` : 'No empty spaces to fill', { undo: !!n })
   }
 
-  type Target = { what: 'eq'; id: EquipmentId; h: number; start: number | null } | { what: 'acc'; acc: AccessoryKind; h: number; start: number | null } | { what: 'move'; id: string; from: string; h: number; start: number | null }
+  type Target = { what: 'eq'; id: EquipmentId; h: number; start: number | null; slot?: 'left' | 'right' | null } | { what: 'acc'; acc: AccessoryKind; h: number; start: number | null } | { what: 'move'; id: string; from: string; h: number; start: number | null }
   const dragTarget = (e: React.DragEvent): Target | null => {
     const raw = e.dataTransfer.getData(DRAG_MIME) || dragCache
     if (!raw) return null
@@ -98,6 +98,12 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
       const eq = project.equipment.find((x) => x.id === p.id)
       const h = eq?.product.physical.rackUnits
       if (!eq || !h) return null
+      if (eq.product.physical.halfWidth) {
+        // ½-width gear: the half under the cursor, else the other half of that unit, else the nearest free half.
+        const prefer = e.clientX - rect.left - rail < bodyW / 2 ? 'left' : 'right'
+        const spot = layout.nearestSpot(h, eq.product.physical.depthMM, Math.max(1, unitAtCursor - h + 1), face, { kind: 'equipment', id: eq.id }, true, prefer)
+        return { what: 'eq', id: eq.id, h, start: spot?.start ?? null, slot: spot?.slot ?? null }
+      }
       return { what: 'eq', id: eq.id, h, start: at(h, eq.product.physical.depthMM, { kind: 'equipment', id: eq.id }) }
     }
     if (p.kind === 'rack-acc') return { what: 'acc', acc: p.acc, h: p.height, start: at(p.height, ACCESSORY_KINDS[p.acc].depthMM) }
@@ -134,7 +140,7 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
           if (!e.dataTransfer.types.includes(DRAG_MIME)) return
           e.preventDefault()
           const t = dragTarget(e)
-          setGhost(t ? { start: t.start ?? 1, height: t.h, ok: t.start != null } : null)
+          setGhost(t ? { start: t.start ?? 1, height: t.h, ok: t.start != null, slot: t.what === 'eq' ? t.slot : null } : null)
         }}
         onDragLeave={() => setGhost(null)}
         onDrop={(e) => {
@@ -145,7 +151,7 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
           e.preventDefault()
           if (t.what === 'eq') apply('Place in Rack', (d) => {
             const eq = d.equipment.find((x) => x.id === t.id)
-            if (eq) eq.rackPlacement = { rack: rack.id, startUnit: t.start!, face }
+            if (eq) eq.rackPlacement = { rack: rack.id, startUnit: t.start!, face, ...(t.slot ? { halfSlot: t.slot } : {}) }
           })
           else if (t.what === 'acc') {
             let added: RackAccessory | null = null
@@ -184,7 +190,7 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
               draggable={id != null}
               onDragStart={(e) => { if (id) { const s = JSON.stringify({ kind: 'rack-eq', id } satisfies DragPayload); dragCache = s; e.dataTransfer.setData(DRAG_MIME, s) } }}
               onClick={() => id && select([id])}
-              onContextMenu={(e) => { if (!id) return; select([id]); showContextMenu(e, [...deviceMenu(id), 'sep', { label: 'Flip Front/Rear', onClick: () => apply('Flip Mount Face', (d) => { const eq = d.equipment.find((x) => x.id === id); if (eq?.rackPlacement) eq.rackPlacement.face = eq.rackPlacement.face === 'front' ? 'rear' : 'front' }) }]) }}
+              onContextMenu={(e) => { if (!id) return; select([id]); showContextMenu(e, [...deviceMenu(id), 'sep', ...(o.halfSlot ? [{ label: `Move to ${o.halfSlot === 'left' ? 'Right' : 'Left'} Half`, disabled: !layout.canPlace(o.high - o.low + 1, o.depthMM, o.low, o.face, o.ref, o.halfSlot === 'left' ? 'right' : 'left'), onClick: () => apply('Move Half-Rack Unit', (d) => { const eq = d.equipment.find((x) => x.id === id); if (eq?.rackPlacement) eq.rackPlacement.halfSlot = o.halfSlot === 'left' ? 'right' : 'left' }) }] : []), { label: 'Flip Front/Rear', onClick: () => apply('Flip Mount Face', (d) => { const eq = d.equipment.find((x) => x.id === id); if (eq?.rackPlacement) eq.rackPlacement.face = eq.rackPlacement.face === 'front' ? 'rear' : 'front' }) }]) }}
               onDoubleClick={() => id && apply('Flip Mount Face', (d) => { const eq = d.equipment.find((x) => x.id === id); if (eq?.rackPlacement) eq.rackPlacement.face = eq.rackPlacement.face === 'front' ? 'rear' : 'front' })}
               title={id ? 'Drag to move · double-click to flip front/rear · right-click to edit · Delete removes from rack' : undefined}
               tabIndex={id ? 0 : -1}
@@ -203,7 +209,7 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
             </div>
           )
         })}
-        {ghost && <div className={`rack-ghost ${ghost.ok ? '' : 'bad'}`} style={{ top: yOf(ghost.start + ghost.height - 1), height: ghost.height * unitPx, left: rail, width: bodyW }} />}
+        {ghost && <div className={`rack-ghost ${ghost.ok ? '' : 'bad'}`} style={{ top: yOf(ghost.start + ghost.height - 1), height: ghost.height * unitPx, left: rail + (ghost.slot === 'right' ? bodyW / 2 : 0), width: ghost.slot ? bodyW / 2 : bodyW }} />}
         {cog != null && <div className="cog" style={{ top: (total - cog) * unitPx }} title={`Centre of gravity U${cog.toFixed(1)}`}>◆</div>}
       </div>
       <dl className="rack-stats">

@@ -267,9 +267,11 @@ const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); retu
 export interface ChannelWire { id: string; sx: number; sy: number; tx: number; ty: number; /** Right edge of the source device. */ sourceRight: number }
 
 /**
- * A vertical track (x) for each left-to-right wire. Wires turning in the same
- * gap get separate tracks; wires going down take tracks right-to-left from the
- * top, wires going up the other way, so wires in one gap never cross.
+ * A vertical track (x) for each left-to-right wire. Every wire turning in the
+ * same gap gets its own track, ordered so the bundle crosses itself as little
+ * as possible: a wire never runs across another's turn when an order exists
+ * that avoids it (down-going wires that start lower sit further left, etc.).
+ * Tracks are squeezed (down to 5 px apart) to fit a narrow gap.
  */
 export function planChannels(wires: ChannelWire[], gap = WIRE_TRACK_GAP, spacing = WIRE_TRACK_SPACING): Map<string, number> {
   const res = new Map<string, number>()
@@ -279,24 +281,41 @@ export function planChannels(wires: ChannelWire[], gap = WIRE_TRACK_GAP, spacing
     const k = Math.round((w.sourceRight + gap) / 24)
     buckets.set(k, [...(buckets.get(k) ?? []), w])
   }
+  // Crossings if a sits left of b: a horizontal reaching past the other wire's track inside its vertical run.
+  const inside = (v: number, w: ChannelWire) => v > Math.min(w.sy, w.ty) + 0.5 && v < Math.max(w.sy, w.ty) - 0.5
+  const cross = (a: ChannelWire, b: ChannelWire) => (inside(a.ty, b) ? 1 : 0) + (inside(b.sy, a) ? 1 : 0)
   for (const ws of buckets.values()) {
     const left = Math.max(...ws.map((w) => w.sourceRight)) + gap
-    const tracks: [number, number][][] = []
-    const place = (w: ChannelWire) => {
-      const lo = Math.min(w.sy, w.ty) - 3, hi = Math.max(w.sy, w.ty) + 3
-      for (let k = 0; ; k++) {
-        const t = (tracks[k] ??= [])
-        if (t.every(([a, b]) => hi < a || lo > b)) {
-          t.push([lo, hi])
-          const x = left + k * spacing
-          if (x <= w.tx - gap) res.set(w.id, x)
-          return
-        }
-      }
+    const right = Math.min(...ws.map((w) => w.tx)) - gap
+    const order: ChannelWire[] = []
+    // Insertion with the pairwise rule, seeded in a good global order.
+    const seed = [...ws].sort((a, b) => (Math.sign(b.ty - b.sy) - Math.sign(a.ty - a.sy)) || (a.ty > a.sy ? b.sy - a.sy : a.sy - b.sy) || a.ty - b.ty)
+    for (const w of seed) {
+      let at = order.length
+      while (at > 0 && cross(w, order[at - 1]) < cross(order[at - 1], w)) at--
+      order.splice(at, 0, w)
     }
-    // Down-going: bottom-most source first gets the leftmost track; up-going: top-most first.
-    ws.filter((w) => w.ty > w.sy).sort((a, b) => b.sy - a.sy || b.ty - a.ty).forEach(place)
-    ws.filter((w) => w.ty < w.sy).sort((a, b) => a.sy - b.sy || a.ty - b.ty).forEach(place)
+    // Tracks: each wire takes the leftmost track that adds no crossings (sharing one only with
+    // wires whose runs don't overlap), else a new track on the right.
+    const track = new Map<string, number>(), byTrack: ChannelWire[][] = []
+    for (const w of order) {
+      let best = byTrack.length, bestCost = Infinity
+      for (let k = 0; k <= byTrack.length; k++) {
+        if (k < byTrack.length && byTrack[k].some((u) => Math.min(u.sy, u.ty) - 4 < Math.max(w.sy, w.ty) && Math.min(w.sy, w.ty) - 4 < Math.max(u.sy, u.ty))) continue
+        let c = 0
+        for (const [id, t] of track) { const u = ws.find((x) => x.id === id)!; if (t < k) c += cross(u, w); else if (t > k) c += cross(w, u) }
+        if (c < bestCost) { bestCost = c; best = k }
+      }
+      ;(byTrack[best] ??= []).push(w)
+      track.set(w.id, best)
+    }
+    const n = byTrack.length
+    const room = right - left
+    const step = n > 1 ? Math.max(5, Math.min(spacing, room / (n - 1))) : spacing
+    for (const w of ws) {
+      const x = left + track.get(w.id)! * step
+      if (x <= w.tx - gap) res.set(w.id, Math.round(x * 2) / 2)
+    }
   }
   return res
 }

@@ -10,7 +10,7 @@ import { DOMAINS } from '../signals'
 import { portDomain } from '../project'
 import { planChannels, type ChannelWire } from '../autolayout'
 import { cardLayout, cardPortLabel, FACE_H, headerHeight, NODE_WIDTH, nodeGeom, SEC_HEAD, splitPorts } from '../diagramgeom'
-import { crossings, nudgeWires, route, WIRE_CLEAR, type Pt, type Rect } from '../wireroute'
+import { crossings, detourBudget, nudgeWires, route, WIRE_CLEAR, type Pt, type Rect } from '../wireroute'
 import { groupsOf } from '../groups'
 import { newSheet, sheetSize, type SheetOptions } from './sheet'
 import { Svg, textWidth } from './svg'
@@ -307,6 +307,7 @@ function drawWires(svg: Svg, p: Project, o: SchematicOptions, eqs: EquipmentInst
   }
   const plan = planChannels(wires)
   // Route every wire drawn in full first, then pull apart wires sharing a run.
+  detourBudget(4000)
   const full = new Map<string, Pt[]>()
   for (const c of cables) {
     const a = endOf(p, c.from), b = endOf(p, c.to)

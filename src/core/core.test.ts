@@ -626,3 +626,18 @@ describe('manufacturer directory', () => {
     expect(d.all.filter((m) => m.name.toLowerCase() === 'shure')).toHaveLength(1)
   })
 })
+
+describe('half-rack units', () => {
+  it('two ½-width 1RU devices share one unit side by side', async () => {
+    const { RackLayout } = await import('./rack')
+    const p = newProject()
+    const r = addRack(p)
+    const half = { ...BUILT_IN_PRODUCTS.find((x) => x.physical.rackUnits === 1)!, key: 'half', physical: { ...BUILT_IN_PRODUCTS.find((x) => x.physical.rackUnits === 1)!.physical, halfWidth: true } }
+    const a = addEquipment(p, half, { x: 0, y: 0 }), b = addEquipment(p, half, { x: 0, y: 0 })
+    a.rackPlacement = { rack: r.id, startUnit: 10, face: 'front', halfSlot: 'left' }
+    const spot = RackLayout.of(p, r.id)!.nearestSpot(1, half.physical.depthMM, 10, 'front', { kind: 'equipment', id: b.id }, true, 'left')
+    expect(spot).toEqual({ start: 10, slot: 'right' })
+    b.rackPlacement = { rack: r.id, startUnit: 10, face: 'front', halfSlot: 'right' }
+    expect(RackLayout.of(p, r.id)!.usedUnits).toBe(1)
+  })
+})

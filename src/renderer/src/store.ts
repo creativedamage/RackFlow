@@ -128,6 +128,9 @@ let toastSeq = 0
 
 const MAX_HISTORY = 200
 
+/** Shared empty pick, so clearing it doesn't count as a change (keeps the diagram from redrawing every wire). */
+const NO_CABLES: CableId[] = []
+
 export const useStore = create<AppState>((set, get) => ({
   project: newProject(),
   path: null,
@@ -140,7 +143,7 @@ export const useStore = create<AppState>((set, get) => ({
   mode: 'diagram',
   selection: [],
   selectedCable: null,
-  selectedCables: [],
+  selectedCables: NO_CABLES,
   selectedRack: null,
   selectedBay: null,
   selectedAccessory: null,
@@ -203,7 +206,7 @@ export const useStore = create<AppState>((set, get) => ({
   }) },
   markSaved: (path) => { rememberSaved(get().project); set({ path, dirty: false, lastSaved: Date.now() }) },
   set: (patch) => set(patch),
-  select: (ids, cable = null) => set({ selection: ids, selectedCable: cable, selectedCables: [], selectedAccessory: null }),
+  select: (ids, cable = null) => set({ selection: ids, selectedCable: cable, selectedCables: NO_CABLES, selectedAccessory: null }),
   focusIssue: (s) => {
     switch (s.kind) {
       case 'equipment': set({ mode: 'diagram', selection: [s.id], selectedCable: null }); break

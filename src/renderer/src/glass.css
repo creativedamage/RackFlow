@@ -349,3 +349,10 @@ button.danger:not(.link):hover:not(:disabled) { background: var(--danger) !impor
 .templates-panel.peek { width: var(--tp-w, 420px); display: flex; }
 .sidebar.peek { animation: none; }
 .sidebar { animation: none; }
+
+/* Page tabs stay on one line (scrolling sideways when there are many) – a wrapped second row
+   used to sit on top of the diagram tools and swallow their clicks. */
+.page-tabs { flex-wrap: nowrap !important; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; white-space: nowrap; }
+.page-tabs::-webkit-scrollbar { display: none; }
+.page-tabs > * { flex-shrink: 0; }
+.app.mode-diagram .page-tabs { max-width: calc(100% - 24px); }
