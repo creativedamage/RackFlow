@@ -1122,6 +1122,7 @@ input.mono { font-family: var(--mono); }
 .pb-rowtab i { font-style: normal; font-size: 9px; }
 .pb-rowtab span { font-size: 7.5px; font-weight: 700; letter-spacing: 0.02em; }
 .pb-arrow { font-style: normal; font-size: 8px; line-height: 1; display: block; text-align: center; opacity: 0.85; margin-top: 1px; }
+.pb-arrow.top { margin-top: 0; margin-bottom: 1px; }
 .fb-check { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; white-space: nowrap; padding: 0 4px; }
 .fb-letter { width: 34px; text-align: center; font-weight: 700; }
 .format-bar .fb.on, .format-bar button.fb.on { background: var(--accent); color: #fff; border-color: var(--accent); }

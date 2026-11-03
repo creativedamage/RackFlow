@@ -3,7 +3,7 @@
 // printToPDF with a CSS @page size, so screen, SVG and PDF are identical.
 
 import type { CellStyle, LabelStripGeometry, LabelStyle, PatchBay } from '../model'
-import { arrowGlyph, findCell, NORMAL_SYMBOLS, NORMAL_WORDS, rowLetter, rowMode } from './patchbay'
+import { arrowGlyph, rowOnBottom, findCell, NORMAL_SYMBOLS, NORMAL_WORDS, rowLetter, rowMode } from './patchbay'
 import { cellSpanMM } from './template'
 
 export interface LabelStock { key: string; name: string; widthMM: number; heightMM: number; marginMM: number }
@@ -106,6 +106,7 @@ export function layoutLabels(bays: PatchBay[], o: PrintOptions): LabelPage[] {
         const cellY = sy + titleH + (g.padTopMM ?? 0), cellH = h - titleH - normH - (g.padTopMM ?? 0) - (g.padBottomMM ?? 0)
         const xOf = (ch: number) => x0 + cellSpanMM(g, ch).x - seg.origin
         const arrow = arrowGlyph(bay.arrows?.[String(row.id)])
+        const bottomRow = rowOnBottom(bay, row.id)
         const tabs = !!bay.rowTabs?.on
         const mode = tabs ? rowMode(bay, row.id) : null
         // With strip-end tabs, bands and dividers stop at the tabs – nothing runs under the row letters.
@@ -136,10 +137,11 @@ export function layoutLabels(bays: PatchBay[], o: PrintOptions): LabelPage[] {
           if (bay.style.showChannelNumbers) lines = [String(ch + 1), ...lines]
           lines = lines.slice(0, g.linesPerCell + (bay.style.showChannelNumbers ? 1 : 0))
           if (!lines.some((l) => l.trim())) continue
-          // ▲ / ▼ on each port label: always under the text, centred over the jack it names.
+          // ▲ / ▼ on each port label, centred over the jack it names, on the jack's side of the text:
+          // under it on a top row, above it on a bottom row.
           const ah = arrow ? Math.min(2.2, cellH * 0.3) : 0
-          if (arrow) items.push({ t: 'text', lines: [arrow], r: { x: cx, y: cellY + cellH - ah - 0.1, w: span.width, h: ah }, font: 'Helvetica, Arial, sans-serif', sizePt: Math.min(5, ah * PT_PER_MM * 0.95), color: '#000000', bold: false, align: 'center' })
-          const r = { x: cx + 0.4, y: cellY + 0.3, w: span.width - 0.8, h: cellH - 0.6 - ah }
+          if (arrow) items.push({ t: 'text', lines: [arrow], r: { x: cx, y: bottomRow ? cellY + 0.1 : cellY + cellH - ah - 0.1, w: span.width, h: ah }, font: 'Helvetica, Arial, sans-serif', sizePt: Math.min(5, ah * PT_PER_MM * 0.95), color: '#000000', bold: false, align: 'center' })
+          const r = { x: cx + 0.4, y: cellY + 0.3 + (bottomRow ? ah : 0), w: span.width - 0.8, h: cellH - 0.6 - ah }
           items.push({
             t: 'text', lines, r, font: st?.fontFamily ?? bay.style.fontFamily,
             sizePt: st?.sizePt ?? fittedFontPt(lines, r, bay.style), color: st?.color ?? '#000000',
@@ -169,11 +171,13 @@ export function layoutLabels(bays: PatchBay[], o: PrintOptions): LabelPage[] {
           // Stacked and centred: letter, then the arrow under it, then the word under that.
           const end = (x: number, w: number) => {
             if (w < 3.5) return
-            const glyph = word ? (arrow || '▼') : ''
+            const glyph = word ? (arrow || (bottomRow ? '▲' : '▼')) : ''
             const wordH = word ? Math.min(h * 0.2, 2.2) : 0, glyphH = glyph ? Math.min(h * 0.2, 2.2) : 0
             const letterH = h - wordH - glyphH - 0.4
-            items.push({ t: 'text', lines: [rowLetter(bay, row.id)], r: { x, y: sy + 0.2, w, h: letterH }, font: bay.style.fontFamily, sizePt: Math.min(letterH * 0.9, w * 0.85) * PT_PER_MM, color: '#000000', bold: true, align: 'center' })
-            if (glyph) items.push({ t: 'text', lines: [glyph], r: { x, y: sy + 0.2 + letterH, w, h: glyphH }, font: 'Helvetica, Arial, sans-serif', sizePt: Math.min(glyphH * 0.95 * PT_PER_MM, 6), color: '#000000', bold: false, align: 'center' })
+            // Bottom rows: arrow first (on top), then letter, then word. Top rows: letter, arrow, word.
+            const gy = bottomRow ? sy + 0.2 : sy + 0.2 + letterH, ly = bottomRow ? sy + 0.2 + glyphH : sy + 0.2
+            items.push({ t: 'text', lines: [rowLetter(bay, row.id)], r: { x, y: ly, w, h: letterH }, font: bay.style.fontFamily, sizePt: Math.min(letterH * 0.9, w * 0.85) * PT_PER_MM, color: '#000000', bold: true, align: 'center' })
+            if (glyph) items.push({ t: 'text', lines: [glyph], r: { x, y: gy, w, h: glyphH }, font: 'Helvetica, Arial, sans-serif', sizePt: Math.min(glyphH * 0.95 * PT_PER_MM, 6), color: '#000000', bold: false, align: 'center' })
             if (word) items.push({ t: 'text', lines: [word], r: { x: x + 0.15, y: sy + 0.2 + letterH + glyphH, w: w - 0.3, h: wordH }, font: bay.style.fontFamily, sizePt: Math.min(wordH * 0.9 * PT_PER_MM, ((w - 0.6) / (word.length * AVG_ADVANCE_EM * 1.12)) * PT_PER_MM, 6), color: '#000000', bold: true, align: 'center' })
           }
           if (seg.first === 0) { end(x0, leftW); if (leftW >= 3.5) items.push({ t: 'line', x1: x0 + leftW, y1: sy, x2: x0 + leftW, y2: sy + h, stroke: '#000000', lw: 0.1 }) }

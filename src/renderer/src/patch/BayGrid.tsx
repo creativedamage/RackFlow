@@ -1,7 +1,7 @@
 import { editBayLayout } from '../product/openEditor'
 import { memo, useLayoutEffect, useRef, useState } from 'react'
 import {
-  FORMATS, gapBefore, NORMAL_SYMBOLS, NORMAL_WORDS, arrowGlyph, rowLetter, rowMode, cycleNormal, findCell, titlesIn, totalChannels,
+  FORMATS, gapBefore, NORMAL_SYMBOLS, NORMAL_WORDS, arrowGlyph, rowOnBottom, rowLetter, rowMode, cycleNormal, findCell, titlesIn, totalChannels,
   type CellStyle, type LabelStripGeometry, type LabelSpan, type PatchBay, type PatchRowTemplate, isTwoSided, panelDescription,
 } from '@core/index'
 import { useStore } from '../store'
@@ -135,8 +135,9 @@ function Strip({ bay, row, bank, sel, title, onSel, onEdit }: {
               onMouseDown={(e) => down(e, ch)} onMouseEnter={() => enter(ch)}
               onDoubleClick={() => onEdit({ bay: bay.id, row: row.id, channel: ch })}
               title={cell?.text ? `${row.name} ${ch}: ${cell.text.replace(/\n/g, ' / ')}${cell.manual ? ' (typed)' : ' (from wiring)'}` : `${row.name} ${ch}`}>
+              {cell?.text && bay.arrows?.[String(row.id)] && rowOnBottom(bay, row.id) && <i className="pb-arrow top">{arrowGlyph(bay.arrows[String(row.id)])}</i>}
               {cell?.text ? lines.map((l, k) => <span key={k}>{l}</span>) : <span className="ch-num">{ch}</span>}
-              {cell?.text && bay.arrows?.[String(row.id)] && <i className="pb-arrow">{arrowGlyph(bay.arrows[String(row.id)])}</i>}
+              {cell?.text && bay.arrows?.[String(row.id)] && !rowOnBottom(bay, row.id) && <i className="pb-arrow">{arrowGlyph(bay.arrows[String(row.id)])}</i>}
             </div>
           )
         })}
@@ -226,8 +227,9 @@ function RowTab({ bay, rowId }: { bay: PatchBay; rowId: number }) {
   const m = rowMode(bay, rowId), a = arrowGlyph(bay.arrows?.[String(rowId)])
   return (
     <div className="pb-rowtab" title="Strip end: row letter, arrow and the row's normalling (printed on both ends)">
+      {m && rowOnBottom(bay, rowId) && <i>{a || '▲'}</i>}
       <b>{rowLetter(bay, rowId)}</b>
-      {m && <i>{a || '▼'}</i>}
+      {m && !rowOnBottom(bay, rowId) && <i>{a || '▼'}</i>}
       {m && <span>{NORMAL_WORDS[m]}</span>}
     </div>
   )

@@ -108,6 +108,15 @@ export function retemplateBay(p: Project, bayId: string, t: PatchBayTemplate): n
 export const NORMAL_WORDS: Record<NormalMode, string> = { full: 'NORMAL', half: 'HALF', parallel: 'PARALLEL', none: 'ISOLATED' }
 export const arrowGlyph = (a?: RowArrow) => (a === 'up' ? '▲' : a === 'down' ? '▼' : '')
 
+/**
+ * Bottom-row strips (the 2nd, 4th… row of a bay) sit below their jacks, so their
+ * arrow goes on top of the text; top-row strips sit above, arrow underneath.
+ */
+export function rowOnBottom(bay: PatchBay, rowId: number): boolean {
+  const i = bay.template.rows.findIndex((r) => r.id === rowId)
+  return i >= 0 && i % 2 === 1
+}
+
 /** A row's letter on the strip ends: the one you typed, else A, B, C… down the bay. */
 export function rowLetter(bay: PatchBay, rowId: number): string {
   const own = bay.rowTabs?.letters?.[String(rowId)]
