@@ -4,7 +4,7 @@ import { crossings, detourBudget, labelPoint, nudgeWires, planChannels, roundedP
 import { nodeGeom } from './tidy'
 
 export type CableEdgeData = {
-  label: string; color: string; dashed: boolean; lane: number; onSelect?: () => void
+  label: string; color: string; casing?: boolean; dashed: boolean; lane: number; onSelect?: () => void
   mode?: WireMode
   /** Stub labels: where the far end goes ("VSW-001 · Input 3"). */
   toText?: string; fromText?: string
@@ -195,7 +195,8 @@ export const CableEdge = memo(function CableEdge(props: EdgeProps<CableEdgeType>
   const channel = plan.channel.get(id)
   const sDir = dirOf(sourcePosition), tDir = dirOf(targetPosition)
   const color = data?.color ?? '#888'
-  const stroke = { stroke: color, strokeWidth: selected ? 3 : 1.6, strokeDasharray: data?.dashed ? '6 3' : undefined }
+  // White / black jackets get a hairline outline so they stay visible on the page.
+  const stroke = { stroke: color, strokeWidth: selected ? 3 : 1.6, strokeDasharray: data?.dashed ? '6 3' : undefined, filter: data?.casing ? 'drop-shadow(0 0 0.7px rgba(120,120,128,0.95))' : undefined }
   if (plan.stub.get(id) && !selected) {
     const end = (x: number, y: number, dir: number, device: string, text: string | undefined, port: string | undefined, name: string | undefined, key: string) => {
       const g = plan.groups.get(`${id}|${device}|${dir}`)

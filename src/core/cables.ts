@@ -249,6 +249,18 @@ export const CABLE_COLORS: { name: string; hex: string }[] = [
   { name: 'Purple', hex: '#7b2cbf' }, { name: 'Violet', hex: '#9d4edd' }, { name: 'Pink', hex: '#f06595' }, { name: 'Brown', hex: '#8b5a2b' },
   { name: 'Aqua', hex: '#22b8cf' }, { name: 'Lime', hex: '#94d82d' }, { name: 'Tan', hex: '#d2b48c' },
 ]
-export const cableColorHex = (name?: string) => CABLE_COLORS.find((c) => c.name.toLowerCase() === name?.trim().toLowerCase())?.hex
+export const cableColorHex = (name?: string) => {
+  const t = name?.trim().toLowerCase()
+  if (!t) return undefined
+  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/.test(t)) return t
+  return CABLE_COLORS.find((c) => c.name.toLowerCase() === t || (t === 'grey' && c.name === 'Gray'))?.hex
+}
+/** True for jacket colours that vanish on a white or dark page (white, black…) – drawn with a thin outline. */
+export const needsCasing = (hex: string) => {
+  const h = hex.replace('#', ''), f = h.length === 3 ? h.split('').map((x) => x + x).join('') : h
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(f.slice(i, i + 2), 16) / 255)
+  const l = 0.2126 * r + 0.7152 * g + 0.0722 * b
+  return l > 0.82 || l < 0.12
+}
 /** Matches typed / pasted text to a colour name (any other text is kept as typed). */
 export const normalizeColor = (v: string) => { const t = v.trim(); if (!t) return undefined; return CABLE_COLORS.find((c) => c.name.toLowerCase() === t.toLowerCase() || (t.toLowerCase() === 'grey' && c.name === 'Gray'))?.name ?? t }

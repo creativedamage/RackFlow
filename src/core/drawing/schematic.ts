@@ -3,6 +3,7 @@
 // cable number and FROM-TO tags at both ends, off-sheet arrows for long or
 // cross-sheet runs, and dashed room zones.
 
+import { cableColorHex } from '../cables'
 import { viewPrintProject, viewsOf } from '../views'
 import { autoNumber, GENERAL_PAGE, pageNumbers, sheetLabel } from '../sheetnumbers'
 import { CATEGORIES, type Annotation, type Cable, type EquipmentInstance, type PortTemplate, type Project, type WireMode } from '../model'
@@ -326,7 +327,7 @@ function drawWires(svg: Svg, p: Project, o: SchematicOptions, eqs: EquipmentInst
     const a = endOf(p, c.from), b = endOf(p, c.to)
     if (!a || !b) continue
     const d = portDomain(a.port)
-    const stroke = o.color && d ? DOMAINS[d].color : '#000'
+    const stroke = o.color ? (cableColorHex(c.color) ?? (d ? DOMAINS[d].color : '#000')) : '#000'
     const tags = `${compactTag(a.eq.tag)}-${compactTag(b.eq.tag)}`
     const both = onPage.has(a.eq.id) && onPage.has(b.eq.id)
     let pts: Pt[] | null = null

@@ -8,8 +8,7 @@ import {
 } from '@xyflow/react'
 import {
   addEquipment, addPatchBay, addToGroup, pageNumbers, GENERAL_PAGE, layoutView, setInView, viewOffFlags, viewProject, viewsOf, nodeGeom, placeInFreeSpace, connectMany, groupColor, groupsOf, type BulkResult, candidates as findCandidates, connect, DOMAINS, portDomain, resolve, SIGNALS, validate,
-  type CableId, type EquipmentId, type PortAddress,
-} from '@core/index'
+  type CableId, type EquipmentId, type PortAddress, cableColorHex, needsCasing } from '@core/index'
 import { useStore } from '../store'
 import { DRAG_MIME, type DragPayload } from '../components/Sidebar'
 import { setViewCenterProvider } from './placement'
@@ -179,7 +178,9 @@ export function DiagramView() {
       const to = resolve(shown, c.to)
       const d = from ? portDomain(from.port) : null
       const sev = cableSeverity.get(c.id)
-      const color = sev === 'error' ? '#e03131' : d ? DOMAINS[d].color : '#888'
+      // The cable's own jacket colour when it has one; else its signal type's colour.
+      const jacket = cableColorHex(c.color)
+      const color = sev === 'error' ? '#e03131' : jacket ?? (d ? DOMAINS[d].color : '#888')
       const isSel = c.id === selectedCable || multi.has(c.id)
       // Wires touching a selected (or dragged) device draw above other devices.
       const lifted = isSel || sel.has(c.from.equipment) || sel.has(c.to.equipment)
@@ -190,7 +191,7 @@ export function DiagramView() {
         id: c.id, source: c.from.equipment, sourceHandle: c.from.port, target: c.to.equipment, targetHandle: c.to.port,
         // Only the selected wire shows its grab handles (drag an end to rewire) – handles on every wire slow big drawings down.
         type: 'cable' as const, selected: isSel, reconnectable: isSel && !multi.size, zIndex: lifted ? 1000 : 0,
-        data: { label: c.label, color, dashed: sev === 'error', lane: lane + shown.cables.indexOf(c), onSelect: () => select([], c.id),
+        data: { label: c.label, color, casing: !!jacket && sev !== 'error' && needsCasing(jacket), dashed: sev === 'error', lane: lane + shown.cables.indexOf(c), onSelect: () => select([], c.id),
           mode: wireMode, toText: to ? `${to.equipment.tag} · ${to.port.label}` : undefined, fromText: from ? `${from.equipment.tag} · ${from.port.label}` : undefined,
           toPort: to?.port.label, fromPort: from?.port.label, toName: to ? `${to.equipment.tag} · ${to.equipment.product.model}` : undefined, fromName: from ? `${from.equipment.tag} · ${from.equipment.product.model}` : undefined },
       }
