@@ -83,7 +83,7 @@ export function BoxesView() {
         </div>
       ) : <Paper box={box} />}
 
-      {box && <Slide open={showNotes || peek === 'right'} side="right"><NotesPanel key={box.id} box={box} /></Slide>}
+      {box && <Slide open={showNotes || peek === 'right'} side="right"><NotesPanel key={box.id} box={box} floating={!showNotes} /></Slide>}
     </div>
   )
 }
@@ -97,6 +97,17 @@ function Paper({ box }: { box: EquipmentInstance }) {
   const [zoom, setZoom] = useState(1)
   const desk = useRef<HTMLDivElement>(null)
   useEffect(() => setZoom(1), [box.id])
+  // "Fit" shows the whole page: as wide as the desk allows without running past its height.
+  const [fitW, setFitW] = useState(0)
+  const aspect = useMemo(() => { const m = /viewBox="[\d.\s-]*?\s([\d.]+)\s([\d.]+)"/.exec(svg); return m ? Number(m[1]) / Number(m[2]) : 17 / 11 }, [svg])
+  useEffect(() => {
+    const el = desk.current
+    if (!el) return
+    const fit = () => setFitW(Math.max(200, Math.min(el.clientWidth - 48, (el.clientHeight - 48) * aspect)))
+    fit()
+    const ro = new ResizeObserver(fit); ro.observe(el)
+    return () => ro.disconnect()
+  }, [aspect])
   const set = useStore((s) => s.set)
   return (
     <div className="led-canvas boxes-canvas">
@@ -110,14 +121,14 @@ function Paper({ box }: { box: EquipmentInstance }) {
         <span className="pd-group"><button onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))}>−</button><button onClick={() => setZoom(1)}>Fit</button><button onClick={() => setZoom((z) => Math.min(5, z * 1.25))}>+</button></span>
       </div>
       <div className="boxes-desk" ref={desk}>
-        <div className="boxes-paper" style={{ width: `${zoom * 100}%` }} dangerouslySetInnerHTML={{ __html: svg }} />
+        <div className="boxes-paper" style={{ width: fitW ? fitW * zoom : '100%' }} dangerouslySetInnerHTML={{ __html: svg }} />
       </div>
     </div>
   )
 }
 
 /** This box's notes: start from the automatic ones, then change, add, reorder or remove any line. */
-function NotesPanel({ box }: { box: EquipmentInstance }) {
+function NotesPanel({ box, floating }: { box: EquipmentInstance; floating: boolean }) {
   const project = useStore((s) => s.project)
   const apply = useStore((s) => s.apply)
   const auto = useMemo(() => fabricationNotes(project, box.id), [project, box.id])
@@ -129,7 +140,7 @@ function NotesPanel({ box }: { box: EquipmentInstance }) {
   })
   const move = (i: number, by: number) => edit('Move Note', (l) => { const [x] = l.splice(i, 1); l.splice(i + by, 0, x); return l })
   return (
-    <aside className="led-settings boxes-notes">
+    <aside className={`led-settings boxes-notes ${floating ? 'peek' : ''}`}>
       <h4>Location</h4>
       <TextInput value={box.room ?? ''} placeholder="Room / wall, e.g. Studio A – north wall, 18&quot; AFF" onCommit={(v) => apply('Box Location', (d) => { const e = d.equipment.find((x) => x.id === box.id); if (e) e.room = v })} />
       <div className="boxes-notes-head">

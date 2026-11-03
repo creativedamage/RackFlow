@@ -1186,9 +1186,11 @@ input.mono { font-family: var(--mono); }
 
 /* Wall Boxes tab */
 .boxes-view { display: grid; grid-template-columns: 250px minmax(0, 1fr) 340px; height: 100%; min-height: 0; background: var(--bg); }
-.boxes-view.no-list { grid-template-columns: 0 minmax(0, 1fr) 340px; }
-.boxes-view.no-settings { grid-template-columns: 250px minmax(0, 1fr) 0; }
-.boxes-view.no-list.no-settings { grid-template-columns: 0 minmax(0, 1fr) 0; }
+.boxes-view > * { min-width: 0; min-height: 0; }
+/* A hidden panel is unmounted (or floats as a peek), so the grid only counts what's there. */
+.boxes-view.no-list { grid-template-columns: minmax(0, 1fr) 340px; }
+.boxes-view.no-settings { grid-template-columns: 250px minmax(0, 1fr); }
+.boxes-view.no-list.no-settings { grid-template-columns: minmax(0, 1fr); }
 .boxes-search { margin: 0 12px 6px; width: calc(100% - 24px); border-radius: 999px; padding: 5px 12px; }
 .boxes-group { margin: 12px 14px 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); }
 .boxes-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-left: 6px; vertical-align: middle; }
@@ -1206,3 +1208,13 @@ input.mono { font-family: var(--mono); }
 .boxes-note { width: 100%; font-size: 12px; resize: vertical; field-sizing: content; min-height: 30px; }
 .boxes-note-tools { grid-column: 2; display: flex; gap: 4px; justify-content: flex-end; opacity: 0.55; }
 .boxes-note-list li:hover .boxes-note-tools, .boxes-note-list li:focus-within .boxes-note-tools { opacity: 1; }
+.boxes-view { grid-template-columns: clamp(190px, 18vw, 250px) minmax(0, 1fr) clamp(260px, 26vw, 340px); }
+.boxes-view.no-list { grid-template-columns: minmax(0, 1fr) clamp(260px, 26vw, 340px); }
+.boxes-view.no-settings { grid-template-columns: clamp(190px, 18vw, 250px) minmax(0, 1fr); }
+.boxes-view.no-list.no-settings { grid-template-columns: minmax(0, 1fr); }
+.boxes-canvas .led-bar { flex-wrap: wrap; gap: 6px 8px; min-width: 0; overflow: hidden; }
+.boxes-canvas .led-bar > b { white-space: nowrap; }
+.boxes-canvas .led-bar > .muted { flex: 1 1 140px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boxes-canvas .led-bar > .spacer { display: none; }
+.boxes-canvas .led-bar button { white-space: nowrap; }
+.boxes-notes { min-width: 0; overflow-x: hidden; }
