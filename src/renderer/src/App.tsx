@@ -1,5 +1,7 @@
 import { createPortal } from 'react-dom'
 import { ExportAllDialog, openExport } from './print/ExportAllDialog'
+import { ShareDialog } from './share/ShareDialog'
+import { useCloud, useCloudSync } from './share/cloudState'
 import { PanelResizer, usePanelWidth } from './components/PanelResizer'
 import { tidyDiagram } from './diagram/tidy'
 import { DeviceFinder } from './product/DeviceFinder'
@@ -62,6 +64,8 @@ export function App() {
   const editingProduct = useStore((s) => s.editingProduct)
   const finding = useStore((s) => s.finding)
   const exportingAll = useStore((s) => s.exportingAll)
+  const sharing = useCloud((s) => s.open)
+  useCloudSync()
   const editingView = useStore((s) => s.editingView)
   const editingNumbers = useStore((s) => s.editingNumbers)
   const editingNumbering = useStore((s) => s.editingNumbering)
@@ -104,6 +108,7 @@ export function App() {
       case 'saveAs': await saveDocument(true); break
       case 'autosave:toggle': setAutoSave(!s.autoSave); break
       case 'quickPrint': openExport(); break
+      case 'share': useCloud.getState().set({ open: true, tab: 'share' }); break
       case 'save-and-close': if (await saveDocument()) api.closeWindow(); break
       // ⌘Z inside a text field is the field's own undo, not the document's.
       case 'undo': if (s.editingPlate && !inTextField()) { window.dispatchEvent(new Event('designer:undo')); break } if (fieldHasEdits()) document.execCommand('undo'); else docUndo(false); break
@@ -190,6 +195,7 @@ export function App() {
           onCancel={() => { const s = useStore.getState(); const copy = s.copiedView === editingView; s.set({ editingView: null, copiedView: null }); if (copy) { s.undo(); s.set({ diagramView: null }) } }} />}
         {editingNumbers && createPortal(<SheetNumbersDialog onClose={() => useStore.getState().set({ editingNumbers: false })} />, document.body)}
         {editingNumbering && createPortal(<NumberingDialog onClose={() => useStore.getState().set({ editingNumbering: false })} />, document.body)}
+        {sharing && <ShareDialog />}
         {exportingAll && <ExportAllDialog onClose={() => useStore.getState().set({ exportingAll: false })} />}
         <Toasts />
         <ContextMenu />

@@ -3,6 +3,7 @@ import { SidebarButton } from '../panels'
 import { isElectron } from '../platform'
 import { setAutoSave } from '../autosave'
 import { openExport } from '../print/ExportAllDialog'
+import { useCloud } from '../share/cloudState'
 import { Segmented, TextInput } from './ui'
 import { IssuesButton } from './IssuesButton'
 import { AppMenuButton, UpdatePill } from './UpdatePill'
@@ -58,6 +59,7 @@ export function Toolbar() {
       <div className="toolbar-right">
         <UpdatePill />
         <div className="tb-island tb-tools">
+        <ShareButton />
         <button className="icon-btn qp-btn" onClick={() => openExport()} title="Export / Print (⌘P) – choose the drawings and schedules to save, starting with what you're looking at" aria-label="Export">
           <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M10 12.5V3" /><path d="M6.5 6.5L10 3l3.5 3.5" /><path d="M4 10.5v4.5a1.5 1.5 0 001.5 1.5h9a1.5 1.5 0 001.5-1.5v-4.5" /></svg>
         </button>
@@ -95,6 +97,21 @@ function AutoSaveChip() {
     <button className={`autosave-chip ${on ? 'on' : ''} ${dirty ? 'dirty' : ''}`} onClick={() => setAutoSave(!on)}
       title={on ? 'Auto-save is on: every change is written to the file. Click to turn it off.' : 'Auto-save is off. Click to save every change automatically.'}>
       <i />{label}
+    </button>
+  )
+}
+
+/** Share: people icon; a dot shows the project is live online, a badge counts open viewer notes. */
+function ShareButton() {
+  const shared = useStore((s) => !!s.project.cloud)
+  const status = useCloud((s) => s.status)
+  const open = useCloud((s) => s.notes.filter((n) => !n.resolved).length)
+  return (
+    <button className={`icon-btn share-btn ${shared ? 'on' : ''}`} onClick={() => useCloud.getState().set({ open: true, tab: open ? 'notes' : 'share' })}
+      title={shared ? `Shared – ${status === 'live' ? 'viewers see your changes live' : status}${open ? ` · ${open} open note${open === 1 ? '' : 's'}` : ''}` : 'Share with viewers (web)'} aria-label="Share">
+      <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><circle cx="7.5" cy="7" r="2.6" /><path d="M2.8 16c.6-2.6 2.4-4 4.7-4s4.1 1.4 4.7 4" /><circle cx="14" cy="7.8" r="2" /><path d="M13.6 11.6c1.9.1 3.2 1.3 3.7 3.4" /></svg>
+      {shared && <span className={`share-dot ${status}`} />}
+      {open > 0 && <span className="share-badge">{open}</span>}
     </button>
   )
 }

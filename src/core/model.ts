@@ -354,9 +354,14 @@ export interface Revision { id: string; rev: string; date: string; description: 
 
 export interface ProjectInfo { name: string; client: string; designer: string; revision: string; location?: string }
 
+/** Shared to the RackFlow web viewer: the cloud copy this file keeps in sync. */
+export interface CloudLink { id: string; owner: string }
+
 export interface Project {
   schemaVersion: number
   info: ProjectInfo
+  /** Set while the project is shared to the web viewer (kept in the file so it stays linked). */
+  cloud?: CloudLink
   equipment: EquipmentInstance[]
   cables: Cable[]
   racks: Rack[]

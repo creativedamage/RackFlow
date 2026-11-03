@@ -1,0 +1,8 @@
+# RackFlow Viewer (the web app for people you share projects with)
+[build]
+  command = "npm ci && npm run build:viewer"
+  publish = "out/viewer"
+
+[build.environment]
+  ELECTRON_SKIP_BINARY_DOWNLOAD = "1"
+  NODE_VERSION = "22"

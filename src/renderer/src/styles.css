@@ -1157,3 +1157,29 @@ input.mono { font-family: var(--mono); }
 .export-picks-bar { display: flex; gap: 12px; margin-bottom: 2px; }
 .export-picks .check { font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
 .export-sub { padding: 0 0 6px 28px; font-size: 12px; }
+
+/* Share */
+.share { padding: 16px 18px; min-width: 560px; max-width: 680px; display: flex; flex-direction: column; gap: 10px; }
+.share h3 { margin: 0; font-size: 15px; } .share h4 { margin: 10px 0 2px; font-size: 12px; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
+.share-signin { display: flex; flex-direction: column; gap: 10px; }
+.share-signin label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-2); }
+.share-msg { margin: 0; font-size: 12.5px; color: var(--accent); }
+.share-actions { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.share-tabs { display: flex; align-items: center; gap: 6px; }
+.share-tabs > button:not(.link) { border-radius: 999px; padding: 4px 14px; }
+.share-tabs > button.on { background: var(--accent) !important; color: #fff !important; }
+.share-status { display: flex; align-items: center; gap: 8px; }
+.share-dot { width: 8px; height: 8px; border-radius: 50%; background: #2f9e44; flex: none; }
+.share-dot.syncing { background: #f08c00; } .share-dot.error { background: var(--danger); } .share-dot.off, .share-dot.other-owner { background: #999; }
+.share-add { display: flex; gap: 8px; } .share-add input { flex: 1; }
+.share-list, .note-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 40vh; overflow: auto; }
+.share-list li { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 10px; background: var(--c-hover, rgba(0,0,0,.04)); }
+.share-list li span:first-child { flex: 1; }
+.note-list li { padding: 8px 12px; border-radius: 12px; background: var(--c-hover, rgba(0,0,0,.04)); }
+.note-list li.resolved { opacity: .55; }
+.note-list p { margin: 4px 0; white-space: pre-wrap; }
+.note-head { display: flex; gap: 10px; align-items: baseline; }
+.note-actions { display: flex; gap: 14px; }
+.share-btn { position: relative; }
+.share-btn .share-dot { position: absolute; right: 4px; bottom: 4px; width: 6px; height: 6px; }
+.share-badge { position: absolute; top: -3px; right: -4px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 9.5px; font-weight: 700; line-height: 15px; }
