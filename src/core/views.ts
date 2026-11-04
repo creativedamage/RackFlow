@@ -37,12 +37,25 @@ export const isViewId = (p: Project, id: string | undefined | null) => !!id && v
  * types – so a Dante / AES67 network port or a combo jack doesn't slip into an
  * Audio view just because it can also carry audio.
  */
-export const portInView = (port: PortTemplate, domains: SignalDomain[]) => !!port.signals[0] && domains.includes(SIGNALS[port.signals[0]]?.domain)
+export const portInView = (port: PortTemplate, domains: SignalDomain[], e?: EquipmentInstance) =>
+  (!!port.signals[0] && domains.includes(SIGNALS[port.signals[0]]?.domain)) || (domains.includes('video') && !!e && isLedDataPort(e, port))
+
+/**
+ * LED wall data links run on Ethernet but are video: an LED processor's output
+ * ports and an LED wall's Data inputs show in Video views (not its control LAN).
+ */
+export function isLedDataPort(e: EquipmentInstance, port: PortTemplate): boolean {
+  const net = port.signals.some((s) => SIGNALS[s]?.domain === 'network')
+  if (!net) return false
+  if (e.product.tags?.includes('ledwall')) return port.id.startsWith('data.')
+  if (e.product.category === 'ledProcessor') return /output|out\b/i.test(port.label)
+  return false
+}
 
 /** Ports of a device shown in the view: its exact pick, else the signal match. */
 export function viewPortIds(v: Pick<SignalView, 'domains' | 'ports'>, e: EquipmentInstance): Set<string> {
   const pick = v.ports?.[e.id]
-  return new Set(pick ? pick.filter((id) => e.product.ports.some((x) => x.id === id)) : e.product.ports.filter((x) => portInView(x, v.domains)).map((x) => x.id))
+  return new Set(pick ? pick.filter((id) => e.product.ports.some((x) => x.id === id)) : e.product.ports.filter((x) => portInView(x, v.domains, e)).map((x) => x.id))
 }
 
 /** Hide / show single ports of a device in a view (turns the device into an exact pick). */
@@ -57,7 +70,7 @@ export function setPortsInView(p: Project, viewId: string, eqId: string, portIds
 
 /** Devices that have at least one port of the view's signal types. */
 export const viewCandidates = (p: Project, v: Pick<SignalView, 'domains'>) =>
-  p.equipment.filter((e) => e.product.ports.some((x) => portInView(x, v.domains)))
+  p.equipment.filter((e) => e.product.ports.some((x) => portInView(x, v.domains, e)))
 
 export function viewMembers(p: Project, v: SignalView): EquipmentInstance[] {
   const inc = new Set(v.include), exc = new Set(v.exclude)
