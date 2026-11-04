@@ -4,6 +4,7 @@
 // cross-sheet runs, and dashed room zones.
 
 import { cableColorHex } from '../cables'
+import { clusterMembership } from '../clusters'
 import { viewPrintProject, viewsOf } from '../views'
 import { autoNumber, GENERAL_PAGE, pageNumbers, sheetLabel } from '../sheetnumbers'
 import { CATEGORIES, type Annotation, type Cable, type EquipmentInstance, type PortTemplate, type Project, type WireMode } from '../model'
@@ -137,12 +138,12 @@ const ZONE_PAD = 36 // room zone border distance from what it encloses
  * off-sheet flags (and room borders between rooms), then blocks in a column
  * are pushed down so every block keeps its tag above and type line below.
  */
-export function printPositions(p: Project, eqs: EquipmentInstance[], o: Pick<SchematicOptions, 'wires'> & Partial<Pick<SchematicOptions, 'zones' | 'rooms' | 'split'>> = { wires: 'smart' }): Map<string, { x: number; y: number }> {
+export function printPositions(p: Project, eqs: EquipmentInstance[], o: Pick<SchematicOptions, 'wires'> & Partial<Pick<SchematicOptions, 'zones' | 'rooms' | 'split'>> = { wires: 'smart' }, groupOf?: Map<string, string>): Map<string, { x: number; y: number }> {
   const H = (e: EquipmentInstance) => nodeGeom(e).height + 12 // box incl. the type line
   const reach = new Map(eqs.map((e) => [e.id as string, sideReach(p, e, o)]))
   // Zone each device sits in – columns of different zones get room for the zone borders.
   const zm = zoneMode(p, o)
-  const room = (e: EquipmentInstance) => (zm === 'groups' ? e.cluster ?? '' : zm === 'rooms' && o.split !== 'room' ? e.room?.trim() ?? '' : '')
+  const room = (e: EquipmentInstance) => (zm === 'groups' ? groupOf?.get(e.id) ?? '' : zm === 'rooms' && o.split !== 'room' ? e.room?.trim() ?? '' : '')
   // 1. Columns: devices whose x is within 120 of each other move together.
   const byX = [...eqs].sort((a, b) => a.position.x - b.position.x)
   const cols: EquipmentInstance[][] = []
@@ -190,7 +191,11 @@ export function printPositions(p: Project, eqs: EquipmentInstance[], o: Pick<Sch
 function drawPage(p0: Project, o: SchematicOptions, page: Page, n: number, total: number, sheetOf: Map<string, number>, labels: (string | undefined)[] = []): string {
   const { svg, area } = newSheet(p0, o, n, total, page.title, labels[n - 1])
   // Work on a copy with print positions so blocks never crowd each other.
-  const pos = printPositions(p0, p0.equipment.filter((e) => page.ids.has(e.id)), o)
+  // Which group box each device sits in, from the layout it was drawn in (before re-spacing).
+  const viewIds = new Set(viewsOf(p0).map((v) => v.id))
+  const isView = !!page.pageId && viewIds.has(page.pageId)
+  const groupOf = clusterMembership(p0, p0.equipment.filter((e) => page.ids.has(e.id)), { page: isView ? null : page.pageId ?? null, view: isView ? page.pageId! : null }, viewIds)
+  const pos = printPositions(p0, p0.equipment.filter((e) => page.ids.has(e.id)), o, groupOf)
   const p: Project = { ...p0, equipment: p0.equipment.map((e) => (pos.has(e.id) ? { ...e, position: pos.get(e.id)! } : e)) }
   const eqs = p.equipment.filter((e) => page.ids.has(e.id))
   // Notes on this sheet move with the device they sit next to.
@@ -217,7 +222,7 @@ function drawPage(p0: Project, o: SchematicOptions, page: Page, n: number, total
     const zm = zoneMode(p, o)
     if (zm === 'groups') {
       const names = new Map((p.clusters ?? []).map((c) => [c.id, c.name]))
-      drawZones(g, eqs, geo, reachOf, (e) => (e.cluster && names.has(e.cluster) ? e.cluster : ''), (k) => names.get(k) ?? '', true)
+      drawZones(g, eqs, geo, reachOf, (e) => { const k = groupOf.get(e.id); return k && names.has(k) ? k : '' }, (k) => names.get(k) ?? '', true)
     } else if (zm === 'rooms' && o.split !== 'room') drawZones(g, eqs, geo, reachOf, (e) => e.room?.trim() ?? '', (k) => k)
     for (const e of eqs) drawDevice(g, e, { ...o, zones: zm })
     drawWires(g, p, o, eqs, rects, sheetOf, n, labels)

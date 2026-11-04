@@ -269,6 +269,13 @@ export interface Cluster {
   id: string
   name: string
   color?: string
+  /** Page or signal view the box was drawn on (null = All pages). */
+  scope?: string | null
+  /** The box, in diagram units. */
+  x?: number
+  y?: number
+  w?: number
+  h?: number
 }
 
 /** A named system on the wiring diagram (e.g. "FOH Audio", "Stage Video"). */
