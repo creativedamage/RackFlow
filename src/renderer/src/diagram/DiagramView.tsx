@@ -1,6 +1,6 @@
 import { editPlacedDevice } from '../product/openEditor'
 import { deviceMenu } from '../product/productActions'
-import { showContextMenu } from '../components/ContextMenu'
+import { showContextMenu, type MenuItem } from '../components/ContextMenu'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyNodeChanges, Background, BackgroundVariant, ConnectionMode, Controls, MiniMap, Panel, ReactFlow, useConnection, useReactFlow,
@@ -8,7 +8,7 @@ import {
 } from '@xyflow/react'
 import {
   addEquipment, addPatchBay, addToGroup, pageNumbers, GENERAL_PAGE, layoutView, setInView, viewOffFlags, viewProject, viewsOf, nodeGeom, placeInFreeSpace, connectMany, groupColor, groupsOf, type BulkResult, candidates as findCandidates, connect, DOMAINS, portDomain, resolve, SIGNALS, validate,
-  type CableId, type EquipmentId, type PortAddress, cableColorHex, needsCasing } from '@core/index'
+  type CableId, type EquipmentId, type PortAddress, cableColorHex, needsCasing, clustersOf, clusterColor, newCluster, setCluster, deleteCluster, renameCluster, CLUSTER_COLORS } from '@core/index'
 import { useStore } from '../store'
 import { DRAG_MIME, type DragPayload } from '../components/Sidebar'
 import { setViewCenterProvider } from './placement'
@@ -116,7 +116,25 @@ export function DiagramView() {
       data: { id: g.id, name: g.name, color: groupColor(g), count: members.length, system: g.system, active: focusGroup === g.id },
     }]
   }), [project, nodes, focusGroup, page, view])
+  // Device groups: a box round each group's devices on whatever page or view is showing.
+  const clusterFrames = useMemo<GroupFrameType[]>(() => clustersOf(project).flatMap((c) => {
+    const members = nodes.filter((n) => !n.hidden && n.data.eq.cluster === c.id)
+    if (!members.length) return []
+    const P = 14, LBL = 24
+    const x0 = Math.min(...members.map((n) => n.position.x)) - P
+    const y0 = Math.min(...members.map((n) => n.position.y)) - P - LBL
+    const x1 = Math.max(...members.map((n) => n.position.x + (n.measured?.width ?? NODE_WIDTH))) + P
+    const y1 = Math.max(...members.map((n) => n.position.y + nodeH(n))) + P
+    return [{
+      id: `cluster:${c.id}`, type: 'groupFrame' as const, position: { x: x0, y: y0 }, zIndex: 0, // listed before the devices, so drawn under them but above the canvas (grab-able)
+      selectable: false, draggable: true, dragHandle: '.gf-label',
+      width: x1 - x0, height: y1 - y0, style: { width: x1 - x0, height: y1 - y0, pointerEvents: 'none' as const },
+      data: { id: c.id, name: c.name, color: clusterColor(project, c), count: members.length, system: '', active: false, kind: 'cluster' as const,
+        onRename: (name: string) => apply('Rename Group', (dr) => renameCluster(dr, c.id, name)) },
+    }]
+  }), [project, nodes])
   const framesRef = useRef(frames); framesRef.current = frames
+  const clusterFramesRef = useRef(clusterFrames); clusterFramesRef.current = clusterFrames
   const nodesRef = useRef(nodes); nodesRef.current = nodes
   // Notes / callouts / revision notes: local state for smooth dragging and resizing.
   const [notes, setNotes] = useState<NoteNodeType[]>([])
@@ -131,7 +149,7 @@ export function DiagramView() {
     })
   }, [project.annotations, scope, viewIds])
   const notesRef = useRef(notes); notesRef.current = notes
-  const allNodes = useMemo<AnyNode[]>(() => [...frames, ...nodes, ...notes], [frames, nodes, notes])
+  const allNodes = useMemo<AnyNode[]>(() => [...frames, ...clusterFrames, ...nodes, ...notes], [frames, clusterFrames, nodes, notes])
 
   const cableSeverity = useMemo(() => {
     const m = new Map<string, 'error' | 'warning'>()
@@ -228,13 +246,24 @@ export function DiagramView() {
       const f = framesRef.current.find((x) => x.id === c.id)
       if (f) moves.set(c.id.slice(6), { dx: c.position.x - f.position.x, dy: c.position.y - f.position.y, dragging: c.dragging })
     }
+    // …and dragging a device group's label moves the devices in it.
+    const cmoves = new Map<string, { dx: number; dy: number }>()
+    for (const c of all) {
+      if (c.type !== 'position' || !c.id.startsWith('cluster:') || !c.position) continue
+      const f = clusterFramesRef.current.find((x) => x.id === c.id)
+      if (f) cmoves.set(c.id.slice(8), { dx: c.position.x - f.position.x, dy: c.position.y - f.position.y })
+    }
     const noteChanges = all.filter((c) => 'id' in c && String(c.id).startsWith('note:')) as NodeChange<NoteNodeType>[]
     if (noteChanges.length) setNotes((ns) => applyNodeChanges(noteChanges.filter((c) => c.type !== 'remove'), ns))
-    const changes = all.filter((c) => !('id' in c && (String(c.id).startsWith('group:') || String(c.id).startsWith('note:')))) as NodeChange<DeviceNodeType>[]
+    const changes = all.filter((c) => !('id' in c && (String(c.id).startsWith('group:') || String(c.id).startsWith('cluster:') || String(c.id).startsWith('note:')))) as NodeChange<DeviceNodeType>[]
     setNodes((ns) => {
       let next = applyNodeChanges(changes.filter((c) => c.type !== 'remove'), ns)
       if (moves.size) next = next.map((n) => {
         const m = n.data.eq.groupId ? moves.get(n.data.eq.groupId) : undefined
+        return m ? { ...n, position: { x: n.position.x + m.dx, y: n.position.y + m.dy } } : n
+      })
+      if (cmoves.size) next = next.map((n) => {
+        const m = !n.hidden && n.data.eq.cluster ? cmoves.get(n.data.eq.cluster) : undefined
         return m ? { ...n, position: { x: n.position.x + m.dx, y: n.position.y + m.dy } } : n
       })
       if (changes.some((c) => c.type === 'select')) {
@@ -258,9 +287,11 @@ export function DiagramView() {
     const devs = draggedAll.filter((n) => n.type === 'device').map((n) => n.id)
     document.querySelectorAll('.page-tabs .drop').forEach((el) => el.classList.remove('drop'))
     const vid = useStore.getState().diagramView
+    const clusterIds = new Set(draggedAll.filter((n) => n.id.startsWith('cluster:')).map((n) => n.id.slice(8)))
+    const clusterMembers = clusterIds.size ? nodesRef.current.filter((n) => !n.hidden && n.data.eq.cluster && clusterIds.has(n.data.eq.cluster) && !draggedAll.some((x) => x.id === n.id)) : []
     if (vid) {
       // In a signal view, moving only changes the view's own layout.
-      const moved = draggedAll.filter((n) => n.type === 'device')
+      const moved = [...draggedAll.filter((n) => n.type === 'device'), ...clusterMembers]
       if (moved.length) apply(moved.length > 1 ? 'Move Devices in View' : 'Move Device in View', (d) => {
         const v = viewsOf(d).find((x) => x.id === vid)
         if (v) for (const n of moved) v.positions[n.id] = { x: Math.round(n.position.x), y: Math.round(n.position.y) }
@@ -274,7 +305,7 @@ export function DiagramView() {
       if (target || s.project.equipment.some((e) => devs.includes(e.id) && e.groupId)) moveDevicesToPage(devs, target)
       return
     }
-    const groupIds = new Set(draggedAll.filter((n) => n.type === 'groupFrame').map((n) => (n as GroupFrameType).data.id))
+    const groupIds = new Set(draggedAll.filter((n) => n.type === 'groupFrame' && n.id.startsWith('group:')).map((n) => (n as GroupFrameType).data.id))
     const movedNotes = draggedAll.filter((n) => n.type === 'note')
     if (movedNotes.length) {
       apply(movedNotes.length > 1 ? 'Move Notes' : 'Move Note', (d) => {
@@ -291,9 +322,10 @@ export function DiagramView() {
     const dragged = [
       ...draggedAll.filter((n): n is DeviceNodeType => n.type === 'device'),
       ...nodesRef.current.filter((n) => n.data.eq.groupId && groupIds.has(n.data.eq.groupId)),
+      ...clusterMembers,
     ]
     if (!dragged.length) return
-    apply(groupIds.size ? 'Move Group' : dragged.length > 1 ? 'Move Devices' : 'Move Device', (d) => {
+    apply(groupIds.size || clusterIds.size ? 'Move Group' : dragged.length > 1 ? 'Move Devices' : 'Move Device', (d) => {
       for (const n of dragged) {
         const eq = d.equipment.find((e) => e.id === n.id)
         if (eq) eq.position = { x: Math.round(n.position.x), y: Math.round(n.position.y) }
@@ -471,16 +503,18 @@ export function DiagramView() {
         }}
         onDelete={onDelete}
         onNodeDoubleClick={(ev, n) => {
+          if (n.type === 'groupFrame' && n.id.startsWith('cluster:')) { select(project.equipment.filter((e) => e.cluster === (n as GroupFrameType).data.id).map((e) => e.id)); return }
           if (n.type === 'groupFrame') { select(project.equipment.filter((e) => e.groupId === (n as GroupFrameType).data.id).map((e) => e.id)); return }
           if ((ev.target as HTMLElement).closest('.react-flow__handle')) return
           select([n.id as EquipmentId]); editPlacedDevice(n.id)
         }}
         onNodeContextMenu={(ev, n) => {
+          if (n.type === 'groupFrame' && n.id.startsWith('cluster:')) { showContextMenu(ev, clusterFrameMenu((n as GroupFrameType).data.id)); return }
           if (n.type !== 'device') return
           const cur = useStore.getState().selection
           const ids = cur.includes(n.id as EquipmentId) ? cur : [n.id as EquipmentId]
           if (ids !== cur) select(ids)
-          showContextMenu(ev, [...deviceMenu(n.id), ...(view ? viewMenuItems(ids, view.id) : [...pageMenuItems(ids), ...addToViewItems(ids)])])
+          showContextMenu(ev, [...deviceMenu(n.id), ...clusterMenuItems(ids), ...(view ? viewMenuItems(ids, view.id) : [...pageMenuItems(ids), ...addToViewItems(ids)])])
         }}
         edgesReconnectable={false}
         reconnectRadius={14}
@@ -628,3 +662,33 @@ function DiagramTools() {
     </Panel>
   )
 }
+
+/** Right-click on devices: put them in a group, move them to another, or take them out. */
+function clusterMenuItems(ids: string[]): MenuItem[] {
+  const s = useStore.getState()
+  const groups = clustersOf(s.project)
+  const cur = new Set(s.project.equipment.filter((e) => ids.includes(e.id)).map((e) => e.cluster ?? null))
+  const n = ids.length > 1 ? ` (${ids.length})` : ''
+  return [
+    'sep',
+    { label: `Make a New Group${n}`, onClick: () => s.apply('New Group', (d) => { newCluster(d, ids) }) },
+    ...groups.filter((g) => !(cur.size === 1 && cur.has(g.id))).map((g): MenuItem => ({ label: `Add${n} to Group ▸ ${g.name}`, onClick: () => s.apply('Add to Group', (d) => setCluster(d, ids, g.id)) })),
+    ...([...cur].some(Boolean) ? [{ label: `Remove${n} from Group`, onClick: () => s.apply('Remove from Group', (d) => setCluster(d, ids, null)) } as MenuItem] : []),
+  ]
+}
+
+/** Right-click on a group's label: rename (double-click), colour, select, ungroup. */
+function clusterFrameMenu(id: string): MenuItem[] {
+  const s = useStore.getState()
+  const c = clustersOf(s.project).find((x) => x.id === id)
+  if (!c) return []
+  return [
+    { label: 'Select Devices in Group', onClick: () => s.select(s.project.equipment.filter((e) => e.cluster === id).map((e) => e.id)) },
+    { label: 'Rename… (double-click the label)', onClick: () => (document.querySelector(`.react-flow__node[data-id="cluster:${id}"] .gf-label`) as HTMLElement | null)?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })) },
+    'sep',
+    ...CLUSTER_COLORS.map((col, i): MenuItem => ({ label: `${clusterColor(s.project, c) === col ? '● ' : '○ '}Colour ${['Indigo', 'Teal', 'Amber', 'Pink', 'Violet', 'Cyan', 'Lime', 'Orange', 'Grey'][i]}`, onClick: () => s.apply('Group Colour', (d) => { const x = d.clusters?.find((y) => y.id === id); if (x) x.color = col }) })),
+    'sep',
+    { label: 'Ungroup (keep devices)', danger: true, onClick: () => s.apply('Ungroup', (d) => deleteCluster(d, id)) },
+  ]
+}
+

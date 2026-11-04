@@ -1219,3 +1219,8 @@ input.mono { font-family: var(--mono); }
 .boxes-canvas .led-bar > .spacer { display: none; }
 .boxes-canvas .led-bar button { white-space: nowrap; }
 .boxes-notes { min-width: 0; overflow-x: hidden; }
+
+/* Device groups (boxes round devices on any page or view) */
+.group-frame.cluster { border-radius: 10px; border-style: dashed; border-width: 1.5px; background: color-mix(in srgb, var(--gc) 5%, transparent); }
+.group-frame.cluster .gf-label { left: 8px; top: 3px; font-size: 10.5px; padding: 1px 9px 1px 7px; }
+.gf-input { font: inherit; color: #111; background: #fff; border: none; border-radius: 6px; padding: 0 6px; width: 140px; height: 18px; outline: none; }

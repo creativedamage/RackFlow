@@ -20,7 +20,10 @@ export interface SchematicOptions extends SheetOptions {
   wires: WireMode
   /** One sheet for everything, or one per group / room. */
   split: 'none' | 'group' | 'room'
-  rooms: boolean
+  /** Old switch for room zones; `zones` replaces it. */
+  rooms?: boolean
+  /** Dashed boxes round devices: their groups, their rooms, or none. Default: groups when the project has any, else rooms. */
+  zones?: ZoneMode
   color: boolean
   /** Signal views to add as extra sheets (undefined = all of them). */
   views?: string[]
@@ -31,8 +34,13 @@ export interface SchematicOptions extends SheetOptions {
   onlySheets?: string[]
 }
 
+export type ZoneMode = 'groups' | 'rooms' | 'none'
+/** Which zones a print draws (groups win when the project uses them). */
+export const zoneMode = (p: Project, o: Pick<SchematicOptions, 'zones' | 'rooms'>): ZoneMode =>
+  o.zones ?? (o.rooms === false ? 'none' : p.clusters?.length ? 'groups' : 'rooms')
+
 export const defaultSchematic = (p?: Project): SchematicOptions => ({
-  sheet: 'archD', titleBlock: true, title: 'SIGNAL FLOW', wires: p?.diagram?.wires === 'all' ? 'all' : 'smart', split: p?.groups?.length ? 'group' : 'none', rooms: true, color: false,
+  sheet: 'archD', titleBlock: true, title: 'SIGNAL FLOW', wires: p?.diagram?.wires === 'all' ? 'all' : 'smart', split: p?.groups?.length ? 'group' : 'none', color: false,
 })
 
 const BADGE = 22      // connector badge width (px, diagram units)
@@ -129,10 +137,12 @@ const ZONE_PAD = 36 // room zone border distance from what it encloses
  * off-sheet flags (and room borders between rooms), then blocks in a column
  * are pushed down so every block keeps its tag above and type line below.
  */
-export function printPositions(p: Project, eqs: EquipmentInstance[], o: Pick<SchematicOptions, 'wires'> = { wires: 'smart' }): Map<string, { x: number; y: number }> {
+export function printPositions(p: Project, eqs: EquipmentInstance[], o: Pick<SchematicOptions, 'wires'> & Partial<Pick<SchematicOptions, 'zones' | 'rooms' | 'split'>> = { wires: 'smart' }): Map<string, { x: number; y: number }> {
   const H = (e: EquipmentInstance) => nodeGeom(e).height + 12 // box incl. the type line
   const reach = new Map(eqs.map((e) => [e.id as string, sideReach(p, e, o)]))
-  const room = (e: EquipmentInstance) => e.room?.trim() ?? ''
+  // Zone each device sits in – columns of different zones get room for the zone borders.
+  const zm = zoneMode(p, o)
+  const room = (e: EquipmentInstance) => (zm === 'groups' ? e.cluster ?? '' : zm === 'rooms' && o.split !== 'room' ? e.room?.trim() ?? '' : '')
   // 1. Columns: devices whose x is within 120 of each other move together.
   const byX = [...eqs].sort((a, b) => a.position.x - b.position.x)
   const cols: EquipmentInstance[][] = []
@@ -204,31 +214,38 @@ function drawPage(p0: Project, o: SchematicOptions, page: Page, n: number, total
     return { id: e.id, x0: e.position.x - BADGE - WIRE_CLEAR, y0: e.position.y - 22 - WIRE_CLEAR, x1: e.position.x + g.width + BADGE + WIRE_CLEAR, y1: e.position.y + g.height + 14 + WIRE_CLEAR }
   })
   svg.group(`translate(${ox} ${oy}) scale(${scale}) translate(${-x0} ${-y0})`, (g) => {
-    if (o.rooms && o.split !== 'room') drawRooms(g, eqs, geo, reachOf)
-    for (const e of eqs) drawDevice(g, e, o)
+    const zm = zoneMode(p, o)
+    if (zm === 'groups') {
+      const names = new Map((p.clusters ?? []).map((c) => [c.id, c.name]))
+      drawZones(g, eqs, geo, reachOf, (e) => (e.cluster && names.has(e.cluster) ? e.cluster : ''), (k) => names.get(k) ?? '', true)
+    } else if (zm === 'rooms' && o.split !== 'room') drawZones(g, eqs, geo, reachOf, (e) => e.room?.trim() ?? '', (k) => k)
+    for (const e of eqs) drawDevice(g, e, { ...o, zones: zm })
     drawWires(g, p, o, eqs, rects, sheetOf, n, labels)
     for (const a of notes) drawNote(g, a)
   })
   return svg.toString()
 }
 
-function drawRooms(svg: Svg, eqs: EquipmentInstance[], geo: Map<string, { width: number; height: number }>, reach: Map<string, { left: number; right: number }>) {
+/** Dashed, labelled boxes round devices that share a zone (a group, or a room). */
+function drawZones(svg: Svg, eqs: EquipmentInstance[], geo: Map<string, { width: number; height: number }>, reach: Map<string, { left: number; right: number }>, keyOf: (e: EquipmentInstance) => string, nameOf: (k: string) => string, whole = false) {
   const rooms = new Map<string, EquipmentInstance[]>()
-  for (const e of eqs) if (e.room?.trim()) rooms.set(e.room.trim(), [...(rooms.get(e.room.trim()) ?? []), e])
+  for (const e of eqs) { const k = keyOf(e); if (k) rooms.set(k, [...(rooms.get(k) ?? []), e]) }
   if (rooms.size < 1) return
   const boxOf = (e: EquipmentInstance) => ({ x0: e.position.x - BADGE - (reach.get(e.id)?.left ?? 0) - ZONE_PAD / 2, y0: e.position.y - 30 - ZONE_PAD, x1: e.position.x + NODE_WIDTH + BADGE + (reach.get(e.id)?.right ?? 0) + ZONE_PAD / 2, y1: e.position.y + geo.get(e.id)!.height + 12 + ZONE_PAD })
   const near = (a: { x0: number; y0: number; x1: number; y1: number }, b: typeof a) => a.x0 < b.x1 + 80 && b.x0 < a.x1 + 80 && a.y0 < b.y1 + 80 && b.y0 < a.y1 + 80
   for (const [room, ms] of rooms) {
     // Devices of one room that sit apart get separate zones instead of one box over everything.
     let zones = ms.map((e) => ({ ...boxOf(e), ids: [e.id as string] }))
-    for (let merged = true; merged;) {
+    // A group is one box round all its devices; rooms split where their devices sit apart.
+    if (whole) zones = [zones.reduce((a, b) => ({ x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1), ids: [...a.ids, ...b.ids] }))]
+    for (let merged = !whole; merged;) {
       merged = false
       outer: for (let i = 0; i < zones.length; i++) for (let j = i + 1; j < zones.length; j++) {
         const a = zones[i], b = zones[j]
         if (!near(a, b)) continue
         const u = { x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1), ids: [...a.ids, ...b.ids] }
         // Don't merge across another room's device.
-        const intruder = eqs.some((e) => !u.ids.includes(e.id) && (e.room?.trim() ?? '') !== room && e.position.x + NODE_WIDTH / 2 > u.x0 && e.position.x + NODE_WIDTH / 2 < u.x1 && e.position.y + 20 > u.y0 && e.position.y + 20 < u.y1)
+        const intruder = eqs.some((e) => !u.ids.includes(e.id) && keyOf(e) !== room && e.position.x + NODE_WIDTH / 2 > u.x0 && e.position.x + NODE_WIDTH / 2 < u.x1 && e.position.y + 20 > u.y0 && e.position.y + 20 < u.y1)
         if (intruder) continue
         zones = [...zones.filter((_, k) => k !== i && k !== j), u]
         merged = true
@@ -238,7 +255,7 @@ function drawRooms(svg: Svg, eqs: EquipmentInstance[], geo: Map<string, { width:
     for (const z of zones) {
       svg.rect(z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0, { lw: 1, dash: '14 8', stroke: '#444' })
       // Room name on the top border, on a white backing so lines never run through it.
-      const label = room.toUpperCase(), tw = textWidth(label, 12) + 14
+      const label = nameOf(room).toUpperCase(), tw = textWidth(label, 12) + 14
       svg.rect(z.x0 + 10, z.y0 - 8, tw, 16, { fill: '#fff', stroke: 'none', lw: 0 })
       svg.text(z.x0 + 15, z.y0, label, { size: 12, fill: '#444' })
     }
@@ -256,7 +273,7 @@ function drawDevice(svg: Svg, e: EquipmentInstance, o: SchematicOptions) {
   const maker = e.product.manufacturer.toUpperCase(), model = e.product.model.toUpperCase()
   svg.text(x + NODE_WIDTH / 2, y + 11, maker, { size: 9, anchor: 'middle', maxWidth: NODE_WIDTH - 16 })
   svg.text(x + NODE_WIDTH / 2, y + 23, model, { size: 9.5, anchor: 'middle', maxWidth: NODE_WIDTH - 16 })
-  if (e.room?.trim()) svg.text(x + NODE_WIDTH / 2, y + 36, `(${e.room.trim().toUpperCase()})`, { size: 8, anchor: 'middle', fill: '#444', maxWidth: NODE_WIDTH - 16 })
+  if (e.room?.trim() && o.zones !== 'groups') svg.text(x + NODE_WIDTH / 2, y + 36, `(${e.room.trim().toUpperCase()})`, { size: 8, anchor: 'middle', fill: '#444', maxWidth: NODE_WIDTH - 16 })
   const L = cardLayout(e)
   svg.line(x, y + h - 2, x + NODE_WIDTH, y + h - 2, { lw: 0.5 })
   for (const sec of L.sections) {

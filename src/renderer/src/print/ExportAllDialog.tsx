@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { buildExport, EXPORT_PARTS, exportChoices, GENERAL_PAGE, SHEETS, type ExportPart, type ExportSelection } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
-import { Field, Modal, Select, Toggle } from '../components/ui'
+import { Field, Modal, Select, Toggle, Segmented } from '../components/ui'
 
 type Picks = Partial<Record<ExportPart, string[]>>
 const SEL_KEY: Partial<Record<ExportPart, keyof ExportSelection>> = { wiring: 'sheets', racks: 'racks', panels: 'panels', labels: 'bays', led: 'walls' }
@@ -58,17 +58,18 @@ export function ExportAllDialog({ onClose }: { onClose: () => void }) {
   })
   const [open, setOpen] = useState<ExportPart | null>(init?.parts.length === 1 && (choices[init.parts[0]]?.length ?? 0) > 1 ? init.parts[0] : null)
   const [perBox, setPerBox] = useState(true)
+  const [zones, setZones] = useState<'groups' | 'rooms' | 'none'>(() => (project.clusters?.length ? 'groups' : 'rooms'))
   const [sheet, setSheet] = useState('ansiB')
   const [busy, setBusy] = useState(false)
 
   const sel: ExportSelection = useMemo(() => {
-    const out: ExportSelection = { panelsPerBox: perBox }
+    const out: ExportSelection = { panelsPerBox: perBox, zones }
     for (const [part, key] of Object.entries(SEL_KEY) as [ExportPart, keyof ExportSelection][]) {
       const all = choices[part] ?? [], picked = picks[part] ?? []
       if (picked.length < all.length) (out as Record<string, unknown>)[key] = picked
     }
     return out
-  }, [picks, choices, perBox])
+  }, [picks, choices, perBox, zones])
   const files = useMemo(() => buildExport(project, [...parts], sheet, sel), [project, parts, sheet, sel])
   const counts = useMemo(() => new Map(buildExport(project, EXPORT_PARTS.map((p) => p.key), sheet, sel).map((f) => [f.name, f.count])), [project, sheet, sel])
   const pdfs = files.filter((f) => f.kind === 'pdf')
@@ -116,6 +117,13 @@ export function ExportAllDialog({ onClose }: { onClose: () => void }) {
                   {list.map((c) => (
                     <label key={c.id} className="check"><input type="checkbox" checked={picked.includes(c.id)} onChange={(e) => togglePick(p.key, c.id, e.target.checked)} /> {c.label}</label>
                   ))}
+                </div>
+              )}
+              {p.key === 'wiring' && on && (
+                <div className="export-sub">
+                  <Field label="Boxes round">
+                    <Segmented value={zones} onChange={setZones} options={[{ value: 'groups', label: 'Groups' }, { value: 'rooms', label: 'Rooms' }, { value: 'none', label: 'None' }]} />
+                  </Field>
                 </div>
               )}
               {p.key === 'panels' && on && (

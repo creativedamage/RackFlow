@@ -1,6 +1,6 @@
 import { editPlacedDevice } from '../product/openEditor'
 import { useState } from 'react'
-import { CABLE_CATALOG, CABLE_COLORS, cableSpec, CATEGORIES, CONNECTOR_TYPES, connectorIsPower, exactFitCable, fittingCables, cablesAt, connectorName, DOMAINS, heatBTU, orientation, portDomain, resolve, SIGNALS, validateCable, findRack, addToGroup, groupsOf, removeFromGroup, groupColor, circuitLoads, circuitName, isPowerSource, sourceRating, sourcesFor, type Cable, type EquipmentId, type EquipmentInstance, fmtLen, fmtLenPair, fmtWt } from '@core/index'
+import { CABLE_CATALOG, CABLE_COLORS, cableSpec, CATEGORIES, CONNECTOR_TYPES, connectorIsPower, exactFitCable, fittingCables, cablesAt, connectorName, DOMAINS, heatBTU, orientation, portDomain, resolve, SIGNALS, validateCable, findRack, addToGroup, groupsOf, removeFromGroup, groupColor, clustersOf, newCluster, setCluster, renameCluster, circuitLoads, circuitName, isPowerSource, sourceRating, sourcesFor, type Cable, type EquipmentId, type EquipmentInstance, fmtLen, fmtLenPair, fmtWt } from '@core/index'
 import { useStore } from '../store'
 import { RackSettings } from '../rack/RackView'
 import { AccessoryInspector } from '../rack/AccessoryInspector'
@@ -55,6 +55,14 @@ function EquipmentInspector({ eq }: { eq: EquipmentInstance }) {
           apply(v ? 'Move to Page' : 'Remove from Page', (d) => { if (v) addToGroup(d, [eq.id], v); else removeFromGroup(d, [eq.id]) })
         }} options={[{ value: '', label: 'No page' }, ...groupsOf(project).map((g) => ({ value: g.id, label: g.name })), { value: '__new', label: '+ New page…' }]} />
       </Field>
+
+      <Field label="Group">
+        <Select value={eq.cluster ?? ''} onChange={(v: string) => {
+          if (v === '__new') { apply('New Group', (d) => { newCluster(d, [eq.id]) }); return }
+          apply(v ? 'Add to Group' : 'Remove from Group', (d) => setCluster(d, [eq.id], v || null))
+        }} options={[{ value: '', label: 'No group' }, ...clustersOf(project).map((c) => ({ value: c.id, label: c.name })), { value: '__new', label: '+ New group' }]} />
+      </Field>
+      {eq.cluster && <Field label="Group name"><TextInput value={clustersOf(project).find((c) => c.id === eq.cluster)?.name ?? ''} onCommit={(v) => apply('Rename Group', (d) => renameCluster(d, eq.cluster!, v))} /></Field>}
 
       {isPowerSource(eq) ? <PowerSourceSection eq={eq} /> : <FedFrom eq={eq} />}
 
@@ -252,6 +260,13 @@ function MultiInspector({ ids }: { ids: EquipmentId[] }) {
         </Field>
       )}
       {devices.some((d) => d.groupId) && <button onClick={() => apply('Remove from Page', (d) => removeFromGroup(d, ids))}>Take off their pages</button>}
+      <h4>Group</h4>
+      <div className="row-gap">
+        <button onClick={() => apply('New Group', (d) => { newCluster(d, ids) })} title="A labelled box round these devices on every page and view">Make a Group</button>
+        {clustersOf(project).length > 0 && <Select value="" onChange={(v: string) => { if (v) apply('Add to Group', (d) => setCluster(d, ids, v)) }}
+          options={[{ value: '', label: 'Add to group…' }, ...clustersOf(project).map((c) => ({ value: c.id, label: c.name }))]} />}
+        {devices.some((d) => d.cluster) && <button onClick={() => apply('Remove from Group', (d) => setCluster(d, ids, null))}>Ungroup</button>}
+      </div>
       <h4>Location</h4>
       <Field label="Room"><TextInput value={rooms.length === 1 ? rooms[0] : ''} placeholder={rooms.length > 1 ? 'Mixed – type to set all' : 'e.g. Main Hall'}
         onCommit={(v) => apply('Set Room', (d) => { for (const e of d.equipment) if (ids.includes(e.id)) e.room = v })} /></Field>

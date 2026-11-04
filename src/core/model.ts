@@ -222,6 +222,8 @@ export interface EquipmentInstance {
   rackPlacement: RackPlacement | null
   room: string
   notes: string
+  /** Device group (a box drawn round it on every page and view it appears on). */
+  cluster?: string
   /** Wall boxes / plates: this box's fabrication-sheet notes (replaces the automatic ones when set). */
   fabNotes?: string[]
   /** Heading over those notes (default "NOTES"). */
@@ -257,6 +259,16 @@ export interface NetInfo {
   switchTag?: string
   switchPort?: string
   notes?: string
+}
+
+/**
+ * A group of devices drawn as a labelled box round them – on whichever page or
+ * view they appear (e.g. "FOH Rack", "Stage Left"). Independent of pages and rooms.
+ */
+export interface Cluster {
+  id: string
+  name: string
+  color?: string
 }
 
 /** A named system on the wiring diagram (e.g. "FOH Audio", "Stage Video"). */
@@ -390,6 +402,8 @@ export interface Project {
   titleBlock?: import('./titleblock').TitleBlockTemplate
   /** Tag / cable label numbering standard; unset = RackFlow's default. */
   numbering?: import('./numbering').NumberingStandard
+  /** Device groups (boxes round devices on the diagram and print). */
+  clusters?: Cluster[]
 }
 
 // --- Patch bays (types here to keep the document schema in one file) ---

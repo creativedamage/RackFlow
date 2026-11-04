@@ -31,7 +31,7 @@ export const EXPORT_PARTS: { key: ExportPart; name: string; file: string }[] = [
 ]
 
 /** Which items of each part to export (undefined = all). */
-export interface ExportSelection { sheets?: string[]; racks?: string[]; panels?: string[]; bays?: string[]; walls?: string[]; panelsPerBox?: boolean }
+export interface ExportSelection { sheets?: string[]; racks?: string[]; panels?: string[]; bays?: string[]; walls?: string[]; panelsPerBox?: boolean; zones?: 'groups' | 'rooms' | 'none' }
 
 /** What can be picked inside each part, for the Export dialog. */
 export function exportChoices(p: Project): Partial<Record<ExportPart, { id: string; label: string }[]>> {
@@ -59,7 +59,7 @@ export function buildExport(p: Project, parts: ExportPart[], sheet = 'ansiB', se
   const out: ExportFile[] = []
   const name = (k: ExportPart) => EXPORT_PARTS.find((x) => x.key === k)!.file
   if (parts.includes('wiring') && p.equipment.length) {
-    const o = { ...defaultSchematic(p), sheet: sheet === 'ansiB' ? 'archD' : sheet, split: p.groups?.length ? 'group' as const : 'none' as const, onlySheets: sel.sheets }
+    const o = { ...defaultSchematic(p), sheet: sheet === 'ansiB' ? 'archD' : sheet, split: p.groups?.length ? 'group' as const : 'none' as const, onlySheets: sel.sheets, ...(sel.zones ? { zones: sel.zones } : {}) }
     const pages = schematicSheets(p, o)
     if (pages.length) out.push({ name: name('wiring'), kind: 'pdf', content: sheetsToHTML(pages, sheetSize(o)), count: pages.length })
   }

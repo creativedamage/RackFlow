@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { defaultSchematic, exportChoices, GENERAL_PAGE, schematicSheets, viewsOf, type SchematicOptions, type WireMode } from '@core/index'
+import { defaultSchematic, zoneMode, type ZoneMode, exportChoices, GENERAL_PAGE, schematicSheets, viewsOf, type SchematicOptions, type WireMode } from '@core/index'
 import { useStore } from '../store'
 import { DrawingDialog } from './DrawingDialog'
 import { Field, Segmented, Select, Toggle } from '../components/ui'
@@ -61,7 +61,11 @@ export function SchematicPrintDialog({ onClose }: { onClose: () => void }) {
           </>)
         })()}
         <button className="mini" onClick={() => useStore.getState().set({ editingNumbers: true })} title="Prefix + start number (AV101, AV102…) or a custom number per page">Sheet Numbers…</button>
-        <Toggle label="Room zones (dashed)" checked={o.rooms} onChange={(rooms) => set({ ...o, rooms })} />
+        <Field label="Boxes round">
+          <Select<ZoneMode> value={zoneMode(project, o)} onChange={(zones) => set({ ...o, zones, rooms: undefined })} options={[
+            { value: 'groups', label: 'Groups' }, { value: 'rooms', label: 'Rooms' }, { value: 'none', label: 'Nothing' },
+          ]} />
+        </Field>
         <Toggle label="Colour by signal" checked={o.color} onChange={(color) => set({ ...o, color })} />
         <p className="muted small">Tip: ✨ Tidy Up the diagram first. Wires that leave a sheet end in an arrow naming the device, port and sheet they go to.</p>
       </>} />
