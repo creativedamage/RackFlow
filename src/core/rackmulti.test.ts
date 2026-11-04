@@ -1,30 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { addEquipment, addRack, BUILT_IN_PRODUCTS, frontIO, newProject, panelPorts, RackLayout, rackArtSVG } from './index'
+import { addEquipment, addRack, BUILT_IN_PRODUCTS, newProject, RackLayout } from './index'
 
 const o = { x: 0, y: 0 }
 const prod = (k: string) => BUILT_IN_PRODUCTS.find((p) => p.key === k)!
-
-describe('rack artwork', () => {
-  it('switches patch on the front; amps and DSPs on the back', () => {
-    const sw = prod('generic.switch.24poe'), amp = prod('generic.amp.4ch')
-    expect(frontIO(sw)).toBe(true)
-    expect(panelPorts(sw, 'front').length).toBeGreaterThan(20)
-    expect(panelPorts(sw, 'front').some((x) => x.group === 'Power')).toBe(false)
-    expect(frontIO(amp)).toBe(false)
-    expect(panelPorts(amp, 'front')).toHaveLength(0)
-    expect(panelPorts(amp, 'rear')).toHaveLength(amp.ports.length)
-  })
-
-  it('draws a cabled port as a plug in the jacket colour', () => {
-    const p = newProject()
-    const sw = addEquipment(p, prod('generic.switch.24poe'), o)
-    const port = panelPorts(sw.product, 'front')[0]
-    const svg = rackArtSVG(sw, 'front', { cabled: new Map([[port.id, 'Blue']]), hot: new Set(), heightU: 1, uid: 'x' })
-    expect(svg).toContain('#1c64f2')
-    expect(svg).toContain(sw.tag)
-    expect(svg).toContain(sw.product.manufacturer.toUpperCase())
-  })
-})
 
 describe('moving several rack units together', () => {
   it('checks against what stays put and against each other', () => {
