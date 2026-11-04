@@ -1240,3 +1240,11 @@ input.mono { font-family: var(--mono); }
 
 .tbd-cell b { color: var(--warn, #f08c00); font-weight: 700; }
 .tbd-cell .muted { font-size: 11px; }
+
+.vlan-table, .vlan-preview { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 8px; }
+.vlan-table th, .vlan-preview th { text-align: left; font-size: 11px; color: var(--text-2); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--line-2); }
+.vlan-table td, .vlan-preview td { padding: 4px 6px; border-bottom: 1px solid var(--line-2); vertical-align: middle; }
+.vlan-table input { height: 28px; }
+.vlan-table input.bad { border-color: var(--danger) !important; }
+.modal.wide:has(.vlan-modal) { height: auto; width: min(1000px, 96vw); }
+.modal.wide:has(.form.vlan-modal) { width: min(620px, 96vw); }

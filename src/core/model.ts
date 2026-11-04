@@ -247,6 +247,19 @@ export interface EquipmentInstance {
 }
 
 /** One network interface's addressing on the Network sheet. */
+/** A VLAN's IP plan: its gateway (e.g. VLAN 20 → 10.10.20.1) and size (/24, /22…). */
+export interface VlanPlan {
+  /** VLAN ID, e.g. "20". */
+  vlan: string
+  name?: string
+  /** Gateway / router address on this VLAN, e.g. 10.10.20.1. */
+  gateway: string
+  /** Prefix length: 24 = 255.255.255.0 (254 hosts), 22 = 1022 hosts… */
+  prefix: number
+  /** First address handed to devices (default: the 10th host). */
+  start?: string
+}
+
 export interface NetInfo {
   ip?: string
   /** VLAN ID: the access (untagged / native) VLAN on a switch port, or the interface's VLAN on a device. */
@@ -411,6 +424,8 @@ export interface Project {
   numbering?: import('./numbering').NumberingStandard
   /** Device groups (boxes round devices on the diagram and print). */
   clusters?: Cluster[]
+  /** VLAN IP plan (Network schedule › VLANs…). */
+  vlans?: VlanPlan[]
 }
 
 // --- Patch bays (types here to keep the document schema in one file) ---
