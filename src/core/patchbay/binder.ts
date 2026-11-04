@@ -11,9 +11,12 @@ export interface Binding { remote: ResolvedPort; cable: Cable; signal: SignalTyp
 /** What is cabled to the rear of a channel, if anything. */
 export function binding(bay: PatchBay, row: number, channel: number, p: Project): Binding | null {
   // Rear first (the permanent wiring); two-sided panels fall back to the front jack.
-  let address = { equipment: bay.equipment, port: patchPortId(row, channel) }
+  // Bays made from a rack panel use the panel's own jack ids.
+  const base = bay.portMap ? bay.portMap[`${row}.${channel}`] : patchPortId(row, channel)
+  if (!base) return null
+  let address = { equipment: bay.equipment, port: bay.portMap ? `${base}.r` : base }
   let cable = cablesAt(p, address)[0]
-  if (!cable) { address = { equipment: bay.equipment, port: `${patchPortId(row, channel)}.f` }; cable = cablesAt(p, address)[0] }
+  if (!cable) { address = { equipment: bay.equipment, port: `${base}.f` }; cable = cablesAt(p, address)[0] }
   if (!cable) return null
   const remoteAddr = cable.from.equipment === address.equipment && cable.from.port === address.port ? cable.to : cable.from
   const remote = resolve(p, remoteAddr)

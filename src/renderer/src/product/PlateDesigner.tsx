@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { produce } from 'immer'
-import { BUILT_IN_KEYS, footprint, makePlateProduct, newPlateText, nextPid, PLATE_MODULE_KEYS, PLATE_MODULES, PLATE_SIZES, PLATE_STYLE_LIST, plateInner, withLayout, FINISHES, type PlateFinish, autoArrange, type PlateInsert, type PlateKind, type PlateLayout, type PlateSpec, type ProductDefinition, imperial, fmtLen, fmtLenPair, refreshBoxPorts, withoutPortNumbers, isMultipin, MULTIPIN_CHANNELS, summarizeLabels, tiedTo, keepInViews } from '@core/index'
+import { BUILT_IN_KEYS, footprint, makePlateProduct, newPlateText, nextPid, PLATE_MODULE_KEYS, PLATE_MODULES, PLATE_SIZES, PLATE_STYLE_LIST, plateInner, withLayout, FINISHES, type PlateFinish, autoArrange, type PlateInsert, type PlateKind, type PlateLayout, type PlateSpec, type ProductDefinition, imperial, fmtLen, fmtLenPair, refreshBoxPorts, withoutPortNumbers, isMultipin, MULTIPIN_CHANNELS, summarizeLabels, tiedTo, keepInViews, syncPanelBay } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
 import { addProductToDiagram } from '../diagram/placement'
@@ -285,7 +285,7 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
     const hits = st.project.equipment.filter((e) => (only ? e.id === only : e.product.key === p.key || e.id === instanceId))
     if (!hits.length) return 0
     st.apply(`Update ${p.model}`, (d) => {
-      for (const e of d.equipment) if (hits.some((h) => h.id === e.id)) keepInViews(d, e.id, () => { e.product = structuredClone(p); refreshBoxPorts(d, e) })
+      for (const e of d.equipment) if (hits.some((h) => h.id === e.id)) { keepInViews(d, e.id, () => { e.product = structuredClone(p); refreshBoxPorts(d, e) }); syncPanelBay(d, e) }
       const ids = new Map(d.equipment.map((e) => [e.id, new Set(e.product.ports.map((x) => x.id))]))
       d.cables = d.cables.filter((c) => ids.get(c.from.equipment)?.has(c.from.port) && ids.get(c.to.equipment)?.has(c.to.port))
     })
@@ -351,6 +351,7 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
             <LenInput value={L.h} min={20} max={1000} label="H" width={60} onCommit={(v) => editL((l) => { l.h = v ?? l.h })} />
             <Select value={L.shape ?? 'rect'} onChange={(v) => editL((l) => { l.shape = v === 'round' ? 'round' : undefined })} options={[{ value: 'rect', label: 'Rectangle' }, { value: 'round', label: 'Round' }]} />
           </>)}
+          {spec.kind === 'rackPanel' && <label className="pd-snap" title="Also list this panel on the Patch Labels page, with a label strip over its jacks that fills in from the wiring"><input type="checkbox" checked={!!spec.patchBay} onChange={(e) => edit((d) => { if (e.target.checked) d.patchBay = true; else delete d.patchBay })} /> Patch panel (labels)</label>}
           <Select<PlateFinish> value={L.finish} onChange={(v) => editL((l) => { l.finish = v })} options={FINISHES.map((f) => ({ value: f.value, label: f.label }))} />
           <span className="spacer" />
           <input className="pd-name" value={name} placeholder="Name, e.g. Podium Plate" onChange={(e) => setName(e.target.value)} />

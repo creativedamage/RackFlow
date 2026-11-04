@@ -65,7 +65,16 @@ export const BayGrid = memo(function BayGrid({ bay, index, count }: { bay: Patch
         <span title="Patch bay">☰</span>
         <button className="icon-btn" title="Move up" disabled={index === 0} onClick={() => useStore.getState().apply('Move Patch Bay', (d) => { const i = d.patchBays.findIndex((b) => b.id === bay.id); [d.patchBays[i - 1], d.patchBays[i]] = [d.patchBays[i], d.patchBays[i - 1]] })}>⌃</button>
         <button className="icon-btn" title="Move down" disabled={index === count - 1} onClick={() => useStore.getState().apply('Move Patch Bay', (d) => { const i = d.patchBays.findIndex((b) => b.id === bay.id); [d.patchBays[i + 1], d.patchBays[i]] = [d.patchBays[i], d.patchBays[i + 1]] })}>⌄</button>
-        <button className="icon-btn" title="Delete patch bay (and its device in the diagram)" onClick={() => {
+        <button className="icon-btn" title={bay.portMap ? 'Remove from Patch Labels (the panel stays in the diagram)' : 'Delete patch bay (and its device in the diagram)'} onClick={() => {
+          if (bay.portMap) {
+            useStore.getState().apply('Remove Panel Labels', (d) => {
+              d.patchBays = d.patchBays.filter((b) => b.id !== bay.id)
+              const e = d.equipment.find((x) => x.id === bay.equipment)
+              if (e?.product.plate) delete e.product.plate.patchBay
+            })
+            setSel(null)
+            return
+          }
           if (!confirm(`Delete ${bay.name}? Its device and cables are removed from the wiring diagram too.`)) return
           useStore.getState().apply('Delete Patch Bay', (d) => {
             d.patchBays = d.patchBays.filter((b) => b.id !== bay.id)

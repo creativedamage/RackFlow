@@ -181,6 +181,8 @@ export interface PlateSpec {
   power?: { volts: number; amps: number }
   /** Designer layout (where each jack sits, text, finish). */
   layout?: PlateLayout
+  /** Rack panels: also list it on the Patch Labels page (a label strip over its jacks). */
+  patchBay?: boolean
 }
 
 /** What a building receptacle, panel feed or generator can deliver. */
@@ -561,6 +563,8 @@ export interface PatchBay {
   arrows?: Record<string, RowArrow>
   /** Titles grouping channels that come from the same wall box / plate / floor box (default on). */
   autoTitles?: boolean
+  /** Bays made from a custom rack panel: cell "row.channel" → the panel's jack id (its ports are `<id>.f` / `<id>.r`). */
+  portMap?: Record<string, string>
 }
 export type RowArrow = 'up' | 'down'
 

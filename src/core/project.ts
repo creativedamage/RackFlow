@@ -4,6 +4,7 @@
 import { boxNumberingOf, isBox, numberBoxPorts } from './boxports'
 import { cableRule, nextNumber, tagRule, type CableSystem } from './numbering'
 import { cableSpec, fittingCables } from './cables'
+import { isPanelBayProduct, syncPanelBay } from './patchbay/panelbay'
 import {
   addrKey, CATEGORIES, CURRENT_SCHEMA, newId,
   type Cable, type CanvasPoint, type EquipmentCategory, type EquipmentId, type EquipmentInstance,
@@ -72,6 +73,7 @@ export function addEquipment(p: Project, product: ProductDefinition, at: CanvasP
   }
   p.equipment.push(inst)
   if (isBox(inst) && boxNumberingOf(p).on) numberBoxPorts(p, { ids: [inst.id] })
+  if (isPanelBayProduct(inst.product)) syncPanelBay(p, inst)
   return inst
 }
 

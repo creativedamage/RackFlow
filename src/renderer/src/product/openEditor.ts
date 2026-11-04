@@ -39,5 +39,8 @@ export function editSelection() {
 export function editBayLayout(bayId: string) {
   const s = useStore.getState()
   const bay = s.project.patchBays.find((b) => b.id === bayId)
+  // A bay made from a custom rack panel: its jacks are edited in the panel designer.
+  const eq = bay?.portMap ? s.project.equipment.find((e) => e.id === bay.equipment) : undefined
+  if (eq) { openProductEditor(eq.product, eq.id); return }
   if (bay) s.set({ editingTemplate: { ...structuredClone(bay.template), key: bay.template.key }, editingTemplateBay: bay.id })
 }
