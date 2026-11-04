@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  clearFormatting, clearRange, copyRange, defaultPrintOptions, fillSeries, findCell, FORMAT_PRESETS, layoutLabels, mergeTitle,
+  clearFormatting, clearRange, resetToWiring, boundText, copyRange, defaultPrintOptions, fillSeries, findCell, FORMAT_PRESETS, layoutLabels, mergeTitle,
   NORMAL_SYMBOLS, pagesToPrintHTML, pageToSVG, pasteAt, refreshLabels, removeTitles, setNormals, staleCells, STOCKS, styleRange,
   toggleStyle, arrowGlyph, rowLetter, type CellStyle, type NormalMode, type PatchBay, type PrintOptions, type RowArrow, autoGroupTitles} from '@core/index'
 import { api } from '../platform'
@@ -166,7 +166,15 @@ function FormatBar() {
             <Select value="" width={148} onChange={(name) => { const p = FORMAT_PRESETS.find((x) => x.name === name); if (p) editBay(bay.id, 'Label Format', (b) => { b.format = { ...p.format } }) }}
               options={[{ value: '', label: 'Wiring format…' }, ...FORMAT_PRESETS.map((x) => ({ value: x.name, label: x.name }))]} />
             <button className={`fb ${stale ? 'accent' : ''}`} title="Fill every non-typed cell from the cables wired to this bay's rear ports"
-              onClick={() => editBay(bay.id, 'Refresh from Wiring', (b) => refreshLabels(b, useStore.getState().project))}>⟳ From wiring{stale ? ` (${stale})` : ''}</button>
+              onClick={() => {
+                const pr = useStore.getState().project
+                editBay(bay.id, 'Refresh from Wiring', (b) => refreshLabels(b, pr))
+                // Typed cells are kept – say so when the wiring says something else there.
+                const kept = bay.cells.filter((c) => c.manual && c.text && (boundText(bay, c.row, c.channel, pr) ?? c.text) !== c.text)
+                if (kept.length) useStore.getState().notify(`Kept ${kept.length} typed label${kept.length === 1 ? '' : 's'} that differ from the wiring (${kept.slice(0, 4).map((c) => `${bay.template.rows.find((r) => r.id === c.row)?.name ?? ''} ${c.channel}`).join(', ')}${kept.length > 4 ? '…' : ''}) – select them and use ↺ Reset selected`, { kind: 'info' })
+              }}>⟳ From wiring{stale ? ` (${stale})` : ''}</button>
+            <button className="fb" disabled={!has} title="Put the selected cells back to what's wired – replaces text typed in them (From wiring leaves typed cells alone)"
+              onClick={() => editSelection('Reset to Wiring', (b, s) => resetToWiring(b, useStore.getState().project, s))}>↺ Reset selected</button>
             <label className="fb-check" title="Title each run of channels wired to the same wall box, plate or floor box with its tag and room. Rename or restyle a title to make it your own; untick to remove the automatic ones.">
               <input type="checkbox" checked={bay.autoTitles !== false} onChange={(e) => editBay(bay.id, 'Group by Box', (b) => {
                 b.autoTitles = e.target.checked

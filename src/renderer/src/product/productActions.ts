@@ -1,4 +1,4 @@
-import { BUILT_IN_KEYS, defaultFabrication, fabricationSheets, sheetsToHTML, sheetSize, type ProductDefinition } from '@core/index'
+import { BUILT_IN_KEYS, duplicateDevices, nodeGeom, placeInFreeSpace, defaultFabrication, fabricationSheets, sheetsToHTML, sheetSize, type ProductDefinition } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
 import { addProductToDiagram } from '../diagram/placement'
@@ -42,6 +42,7 @@ export function deviceMenu(id: string): MenuItem[] {
   return [
     { label: eq.product.category === 'patchBay' ? 'Change Panel Layout…' : 'Edit Device…', hint: '⌘E', onClick: () => editPlacedDevice(id) },
     ...(lib ? [{ label: 'Edit Library Product…', onClick: () => openProductEditor(lib) }] : []),
+    { label: s.selection.length > 1 && s.selection.includes(id as never) ? `Duplicate ${s.selection.length} Devices` : 'Duplicate', onClick: () => duplicatePlaced(id) },
     { label: 'Duplicate as Custom Product…', onClick: () => duplicateProduct(eq.product), disabled: eq.product.category === 'patchBay' },
     ...(eq.product.plate ? [{ label: 'Print Fabrication Drawing…', onClick: () => {
       const st = useStore.getState(), sel = st.selection.filter((x) => st.project.equipment.find((e) => e.id === x)?.product.plate).map(String)
@@ -49,4 +50,21 @@ export function deviceMenu(id: string): MenuItem[] {
       void api.print(sheetsToHTML(fabricationSheets(st.project, o), sheetSize(o)))
     } }] : []),
   ]
+}
+
+/** Duplicates a placed device (or the selection it belongs to) onto the wiring diagram, next to the original. */
+export function duplicatePlaced(id: string) {
+  const s = useStore.getState()
+  const ids = s.selection.includes(id as never) ? s.selection.map(String) : [id]
+  let made: string[] = [], tags: string[] = []
+  s.apply(ids.length > 1 ? `Duplicate ${ids.length} Devices` : 'Duplicate Device', (d) => {
+    const copies = duplicateDevices(d, ids)
+    // Out of anyone's way when not in a signal view (views keep their own layout).
+    if (copies.length === 1 && !s.diagramView) placeInFreeSpace(d, copies[0].id, nodeGeom)
+    made = copies.map((c) => c.id); tags = copies.map((c) => c.tag)
+  })
+  if (made.length) {
+    useStore.getState().select(made as never)
+    s.notify(`Duplicated as ${tags.join(', ')}`, { undo: true, kind: 'success' })
+  }
 }

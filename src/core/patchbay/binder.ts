@@ -55,6 +55,18 @@ export function boundText(bay: PatchBay, row: number, channel: number, p: Projec
   return b ? render(bay.format, b, channel) : null
 }
 
+/** Puts these cells back to what the wiring says (typed text in them is replaced). */
+export function resetToWiring(bay: PatchBay, p: Project, r: { row: number; a: number; b: number }) {
+  const lo = Math.min(r.a, r.b), hi = Math.max(r.a, r.b)
+  for (const cell of bay.cells) {
+    if (cell.row !== r.row || cell.channel < lo || cell.channel > hi) continue
+    const b = binding(bay, cell.row, cell.channel, p)
+    cell.text = b ? render(bay.format, b, cell.channel) : ''
+    cell.manual = false
+    cell.fill = bay.style.colorByDomain && b?.signal ? domainFill(b.signal) : null
+  }
+}
+
 /** Re-derive every non-manual cell from current routing. */
 export function refreshLabels(bay: PatchBay, p: Project, overwriteManual = false) {
   for (const cell of bay.cells) {
