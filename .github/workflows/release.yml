@@ -16,7 +16,8 @@ permissions:
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: false
+  # A newer push replaces a run that is still queued or building (only the newest version matters).
+  cancel-in-progress: true
 
 jobs:
   check:
@@ -56,7 +57,7 @@ jobs:
   mac:
     needs: check
     if: needs.check.outputs.release == 'true'
-    runs-on: macos-15
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
