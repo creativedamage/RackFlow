@@ -1,9 +1,10 @@
 import { deviceMenu } from '../product/productActions'
 import { showContextMenu } from '../components/ContextMenu'
-import { memo, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { faceSVG, faceProduct, productFace, fmtWt, rackArtSVG, panelSeen, RACK_W_MM, U_MM, nodeGeom, placeInFreeSpace, addEquipment, type EquipmentInstance, type ProductDefinition } from '@core/index'
 import { ACCESSORY_KINDS, accessoryLabel, canHaveLogo, addAccessory, addRack, fillWithBlanks, RackLayout, type AccessoryKind, type EquipmentId, type Rack, type RackAccessory, type RackFace } from '@core/index'
 import { RackPrintDialog } from './RackPrint'
+import { FaceImageDialog, applyFaceImage } from './FaceImageDialog'
 import { uploadLogo } from './AccessoryInspector'
 import { useStore } from '../store'
 import { DRAG_MIME, type DragPayload } from '../components/Sidebar'
@@ -21,6 +22,8 @@ export function RackView() {
   const [unitPx, setUnitPx] = useState(40)
   const [heat, setHeat] = useState(false)
   const [printing, setPrinting] = useState(false)
+  const [faceFor, setFaceFor] = useState<FaceReq | null>(null)
+  useEffect(() => { const h = (e: Event) => setFaceFor((e as CustomEvent<FaceReq>).detail); window.addEventListener(FACE_EVENT, h); return () => window.removeEventListener(FACE_EVENT, h) }, [])
 
   const unracked = project.equipment.filter((e) => e.product.physical.rackUnits != null && !e.rackPlacement)
 
@@ -45,6 +48,7 @@ export function RackView() {
         ))}
       </div>
       {printing && <RackPrintDialog onClose={() => setPrinting(false)} />}
+      {faceFor && <FaceImageDialog product={faceFor.product} panel={faceFor.panel} heightU={faceFor.heightU} half={faceFor.half} onClose={() => setFaceFor(null)} />}
       <div className="rack-body">
         <div className="unracked">
           <h4>Not yet racked</h4>
@@ -252,7 +256,7 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
                 if (e.shiftKey || e.metaKey) { const cur = useStore.getState().selection; select(cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]) }
                 else select([id])
               }}
-              onContextMenu={(e) => { if (!id) return; if (!useStore.getState().selection.includes(id)) select([id]); showContextMenu(e, [...deviceMenu(id), 'sep', ...(o.halfSlot ? [{ label: `Move to ${o.halfSlot === 'left' ? 'Right' : 'Left'} Half`, disabled: !layout.canPlace(o.high - o.low + 1, o.depthMM, o.low, o.face, o.ref, o.halfSlot === 'left' ? 'right' : 'left'), onClick: () => apply('Move Half-Rack Unit', (d) => { const eq = d.equipment.find((x) => x.id === id); if (eq?.rackPlacement) eq.rackPlacement.halfSlot = o.halfSlot === 'left' ? 'right' : 'left' }) }] : []), { label: 'Flip Front/Rear', onClick: () => apply('Flip Mount Face', (d) => { const eq = d.equipment.find((x) => x.id === id); if (eq?.rackPlacement) eq.rackPlacement.face = eq.rackPlacement.face === 'front' ? 'rear' : 'front' }) }]) }}
+              onContextMenu={(e) => { if (!id) return; if (!useStore.getState().selection.includes(id)) select([id]); showContextMenu(e, [...deviceMenu(id), 'sep', ...faceMenu(id, o.face === face ? 'front' : 'rear', o.high - o.low + 1, !!o.halfSlot), 'sep', ...(o.halfSlot ? [{ label: `Move to ${o.halfSlot === 'left' ? 'Right' : 'Left'} Half`, disabled: !layout.canPlace(o.high - o.low + 1, o.depthMM, o.low, o.face, o.ref, o.halfSlot === 'left' ? 'right' : 'left'), onClick: () => apply('Move Half-Rack Unit', (d) => { const eq = d.equipment.find((x) => x.id === id); if (eq?.rackPlacement) eq.rackPlacement.halfSlot = o.halfSlot === 'left' ? 'right' : 'left' }) }] : []), { label: 'Flip Front/Rear', onClick: () => apply('Flip Mount Face', (d) => { const eq = d.equipment.find((x) => x.id === id); if (eq?.rackPlacement) eq.rackPlacement.face = eq.rackPlacement.face === 'front' ? 'rear' : 'front' }) }]) }}
               onDoubleClick={() => id && apply('Flip Mount Face', (d) => { const eq = d.equipment.find((x) => x.id === id); if (eq?.rackPlacement) eq.rackPlacement.face = eq.rackPlacement.face === 'front' ? 'rear' : 'front' })}
               title={id ? 'Drag to move · double-click to flip front/rear · right-click to edit · Delete removes from rack' : undefined}
               tabIndex={id ? 0 : -1}
@@ -348,8 +352,27 @@ export function RackSettings({ rack }: { rack: Rack }) {
   )
 }
 
+const FACE_EVENT = 'rf-face-image'
+type FaceReq = { product: ProductDefinition; panel: RackFace; heightU: number; half: boolean }
+/** Right-click items for a unit's faceplate picture (the side you're looking at, and the other). */
+function faceMenu(id: string, seen: RackFace, heightU: number, half: boolean) {
+  const eq = useStore.getState().project.equipment.find((e) => e.id === id)
+  if (!eq) return []
+  const open = (panel: RackFace) => window.dispatchEvent(new CustomEvent<FaceReq>(FACE_EVENT, { detail: { product: eq.product, panel, heightU, half } }))
+  const name = (f: RackFace) => (f === 'front' ? 'Front' : 'Rear')
+  const other: RackFace = seen === 'front' ? 'rear' : 'front'
+  const has = (f: RackFace) => !!eq.product.faceImages?.[f]
+  return [
+    { label: `${has(seen) ? 'Replace' : 'Set'} ${name(seen)} Panel Image…`, onClick: () => open(seen) },
+    { label: `${has(other) ? 'Replace' : 'Set'} ${name(other)} Panel Image…`, onClick: () => open(other) },
+    ...(has(seen) ? [{ label: `Remove ${name(seen)} Panel Image`, onClick: () => void applyFaceImage(eq.product, seen, null) }] : []),
+  ]
+}
+
 /** A racked device drawn as the real unit (see core/rackart). Memoised – redrawn only when its cabling or selection changes. */
 const RackArt = memo(function RackArt({ eq, panel, heightU, half, cabled, hot }: { eq: EquipmentInstance; panel: RackFace; heightU: number; half: boolean; cabled?: Map<string, string>; hot?: Set<string> }) {
+  const pic = eq.product.faceImages?.[panel]
+  if (pic) return <div className="rack-art photo" title={`${eq.tag} · ${eq.product.manufacturer} ${eq.product.model}`}><img src={pic.src} alt="" draggable={false} /><span className="rack-tag">{eq.tag}</span>{(hot?.size ?? 0) > 0 && <span className="rack-hot" />}</div>
   const html = rackArtSVG(eq, panel, { cabled: cabled ?? new Map(), hot: hot ?? new Set(), heightU, half, uid: `${eq.id}${panel}` })
   return <div className="rack-art" dangerouslySetInnerHTML={{ __html: html }} />
 }, (a, b) => a.eq === b.eq && a.panel === b.panel && a.heightU === b.heightU && a.half === b.half && sameMap(a.cabled, b.cabled) && sameSet(a.hot, b.hot))

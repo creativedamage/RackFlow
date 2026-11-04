@@ -138,6 +138,15 @@ export interface ProductDefinition {
   fiber?: import('./fiber').FiberSpec
   /** Option-card slots (e.g. dLive I/O Ports): which card family fits, and how many. */
   slots?: { family: string; count: number; name?: string }
+  /** Pictures of the real faceplates (manufacturer drawing or photo, cropped to the panel) for the rack elevation. */
+  faceImages?: { front?: FaceImage; rear?: FaceImage }
+}
+
+/** A faceplate picture: an image data URL cropped to the panel's outline (ears included for the front). */
+export interface FaceImage {
+  src: string
+  /** Where it came from (file name or web page), for the record. */
+  source?: string
 }
 
 export type PlateKind = 'wallBox' | 'wallPlate' | 'floorBox' | 'rackPanel'
