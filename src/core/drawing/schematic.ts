@@ -7,7 +7,7 @@ import { cableColorHex } from '../cables'
 import { clusterMembership } from '../clusters'
 import { viewPrintProject, viewsOf } from '../views'
 import { autoNumber, GENERAL_PAGE, pageNumbers, sheetLabel } from '../sheetnumbers'
-import { CATEGORIES, type Annotation, type Cable, type EquipmentInstance, type PortTemplate, type Project, type WireMode } from '../model'
+import { CATEGORIES, type Annotation, type Cable, type EquipmentInstance, type PortTemplate, type Project, type WireMode, type NetInfo, type VlanPlan } from '../model'
 import { DOMAINS } from '../signals'
 import { portDomain } from '../project'
 import { planChannels, type ChannelWire } from '../autolayout'
@@ -224,7 +224,7 @@ function drawPage(p0: Project, o: SchematicOptions, page: Page, n: number, total
       const names = new Map((p.clusters ?? []).map((c) => [c.id, c.name]))
       drawZones(g, eqs, geo, reachOf, (e) => { const k = groupOf.get(e.id); return k && names.has(k) ? k : '' }, (k) => names.get(k) ?? '', true)
     } else if (zm === 'rooms' && o.split !== 'room') drawZones(g, eqs, geo, reachOf, (e) => e.room?.trim() ?? '', (k) => k)
-    for (const e of eqs) drawDevice(g, e, { ...o, zones: zm })
+    for (const e of eqs) drawDevice(g, e, { ...o, zones: zm }, p.vlans ?? [])
     drawWires(g, p, o, eqs, rects, sheetOf, n, labels)
     for (const a of notes) drawNote(g, a)
   })
@@ -267,7 +267,7 @@ function drawZones(svg: Svg, eqs: EquipmentInstance[], geo: Map<string, { width:
   }
 }
 
-function drawDevice(svg: Svg, e: EquipmentInstance, o: SchematicOptions) {
+function drawDevice(svg: Svg, e: EquipmentInstance, o: SchematicOptions, vlans: VlanPlan[] = []) {
   const g = nodeGeom(e)
   const { x, y } = e.position
   const h = headerHeight(e)
@@ -292,6 +292,7 @@ function drawDevice(svg: Svg, e: EquipmentInstance, o: SchematicOptions) {
   const secOf = new Map(L.sections.flatMap((sec) => sec.ports.map((q) => [q.id, sec] as const)))
   const kind = e.product.category === 'other' ? 'DEVICE' : CATEGORIES[e.product.category].name.toUpperCase()
   svg.text(x + NODE_WIDTH / 2, y + boxH - 8, kind, { size: 9, anchor: 'middle', maxWidth: NODE_WIDTH - 16 })
+  const isSwitch = e.product.category === 'networkSwitch'
   const port = (pt: PortTemplate, _i: number, side: 'left' | 'right') => {
     const py = y + (L.ports.get(pt.id)?.y ?? 0)
     const d = portDomain(pt)
@@ -301,11 +302,23 @@ function drawDevice(svg: Svg, e: EquipmentInstance, o: SchematicOptions) {
     svg.text(bx + BADGE / 2, py + 0.5, connectorBadge(pt.connector), { size: 6.5, anchor: 'middle', maxWidth: BADGE - 3, fill: stroke })
     const sec = secOf.get(pt.id)
     const label = (sec ? cardPortLabel(pt.label, sec.name, sec.faces) : pt.label).toUpperCase()
-    if (side === 'left') svg.text(x + 5, py, label, { size: 8.5, maxWidth: NODE_WIDTH / 2 - 8 })
-    else svg.text(x + NODE_WIDTH - 5, py, label, { size: 8.5, anchor: 'end', maxWidth: NODE_WIDTH / 2 - 8 })
+    // Switch ports with a VLAN: the VLAN goes on a second line under the port name (the row is tall enough for both).
+    const vl = isSwitch ? portVlanText(e.network?.[pt.id], vlans) : ''
+    const ly = vl ? py - 4 : py
+    const lx = side === 'left' ? x + 5 : x + NODE_WIDTH - 5, anchor = side === 'left' ? 'start' as const : 'end' as const
+    svg.text(lx, ly, label, { size: 8.5, anchor, maxWidth: NODE_WIDTH / 2 - 8 })
+    if (vl) svg.text(lx, py + 6, vl, { size: 6.5, anchor, fill: '#555', maxWidth: NODE_WIDTH / 2 - 8 })
   }
   left.forEach((pt, i) => port(pt, i, 'left'))
   right.forEach((pt, i) => port(pt, i, 'right'))
+}
+
+/** "VLAN 20 · AUDIO" for an access port, "TRUNK 10,20 (NATIVE 1)" for a trunk; '' when none is set. */
+export function portVlanText(info: NetInfo | undefined, vlans: VlanPlan[] = []): string {
+  if (!info) return ''
+  const name = (v?: string) => { const n = v ? vlans.find((x) => x.vlan === v)?.name?.trim() : ''; return n ? ` · ${n}` : '' }
+  if (info.mode === 'trunk') return `TRUNK ${info.tagged || ''}${info.vlan ? ` (NATIVE ${info.vlan})` : ''}`.replace(/\s+/g, ' ').trim().toUpperCase()
+  return info.vlan ? `VLAN ${info.vlan}${name(info.vlan)}`.toUpperCase() : ''
 }
 
 interface End { eq: EquipmentInstance; port: PortTemplate; pt: Pt; dir: number }

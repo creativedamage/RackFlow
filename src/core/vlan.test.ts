@@ -22,3 +22,15 @@ it('switch ports carry VLANs that the wired device inherits', () => {
   expect(validVlans('0')).toBe(false)
   expect(validVlans('5000')).toBe(false)
 })
+
+import { defaultSchematic as _ds, portVlanText as _pvt, schematicSheets as _ss } from './index'
+it('prints the VLAN under a switch port on the schematic', () => {
+  expect(_pvt({ vlan: '20' }, [{ vlan: '20', name: 'Audio', gateway: '10.10.20.1', prefix: 24 }])).toBe('VLAN 20 · AUDIO')
+  expect(_pvt({ mode: 'trunk', tagged: '10,20', vlan: '1' })).toBe('TRUNK 10,20 (NATIVE 1)')
+  expect(_pvt({})).toBe('')
+  const p = newProject()
+  const sw = addEquipment(p, BUILT_IN_PRODUCTS.find((x) => x.category === 'networkSwitch')!, { x: 0, y: 0 })
+  const port = sw.product.ports.find((x) => x.connector === 'rj45')!
+  sw.network = { [port.id]: { vlan: '30' } }
+  expect(_ss(p, _ds(p)).join('')).toContain('VLAN 30')
+})
