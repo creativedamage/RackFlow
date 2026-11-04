@@ -26,12 +26,12 @@ it('duplicating a patch bay gives it its own blank label sheet; Reset selected o
   expect(nb.id).not.toBe(bay.id)
   // Typed text survives From wiring, Reset selected replaces it.
   const b = p.patchBays.find((x) => x.id === bay.id)!
-  const mic = BUILT_IN_PRODUCTS.find((x) => x.ports.some((q) => q.connector === b.template.rows[0].rearConnector))
+  const mic = BUILT_IN_PRODUCTS.find((x) => x.ports.some((q) => q.connector === b.template.rearConnector))
   const cell = b.cells.find((x) => x.row === t.rows[0].id && x.channel === 1)!
   cell.text = 'Right'; cell.manual = true
   if (mic) {
     const m = addEquipment(p, mic, { x: 500, y: 0 })
-    const mp = m.product.ports.find((q) => q.connector === b.template.rows[0].rearConnector)!
+    const mp = m.product.ports.find((q) => q.connector === b.template.rearConnector)!
     connect(p, { equipment: b.equipment, port: 'r1.c01' }, { equipment: m.id, port: mp.id })
   }
   refreshLabels(b, p)
