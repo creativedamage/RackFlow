@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  addToGroup, createGroup, groupColor, groupsOf, removeFromGroup, CABLE_CATALOG, cableRows, cablesToCSV, cableSpec, CATEGORIES, defaultSchemes, DOMAINS, findRack, fittingCables, renumberCables, resolve, type CableId, type CableRow, type EquipmentInstance, type NumberScheme, type RenumberOrder, type SignalDomain, longUnit, toLong, fromLong,
+  addToGroup, createGroup, groupColor, groupsOf, removeFromGroup, CABLE_CATALOG, cableRows, cablesToCSV, cableSpec, CATEGORIES, defaultSchemes, DOMAINS, findRack, fittingCables, renumberCables, autoCableTypes, cableChoices, commonCableChoices, needsCableType, resolve, type CableId, type CableRow, type EquipmentInstance, type NumberScheme, type RenumberOrder, type SignalDomain, longUnit, toLong, fromLong,
 } from '@core/index'
 import { useStore } from '../store'
 import { Modal, NumberInput, Select } from '../components/ui'
@@ -59,6 +59,21 @@ function CableSheet() {
     return all.filter((r) => (!system || (r.system ?? 'other') === system)
       && (!s || [r.cable.label, r.fromTag, r.fromPort, r.toTag, r.toPort, r.signal, r.cableType, r.cable.notes].join(' ').toLowerCase().includes(s)))
   }, [all, q, system])
+  // Cables still TBD, or whose type doesn't fit their ports.
+  const unset = useMemo(() => project.cables.filter((c) => needsCableType(project, c)).length, [project])
+  const pickedIds = useMemo(() => picked.map((r) => r.cable.id), [picked])
+  const common = useMemo(() => (picked.length > 1 ? commonCableChoices(project, pickedIds) : []), [project, picked.length, pickedIds])
+  const notify = useStore((s) => s.notify)
+  const autoFill = (ids?: CableId[]) => {
+    let n = 0
+    apply('Auto-fill Cable Types', (d) => { n = autoCableTypes(d, ids) })
+    notify(n ? `Set the cable type on ${n} cable${n === 1 ? '' : 's'}` : 'Every cable already has a type that fits', { kind: n ? 'success' : undefined })
+  }
+  const setForPicked = (v: string) => {
+    if (!v) return
+    if (v === '__best') { let n = 0; apply('Best-fit Cable Types', (d) => { n = autoCableTypes(d, pickedIds, true) }); notify(`Best-fit cable set on ${n} cable${n === 1 ? '' : 's'}`); return }
+    apply('Set Cable Type', (d) => { for (const c of d.cables) if (pickedIds.includes(c.id)) c.specKey = v === '__tbd' ? null : v })
+  }
   const counts = useMemo(() => {
     const m = new Map<string, number>()
     for (const r of all) m.set(r.system ?? 'other', (m.get(r.system ?? 'other') ?? 0) + 1)
@@ -75,6 +90,12 @@ function CableSheet() {
     { key: 'toPort', title: 'To Port', width: 150, get: (r) => r.toPort },
     { key: 'signal', title: 'Signal', width: 120, get: (r) => r.signal },
     { key: 'type', title: 'Cable Type', width: 230, get: (r) => r.cableType || 'TBD', value: (r) => r.cable.specKey ?? '',
+      render: (r) => {
+        if (!needsCableType(project, r.cable)) return <span>{r.cableType}</span>
+        const best = cableChoices(project, r.cable)[0]
+        return <span className="tbd-cell" title={best ? `Suggested: ${best.name} – use Auto-fill, or pick from the list` : undefined}>
+          <b>{r.cable.specKey ? `${r.cableType} ✕` : 'TBD'}</b>{best && <span className="muted"> → {best.name}</span>}</span>
+      },
       options: (r) => {
         const a = resolve(project, r.cable.from), b = resolve(project, r.cable.to)
         const fit = a && b ? fittingCables(a.port, b.port) : CABLE_CATALOG
@@ -122,6 +143,17 @@ function CableSheet() {
           ...(counts.get('other') ? [{ value: 'other' as const, label: `Other (${counts.get('other')})` }] : [])]} />
         <span className="muted small">{picked.length > 1 ? `${picked.length} rows selected` : `${rows.length} cable${rows.length === 1 ? '' : 's'}`}</span>
         <span className="spacer" />
+        {picked.length > 1 && (
+          <Select value="" onChange={setForPicked} options={[
+            { value: '', label: `Cable type for ${picked.length} selected…` },
+            { value: '__best', label: 'Best fit for each' },
+            ...common.map((c) => ({ value: c.key, label: c.name })),
+            { value: '__tbd', label: 'TBD' },
+          ]} />
+        )}
+        <button className={unset ? 'primary' : ''} disabled={!all.length} onClick={() => autoFill(picked.length > 1 ? pickedIds : undefined)}
+          title="Give every TBD cable (and any whose type doesn't fit its ports) the best-fitting cable type. With rows selected, only those.">
+          ✨ Auto-fill Cable Types{unset ? ` (${unset})` : ''}</button>
         <button disabled={!picked.length} onClick={showInDiagram}>Show in Diagram</button>
         <button className="primary" disabled={!all.length} onClick={() => setRenumber(true)}>Renumber…</button>
         <button onClick={() => useStore.getState().set({ editingNumbering: true })} title="Tag and cable label formats (PB-001, A-0001) – saved as a reusable standard">Numbering Standards…</button>

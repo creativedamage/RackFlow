@@ -85,6 +85,13 @@ export const CABLE_CATALOG: CableSpec[] = [
   // Audio tie lines: single pair or multi-pair snake, punched down at both ends.
   cable('audio.pair', 'Audio Cable, 1-pair shielded – punch-down', e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), ['analogMic', 'analogLine', 'aes3'], 300, 'A'),
   ...[4, 8, 12, 16, 24, 32, 48].map((n) => snake(cable(`snake.${n}.h`, `${n}-Channel Snake (multi-pair) – punch-down`, e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), ['analogMic', 'analogLine', 'aes3'], 300, 'A'), n)),
+  // DB25 (TASCAM analog, 8 channels) snakes and fan-outs – patch-bay and console rear panels.
+  snake(cable('db25.db25', 'DB25 Snake, 8-ch (TASCAM) – DB25 to DB25', e('db25', 'male'), e('db25', 'male'), ['analogMic', 'analogLine', 'aes3'], 100, 'A'), 8),
+  snake(cable('db25.xlrm', 'DB25 Fan-out, 8-ch (TASCAM) – DB25 to XLR Male', e('db25', 'male'), e('xlr3', 'male'), ['analogMic', 'analogLine', 'aes3'], 100, 'A'), 8),
+  snake(cable('db25.xlrf', 'DB25 Fan-out, 8-ch (TASCAM) – DB25 to XLR Female', e('db25', 'male'), e('xlr3', 'female'), ['analogMic', 'analogLine', 'aes3'], 100, 'A'), 8),
+  snake(cable('db25.trs', 'DB25 Fan-out, 8-ch (TASCAM) – DB25 to 1/4" TRS', e('db25', 'male'), e('trs6_35', 'male'), ['analogMic', 'analogLine'], 100, 'A'), 8),
+  snake(cable('db25.punch', 'DB25 Snake, 8-ch (TASCAM) – DB25 to punch-down', e('db25', 'male'), e('idcPunchdown', 'male'), ['analogMic', 'analogLine', 'aes3'], 300, 'A'), 8),
+  cable('dmx.punch', 'DMX Cable (120Ω) – XLR-5 Male to punch-down', e('xlr5', 'male'), e('idcPunchdown', 'male'), ['dmx512'], 300, 'L'),
   cable('cat5e.h', 'Cat5e – punch-down both ends', e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), CAT5E, 90, 'N'),
   cable('cat6.h', 'Cat6 – punch-down both ends', e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), [], 90, 'N'),
   cable('cat6a.h', 'Cat6A – punch-down both ends', e('idcPunchdown', 'male'), e('idcPunchdown', 'male'), [], 90, 'N'),

@@ -1237,3 +1237,6 @@ input.mono { font-family: var(--mono); }
 .group-draw { position: absolute; inset: 0; z-index: 20; cursor: crosshair; background: rgba(10, 132, 255, 0.04); }
 .group-draw-hint { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #fff; font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,.2); pointer-events: none; }
 .group-draw-rect { position: absolute; border: 1.5px dashed var(--accent); background: rgba(10, 132, 255, 0.08); border-radius: 10px; pointer-events: none; }
+
+.tbd-cell b { color: var(--warn, #f08c00); font-weight: 700; }
+.tbd-cell .muted { font-size: 11px; }

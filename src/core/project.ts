@@ -3,7 +3,7 @@
 
 import { boxNumberingOf, isBox, numberBoxPorts } from './boxports'
 import { cableRule, nextNumber, tagRule, type CableSystem } from './numbering'
-import { cableSpec } from './cables'
+import { cableSpec, fittingCables } from './cables'
 import {
   addrKey, CATEGORIES, CURRENT_SCHEMA, newId,
   type Cable, type CanvasPoint, type EquipmentCategory, type EquipmentId, type EquipmentInstance,
@@ -103,7 +103,9 @@ export function connect(p: Project, a: PortAddress, b: PortAddress, specKey: str
   // Fiber: single-mode (OS2) or multimode (OM3/4/5) from the panels it lands on.
   const fiberMode = tags.includes('multimode') ? '.mm' : tags.includes('singlemode') ? '.sm' : null
   const fiberPick = fiberMode && verdict.suggestedCables.find((s) => s.key.startsWith('fiber.') && s.key.endsWith(fiberMode))
-  const spec = cableSpec(specKey) ?? (fiberPick || (tp && preferred ? preferred : verdict.suggestedCables[0]))
+  // Nothing in the catalog fits? Fall back to the made-to-order cable for these two ports, never TBD.
+  const ra = resolve(p, from), rb = resolve(p, to)
+  const spec = cableSpec(specKey) ?? (fiberPick || (tp && preferred ? preferred : verdict.suggestedCables[0])) ?? (ra && rb ? fittingCables(ra.port, rb.port)[0] : undefined)
   const prefix = spec?.labelPrefix ?? (verdict.signal ? CABLE_PREFIX[SIGNALS[verdict.signal].domain] : 'X')
   const c: Cable = {
     id: newId(), label: nextCableLabel(p, prefix, verdict.signal ? SIGNALS[verdict.signal].domain : 'other'), from: { ...from }, to: { ...to },
