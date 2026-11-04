@@ -1,7 +1,7 @@
 import { deviceMenu } from '../product/productActions'
 import { showContextMenu } from '../components/ContextMenu'
-import { useMemo, useState } from 'react'
-import { faceSVG, faceProduct, productFace, fmtWt, rackFaceLayout, visiblePanel, nodeGeom, placeInFreeSpace, addEquipment, type EquipmentInstance, type ProductDefinition } from '@core/index'
+import { memo, useMemo, useState } from 'react'
+import { faceSVG, faceProduct, productFace, fmtWt, rackArtSVG, panelSeen, RACK_W_MM, U_MM, nodeGeom, placeInFreeSpace, addEquipment, type EquipmentInstance, type ProductDefinition } from '@core/index'
 import { ACCESSORY_KINDS, accessoryLabel, canHaveLogo, addAccessory, addRack, fillWithBlanks, RackLayout, type AccessoryKind, type EquipmentId, type Rack, type RackAccessory, type RackFace } from '@core/index'
 import { RackPrintDialog } from './RackPrint'
 import { uploadLogo } from './AccessoryInspector'
@@ -18,8 +18,7 @@ export function RackView() {
   const project = useStore((s) => s.project)
   const apply = useStore((s) => s.apply)
   const [face, setFace] = useState<RackFace>('front')
-  const [unitPx, setUnitPx] = useState(30)
-  const [cords, setCords] = useState<'all' | 'selected' | 'off'>('all')
+  const [unitPx, setUnitPx] = useState(40)
   const [heat, setHeat] = useState(false)
   const [printing, setPrinting] = useState(false)
 
@@ -30,8 +29,7 @@ export function RackView() {
       <div className="rack-toolbar">
         <Segmented value={face} onChange={setFace} options={[{ value: 'front', label: 'Front' }, { value: 'rear', label: 'Rear' }]} />
         <Toggle checked={heat} onChange={setHeat} label="Heat map" />
-        <label className="zoom">Zoom <input type="range" min={14} max={64} value={unitPx} onChange={(e) => setUnitPx(+e.target.value)} /></label>
-        <Segmented value={cords} onChange={setCords} options={[{ value: 'all', label: 'All cords', title: 'Draw every patch cord between devices in the rack' }, { value: 'selected', label: 'Selected', title: 'Only cords of the selected device(s)' }, { value: 'off', label: 'No cords' }]} />
+        <label className="zoom">Zoom <input type="range" min={18} max={90} value={unitPx} onChange={(e) => setUnitPx(+e.target.value)} /></label>
         <span className="muted small">Shift-click to select several · drag one to move them all</span>
         <span className="spacer" />
         <button onClick={() => setPrinting(true)} disabled={!project.racks.length}>Print / Export…</button>
@@ -60,14 +58,14 @@ export function RackView() {
         <div className="racks-scroll">
           {project.racks.length === 0
             ? <Empty title="No racks yet"><button className="primary" onClick={() => apply('Add Rack', (d) => { addRack(d) })}>+ Add a 42U Rack</button></Empty>
-            : project.racks.map((r) => <RackColumn key={r.id} rack={r} face={face} unitPx={unitPx} heat={heat} cords={cords} />)}
+            : project.racks.map((r) => <RackColumn key={r.id} rack={r} face={face} unitPx={unitPx} heat={heat} />)}
         </div>
       </div>
     </div>
   )
 }
 
-function RackColumn({ rack, face, unitPx, heat, cords }: { rack: Rack; face: RackFace; unitPx: number; heat: boolean; cords: 'all' | 'selected' | 'off' }) {
+function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; unitPx: number; heat: boolean }) {
   const project = useStore((s) => s.project)
   const apply = useStore((s) => s.apply)
   const selection = useStore((s) => s.selection)
@@ -80,7 +78,7 @@ function RackColumn({ rack, face, unitPx, heat, cords }: { rack: Rack; face: Rac
   if (!layout) return null
 
   const total = rack.spec.rackUnits
-  const bodyW = Math.round(unitPx * 14), rail = 26, gutter = 90
+  const bodyW = Math.round(unitPx * RACK_W_MM / U_MM), rail = 26
   const yOf = (high: number) => (total - high) * unitPx
   const selAcc = useStore((s) => s.selectedAccessory)
   const logos = project.logos ?? []
@@ -139,45 +137,27 @@ function RackColumn({ rack, face, unitPx, heat, cords }: { rack: Rack; face: Rac
     return null
   }
 
-  const occupants = layout.occupants.filter((o) => o.face === face || o.depthMM > rack.spec.mountingDepthMM * 0.8)
+  // From either side you see every device (its front or its back); panels only on their own side (or deep ones).
+  const occupants = (() => {
+    const mine = layout.occupants.filter((o) => o.face === face || o.depthMM > rack.spec.mountingDepthMM * 0.8)
+    const behind = layout.occupants.filter((o) => o.ref.kind === 'equipment' && !mine.includes(o) && !mine.some((m) => m.low <= o.high && o.low <= m.high && (!m.halfSlot || !o.halfSlot || m.halfSlot === o.halfSlot)))
+    return [...mine, ...behind]
+  })()
   // Units free on this face (for the ＋ add buttons).
   const covered = new Set<number>()
   for (const o of occupants) for (let u = o.low; u <= o.high; u++) covered.add(u)
   const freeUnits = Array.from({ length: total }, (_, i) => i + 1).filter((u) => !covered.has(u))
   // Wired ports (dark), and the ports at either end of the selected devices' cables (highlighted).
   const selSet = new Set(selection as string[])
-  const wired = new Set<string>(), hot = new Set<string>()
+  const cabled = new Map<string, Map<string, string>>(), hot = new Map<string, Set<string>>()
+  const mark = (eq: string, port: string, color: string, lit: boolean) => {
+    if (!cabled.has(eq)) cabled.set(eq, new Map())
+    cabled.get(eq)!.set(port, color)
+    if (lit) { if (!hot.has(eq)) hot.set(eq, new Set()); hot.get(eq)!.add(port) }
+  }
   for (const c of project.cables) {
-    const a = `${c.from.equipment}/${c.from.port}`, b = `${c.to.equipment}/${c.to.port}`
-    wired.add(a); wired.add(b)
-    if (selSet.has(c.from.equipment) || selSet.has(c.to.equipment)) { hot.add(a); hot.add(b) }
-  }
-  // Patch cords between devices in this rack, port to port, routed out to the gutter on the right.
-  const portAt = new Map<string, { x: number; y: number }>()
-  for (const o of occupants) {
-    if (o.ref.kind !== 'equipment') continue
-    const eq = project.equipment.find((e) => e.id === o.ref.id)
-    if (!eq) continue
-    const panel = visiblePanel(eq, face)
-    const h = (o.high - o.low + 1) * unitPx - 1, w = o.halfSlot ? bodyW / 2 : bodyW
-    const x0 = rail + (o.halfSlot === 'right' ? bodyW / 2 : 0), y0 = yOf(o.high)
-    const custom = panel === 'front' && !o.halfSlot && productFace(eq.product)?.rack
-    if (custom) { for (const pt of eq.product.ports) portAt.set(`${eq.id}/${pt.id}`, { x: x0 + w - 4, y: y0 + h / 2 }); continue }
-    for (const j of rackFaceLayout(eq, panel, w, h).jacks) portAt.set(`${eq.id}/${j.port.id}`, { x: x0 + j.x, y: y0 + j.y })
-  }
-  const cordPaths: { d: string; hot: boolean }[] = []
-  {
-    const list = project.cables.map((c) => ({ c, a: portAt.get(`${c.from.equipment}/${c.from.port}`), b: portAt.get(`${c.to.equipment}/${c.to.port}`) }))
-      .filter((x) => x.a && x.b && (x.a.x !== x.b.x || x.a.y !== x.b.y))
-      .map((x) => ({ ...x, hot: selSet.has(x.c.from.equipment) || selSet.has(x.c.to.equipment) }))
-      .filter((x) => cords === 'all' || x.hot)
-      .sort((p1, p2) => Math.abs(p1.a!.y - p1.b!.y) - Math.abs(p2.a!.y - p2.b!.y))
-    const edge = rail * 2 + bodyW, lanes = Math.max(1, Math.floor((gutter - 10) / 4))
-    list.forEach((x, i) => {
-      const a = x.a!, b = x.b!, gx = edge + 6 + (i % lanes) * 4, r = 3
-      const [p, q] = a.y <= b.y ? [a, b] : [b, a]
-      cordPaths.push({ hot: x.hot, d: `M ${p.x} ${p.y} L ${gx - r} ${p.y} Q ${gx} ${p.y} ${gx} ${p.y + r} L ${gx} ${q.y - r} Q ${gx} ${q.y} ${gx - r} ${q.y} L ${q.x} ${q.y}` })
-    })
+    const lit = selSet.has(c.from.equipment) || selSet.has(c.to.equipment)
+    mark(c.from.equipment, c.from.port, c.color ?? '', lit); mark(c.to.equipment, c.to.port, c.color ?? '', lit)
   }
   const heatMap = layout.heatPerUnit
   const maxHeat = Math.max(1, ...heatMap)
@@ -198,7 +178,7 @@ function RackColumn({ rack, face, unitPx, heat, cords }: { rack: Rack; face: Rac
       </div>
       <div
         className="rack"
-        style={{ width: bodyW + 2 * rail, height: total * unitPx, marginRight: gutter }}
+        style={{ width: bodyW + 2 * rail, height: total * unitPx, }}
         onDragOver={(e) => {
           if (!e.dataTransfer.types.includes(DRAG_MIME)) return
           e.preventDefault()
@@ -256,7 +236,7 @@ function RackColumn({ rack, face, unitPx, heat, cords }: { rack: Rack; face: Rac
           const height = (o.high - o.low + 1) * unitPx - 1
           return (
             <div key={`${o.ref.kind}:${o.ref.id}`}
-              className={`rack-item ${other ? 'other-face' : ''} ${selected ? 'selected' : ''} ${o.ref.kind}`}
+              className={`rack-item ${other && o.ref.kind !== 'equipment' ? 'other-face' : ''} ${selected ? 'selected' : ''} ${o.ref.kind}`}
               style={{ top: yOf(o.high), height, left: rail + (o.halfSlot === 'right' ? bodyW / 2 : 0), width: o.halfSlot ? bodyW / 2 : bodyW }}
               draggable={id != null}
               onDragStart={(e) => {
@@ -285,19 +265,13 @@ function RackColumn({ rack, face, unitPx, heat, cords }: { rack: Rack; face: Rac
             >
               {(() => {
                 const eq = id ? project.equipment.find((e) => e.id === id) : undefined
-                const f = eq && !o.halfSlot && !other ? productFace(eq.product) : null
-                if (f?.rack) return <><div className="rack-face" dangerouslySetInnerHTML={{ __html: faceSVG(faceProduct(eq!), { pad: 0, stretch: true, bare: true }) }} /><span className="rack-tag">{o.name}</span></>
-                const w = o.halfSlot ? bodyW / 2 : bodyW
-                const fl = eq ? rackFaceLayout(eq, visiblePanel(eq, face), w, height) : null
-                if (fl && fl.jacks.length) return <>
-                  <JackFace eq={eq!} layout={fl} w={w} h={height} wired={wired} hot={hot} />
-                  <span className="rack-tag" title={eq!.product.model}>{o.name}</span>
-                  {(() => { const room = Math.min(...fl.jacks.map((j) => j.x)) - fl.size - 54; return room > 30 && <span className="rack-model-tiny ellipsis" style={{ maxWidth: room }}>{eq!.product.model}</span> })()}
-                </>
-                return <><b>{o.name}</b>{id && <span className="rack-model ellipsis">{eq?.product.model}</span>}
-                  {height > 16 && <span className="muted">{o.typicalWatts.toFixed(0)} W · {fmtWt(o.weightKG)}</span>}</>
+                if (!eq) return <><b>{o.name}</b></>
+                const panel = panelSeen(eq, face)
+                const f = !o.halfSlot && panel === 'front' ? productFace(eq.product) : null
+                if (f?.rack) return <><div className="rack-face" dangerouslySetInnerHTML={{ __html: faceSVG(faceProduct(eq), { pad: 0, stretch: true, bare: true }) }} /><span className="rack-tag">{o.name}</span></>
+                return <RackArt eq={eq} panel={panel} heightU={o.high - o.low + 1} half={!!o.halfSlot} cabled={cabled.get(eq.id)} hot={hot.get(eq.id)} />
               })()}
-              {other && <span className="face-tag">{o.face}</span>}
+              {other && o.ref.kind !== 'equipment' && <span className="face-tag">{o.face}</span>}
             </div>
           )
         })}
@@ -306,7 +280,6 @@ function RackColumn({ rack, face, unitPx, heat, cords }: { rack: Rack; face: Rac
           <button key={`plus${u}`} className="rack-plus" style={{ top: yOf(u), height: unitPx, left: rail, width: bodyW }} title={`Add a device at U${u}`}
             onClick={(e) => { e.stopPropagation(); setPicker(u) }}>＋</button>
         ))}
-        {cords !== 'off' && <CordLayer paths={cordPaths} width={bodyW + 2 * rail + gutter} height={total * unitPx} />}
         {picker != null && <AddPicker rack={rack} unit={picker} face={face} layout={layout} top={Math.max(0, Math.min(yOf(picker) + unitPx, total * unitPx - 300))} left={rail + 20} onClose={() => setPicker(null)} />}
         {ghost && <div className={`rack-ghost ${ghost.ok ? '' : 'bad'}`} style={{ top: yOf(ghost.start + ghost.height - 1), height: ghost.height * unitPx, left: rail + (ghost.slot === 'right' ? bodyW / 2 : 0), width: ghost.slot ? bodyW / 2 : bodyW }} />}
         {cog != null && <div className="cog" style={{ top: (total - cog) * unitPx }} title={`Centre of gravity U${cog.toFixed(1)}`}>◆</div>}
@@ -375,38 +348,13 @@ export function RackSettings({ rack }: { rack: Rack }) {
   )
 }
 
-/** A device's jacks on this face: numbered, used ones filled, the selected device's connections highlighted. */
-function JackFace({ eq, layout, w, h, wired, hot }: { eq: EquipmentInstance; layout: ReturnType<typeof rackFaceLayout>; w: number; h: number; wired: Set<string>; hot: Set<string> }) {
-  const s = layout.size
-  return (
-    <svg className="jack-face" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-      {layout.jacks.map((j) => {
-        const k = `${eq.id}/${j.port.id}`, used = wired.has(k), lit = hot.has(k)
-        const fill = lit ? 'var(--accent)' : used ? '#1d1d1f' : 'transparent', stroke = lit ? 'var(--accent)' : used ? '#1d1d1f' : '#a0a0a8'
-        const x = j.x - s / 2, y = j.y - s / 2
-        return (
-          <g key={j.port.id}>
-            <title>{`${j.port.label} · ${j.port.connector}${used ? ' · wired' : ''}`}</title>
-            {j.glyph === 'rj45' ? <path d={`M ${x} ${y + s * 0.15} h ${s} v ${s * 0.7} h ${-s * 0.25} v ${s * 0.15} h ${-s * 0.5} v ${-s * 0.15} h ${-s * 0.25} z`} fill={fill} stroke={stroke} strokeWidth={0.8} />
-              : j.glyph === 'xlr' || j.glyph === 'round' ? <circle cx={j.x} cy={j.y} r={s / 2} fill={fill} stroke={stroke} strokeWidth={0.8} />
-              : <rect x={x} y={y + s * 0.2} width={s} height={s * 0.6} rx={1} fill={fill} stroke={stroke} strokeWidth={0.8} />}
-            {layout.labels && <text x={j.x} y={j.labelAbove ? y - 1.5 : y + s + 6} fontSize={Math.min(7, s * 0.6)} textAnchor="middle" fill={lit ? 'var(--accent)' : '#6e6e73'}>{j.n}</text>}
-          </g>
-        )
-      })}
-    </svg>
-  )
-}
-
-/** Patch cords between racked devices (drawn over the rack, out through the right-hand gutter). */
-function CordLayer({ paths, width, height }: { paths: { d: string; hot: boolean }[]; width: number; height: number }) {
-  return (
-    <svg className="cord-layer" width={width} height={height}>
-      {paths.filter((p) => !p.hot).map((p, i) => <path key={`c${i}`} d={p.d} fill="none" stroke="#8e8e96" strokeOpacity={0.55} strokeWidth={1} />)}
-      {paths.filter((p) => p.hot).map((p, i) => <path key={`h${i}`} d={p.d} fill="none" stroke="var(--accent)" strokeWidth={1.8} />)}
-    </svg>
-  )
-}
+/** A racked device drawn as the real unit (see core/rackart). Memoised – redrawn only when its cabling or selection changes. */
+const RackArt = memo(function RackArt({ eq, panel, heightU, half, cabled, hot }: { eq: EquipmentInstance; panel: RackFace; heightU: number; half: boolean; cabled?: Map<string, string>; hot?: Set<string> }) {
+  const html = rackArtSVG(eq, panel, { cabled: cabled ?? new Map(), hot: hot ?? new Set(), heightU, half, uid: `${eq.id}${panel}` })
+  return <div className="rack-art" dangerouslySetInnerHTML={{ __html: html }} />
+}, (a, b) => a.eq === b.eq && a.panel === b.panel && a.heightU === b.heightU && a.half === b.half && sameMap(a.cabled, b.cabled) && sameSet(a.hot, b.hot))
+const sameMap = (a?: Map<string, string>, b?: Map<string, string>) => (a?.size ?? 0) === (b?.size ?? 0) && [...(a ?? [])].every(([k, v]) => b?.get(k) === v)
+const sameSet = (a?: Set<string>, b?: Set<string>) => (a?.size ?? 0) === (b?.size ?? 0) && [...(a ?? [])].every((k) => b?.has(k))
 
 /** ＋ on an empty unit: rack a device that's already in the project, or add a new one from the library here. */
 function AddPicker({ rack, unit, face, layout, top, left, onClose }: { rack: Rack; unit: number; face: RackFace; layout: RackLayout; top: number; left: number; onClose: () => void }) {

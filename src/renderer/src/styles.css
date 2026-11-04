@@ -1249,14 +1249,14 @@ input.mono { font-family: var(--mono); }
 .modal.wide:has(.vlan-modal) { height: auto; width: min(1000px, 96vw); }
 .modal.wide:has(.form.vlan-modal) { width: min(620px, 96vw); }
 
-/* Rack elevation editor: jack faces, tags, ＋ on empty units, patch cords */
-.rack-item .jack-face { position: absolute; inset: 0; pointer-events: none; }
-.rack-item .rack-tag { position: absolute; left: 0; top: 0; bottom: 0; width: 48px; padding: 0 3px; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.05; font-size: 9px; font-weight: 600; letter-spacing: .02em; color: #1d1d1f; background: rgba(0,0,0,.06); border-right: 1px solid rgba(0,0,0,.12); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; z-index: 1; }
-.rack-item .rack-face ~ .rack-tag { width: auto; bottom: auto; padding: 1px 5px; background: rgba(255,255,255,.85); border: 1px solid rgba(0,0,0,.15); border-radius: 0 0 4px 0; }
-.rack-item .rack-model-tiny { position: absolute; left: 52px; top: 50%; transform: translateY(-50%); font-size: 7.5px; color: #6e6e73; pointer-events: none; }
-.rack-plus { position: absolute; border: 0; background: transparent; color: rgba(255,255,255,.18); font-size: 13px; line-height: 1; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 2px; z-index: 1; }
-.rack-plus:hover { color: #fff; background: rgba(255,255,255,.08); outline: 1px dashed rgba(255,255,255,.35); outline-offset: -1px; }
-.cord-layer { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 3; overflow: visible; }
+/* Rack elevation: devices drawn as the real units (core/rackart) */
+.rack-item.equipment { background: transparent; border: 0; border-radius: 0; padding: 0; }
+.rack-item.equipment.selected { outline: 2px solid var(--accent); outline-offset: 0; box-shadow: 0 0 0 4px var(--accent-soft); z-index: 2; }
+.rack-art { position: absolute; inset: 0; }
+.rack-art svg { display: block; width: 100%; height: 100%; }
+.rack-item .rack-tag { position: absolute; left: 4px; top: 2px; padding: 1px 5px; font-size: 9px; font-weight: 700; color: #111; background: #f4f1e4; border-radius: 2px; z-index: 1; }
+.rack-plus { position: absolute; border: 0; background: transparent; color: rgba(255,255,255,.14); font-size: 13px; line-height: 1; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 2px; z-index: 1; }
+.rack-plus:hover { color: #fff; background: rgba(255,255,255,.07); outline: 1px dashed rgba(255,255,255,.3); outline-offset: -1px; }
 .rack-picker { position: absolute; z-index: 20; width: 300px; max-height: 320px; display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.35); }
 .rack-picker-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
 .rack-picker input { width: 100%; }
@@ -1264,4 +1264,3 @@ input.mono { font-family: var(--mono); }
 .rack-picker-list h5 { margin: 6px 0 2px; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: #888; }
 .rack-picker-list button { text-align: left; border: 0; background: transparent; padding: 4px 6px; border-radius: 4px; font-size: 12px; cursor: pointer; color: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rack-picker-list button:hover { background: var(--accent-soft); }
-.rack-item.other-face:has(.jack-face) { background: linear-gradient(#e6e6ea, #d2d2d8); color: #333; cursor: grab; }
