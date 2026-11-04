@@ -136,6 +136,8 @@ export interface ProductDefinition {
   plate?: PlateSpec
   /** Modular fiber enclosure (slots, cassettes / panels, engravings). */
   fiber?: import('./fiber').FiberSpec
+  /** Option-card slots (e.g. dLive I/O Ports): which card family fits, and how many. */
+  slots?: { family: string; count: number; name?: string }
 }
 
 export type PlateKind = 'wallBox' | 'wallPlate' | 'floorBox' | 'rackPanel'
@@ -222,6 +224,8 @@ export interface EquipmentInstance {
   rackPlacement: RackPlacement | null
   room: string
   notes: string
+  /** Option cards fitted, slot number ("1", "2"…) → card key (see CARD_CATALOG). */
+  cards?: Record<string, string>
   /** Device group (a box drawn round it on every page and view it appears on). */
   cluster?: string
   /** Wall boxes / plates: this box's fabrication-sheet notes (replaces the automatic ones when set). */

@@ -1,10 +1,14 @@
 import type { ProductDefinition } from '../model'
 import { P } from './dsl'
+import { DLIVE_SLOTS } from '../cards'
 
 const AH = 'Allen & Heath', DG = 'DiGiCo', YA = 'Yamaha', AV = 'Avid', MI = 'Midas', BE = 'Behringer'
+/** dLive option I/O ports (Dante, Waves, fibreACE, gigaACE… cards). */
+const ioPorts = (d: ProductDefinition, count: number): ProductDefinition => ({ ...d, slots: { family: 'dlive', count, name: 'I/O Port' } })
+
 const SC = 'Soundcraft', SSL = 'Solid State Logic', LW = 'Lawo', CR = 'Calrec', PS = 'PreSonus'
 
-export const AUDIO_CONSOLES: ProductDefinition[] = [
+const CONSOLES: ProductDefinition[] = [
   // ── Allen & Heath ──
   P(AH, 'dLive S7000', 'mixer', 'dLive flagship control surface', '8 xlrIn, 8 xlrOut, 2 aesIn, 2 aesOut, 2 lan:gigaACE, 2 lan, iec2', { mount: 'desk', w: 250, kg: 46, tags: 'dlive' }),
   P(AH, 'dLive S5000', 'mixer', 'dLive control surface', '8 xlrIn, 8 xlrOut, 2 aesIn, 2 aesOut, 2 lan:gigaACE, 2 lan, iec2', { mount: 'desk', w: 200, kg: 35, tags: 'dlive' }),
@@ -239,3 +243,5 @@ export const AUDIO_CONSOLES: ProductDefinition[] = [
   P('Telos Alliance', 'Axia xNode Analog', 'audioInterface', 'AoIP node, 4 stereo in/out', '8 xlrLineIn, 8 xlrOut, aes67, dc12', { ru: 1, half: true, w: 15 }),
   P('Wheatstone', 'Blade-4 Mic', 'audioInterface', 'WheatNet-IP I/O blade', '4 xlrIn, 4 xlrOut, aes67, iec', { ru: 1, w: 30 }),
 ]
+
+export const AUDIO_CONSOLES: ProductDefinition[] = CONSOLES.map((d) => (d.manufacturer === AH && DLIVE_SLOTS[d.model] ? ioPorts(d, DLIVE_SLOTS[d.model]) : d))

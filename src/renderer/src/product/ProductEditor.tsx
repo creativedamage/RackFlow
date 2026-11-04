@@ -4,7 +4,7 @@ import {
   BUILT_IN_KEYS, CATEGORIES, CATEGORY_KEYS, CONNECTOR_TYPES, guessMakerCategories, connectorName, DOMAINS, GENDERS, heatBTU, MOUNT_TYPES, port as mkPort, portDomain,
   productProblems, RACK_UNIT_MM, series, SIGNAL_TYPES, SIGNALS, suggestedSignals, typicalPanelGender,
   type ConnectorType, type Gender, type PortDirection, type PortTemplate, type ProductDefinition, type SignalDomain, type SignalType,
-  refreshBoxPorts, keepInViews } from '@core/index'
+  refreshBoxPorts, keepInViews, applyCards } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
 import { Dot, Field, Modal, NumberInput, Select, TextInput, Toggle, LenInput, WtInput } from '../components/ui'
@@ -51,7 +51,7 @@ export function ProductEditor({ initial }: { initial: ProductDefinition }) {
     useStore.getState().apply(`Edit ${instance.tag}`, (d) => {
       const e = d.equipment.find((x) => x.id === instance.id)
       if (!e) return
-      keepInViews(d, e.id, () => { e.product = structuredClone(local); refreshBoxPorts(d, e) })
+      keepInViews(d, e.id, () => { e.product = structuredClone(local); applyCards(e); refreshBoxPorts(d, e) })
       const ids = new Set(local.ports.map((x) => x.id))
       d.cables = d.cables.filter((c) => !((c.from.equipment === e.id && !ids.has(c.from.port)) || (c.to.equipment === e.id && !ids.has(c.to.port))))
     })
@@ -78,7 +78,7 @@ export function ProductEditor({ initial }: { initial: ProductDefinition }) {
       const placed = st.project.equipment.filter((e) => e.product.key === saved.key || e.id === instanceId).length
       if (placed) {
         st.apply(`Update ${saved.model}`, (d) => {
-          for (const e of d.equipment) if (e.product.key === saved.key || (instanceId && e.id === instanceId)) keepInViews(d, e.id, () => { e.product = structuredClone(saved); refreshBoxPorts(d, e) })
+          for (const e of d.equipment) if (e.product.key === saved.key || (instanceId && e.id === instanceId)) keepInViews(d, e.id, () => { e.product = structuredClone(saved); applyCards(e); refreshBoxPorts(d, e) })
           const ids = new Map(d.equipment.map((e) => [e.id, new Set(e.product.ports.map((x) => x.id))]))
           d.cables = d.cables.filter((c) => ids.get(c.from.equipment)?.has(c.from.port) && ids.get(c.to.equipment)?.has(c.to.port))
         })

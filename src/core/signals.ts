@@ -54,6 +54,7 @@ export const SIGNALS = {
   ethernet1G: s('Ethernet 1G', 'network', 'ethernet', 2),
   ethernet10G: s('Ethernet 10G', 'network', 'ethernet', 3),
   dante: s('Dante', 'network', 'ipProtocol'),
+  soundGrid: s('Waves SoundGrid', 'network', 'ipProtocol'),
   aes67: s('AES67', 'network', 'ipProtocol'),
   avbMilan: s('AVB / Milan', 'network', 'ipProtocol'),
   ndi: s('NDI', 'network', 'ipProtocol'),
