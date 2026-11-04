@@ -69,6 +69,25 @@ export class RackLayout {
 
   // MARK: Placement
 
+  /**
+   * Can these units go here together (moving a group)? Each item is checked
+   * against what stays put – and against each other – ignoring where the moving
+   * ones are now. Returns false if any doesn't fit.
+   */
+  canPlaceGroup(items: { id: string; height: number; depthMM: number; start: number; halfSlot?: 'left' | 'right' | null }[], face: RackFace): boolean {
+    const moving = new Set(items.map((i) => `equipment:${i.id}`))
+    const placed: RackOccupant[] = []
+    for (const it of items) {
+      const low = it.start, high = it.start + it.height - 1
+      if (low < 1 || high > this.rack.spec.rackUnits) return false
+      const cand: RackOccupant = { ref: { kind: 'equipment', id: it.id as never }, name: '', low, high, face, halfSlot: it.halfSlot ?? null, depthMM: it.depthMM, weightKG: 0, heatBTU: 0, typicalWatts: 0, maxWatts: 0 }
+      if (this.occupants.some((o) => !moving.has(refKey(o.ref)) && conflict(o, cand, this.rack.spec.mountingDepthMM))) return false
+      if (placed.some((o) => conflict(o, cand, this.rack.spec.mountingDepthMM))) return false
+      placed.push(cand)
+    }
+    return true
+  }
+
   canPlace(height: number, depthMM: number, start: number, face: RackFace, ignoring?: RackOccupant['ref'], halfSlot: 'left' | 'right' | null = null): boolean {
     const low = start, high = start + height - 1
     if (low < 1 || high > this.rack.spec.rackUnits) return false

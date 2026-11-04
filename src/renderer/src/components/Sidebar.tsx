@@ -12,7 +12,7 @@ import { openProductEditor } from '../product/openEditor'
 import { duplicateProduct, productMenu, removeUserProduct } from '../product/productActions'
 
 export const DRAG_MIME = 'application/x-rackflow'
-export type DragPayload = { kind: 'product'; key: string } | { kind: 'patch'; key: string } | { kind: 'rack-eq'; id: string }
+export type DragPayload = { kind: 'product'; key: string } | { kind: 'patch'; key: string } | { kind: 'rack-eq'; id: string } | { kind: 'rack-eq-multi'; ids: string[]; anchor: string }
   | { kind: 'rack-acc'; acc: AccessoryKind; height: number } | { kind: 'rack-acc-move'; rack: string; id: string }
 
 /** What the list shows. */
