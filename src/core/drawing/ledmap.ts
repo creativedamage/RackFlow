@@ -7,7 +7,8 @@ import { fmtFtIn, fmtWt } from '../units'
 import { cellKey, chains, wallStats, type Cell, type Corner, type LedWall } from '../led'
 import { newSheet, sheetSize, type SheetOptions } from './sheet'
 import { Svg, textWidth } from './svg'
-import type { Project } from '../model'
+import type { EquipmentId, Project } from '../model'
+import { traceToSwitch } from '../network'
 
 export type LedView = 'data' | 'power'
 
@@ -17,7 +18,28 @@ export const chainColor = (view: LedView, i: number) => (view === 'data' ? DATA_
 
 const edgeOf = (c: Corner) => ({ bottom: c.startsWith('bottom'), right: c.endsWith('Right') })
 
-export interface LedMapOpts { mono?: boolean; showRemoved?: boolean; interactive?: boolean }
+export interface LedMapOpts {
+  mono?: boolean; showRemoved?: boolean; interactive?: boolean
+  /** Where each chain's cable comes from (chain number → "PROC-01 · Output 3"), from the wiring diagram. */
+  sources?: Map<number, string>
+}
+
+/**
+ * What feeds each data port / power circuit of a wall: follows the cable on the
+ * wall's "Data N" / "Power N" input on the wiring diagram (through patch panels
+ * and wall plates) to the processor output or distro outlet it comes from.
+ */
+export function wallSources(p: Project, w: LedWall, view: LedView): Map<number, string> {
+  const out = new Map<number, string>()
+  if (!w.equipmentId || !p.equipment.some((e) => e.id === w.equipmentId)) return out
+  const st = wallStats(w)
+  const n = view === 'data' ? st.dataPorts : st.circuits
+  for (let i = 1; i <= n; i++) {
+    const link = traceToSwitch(p, { equipment: w.equipmentId as EquipmentId, port: `${view === 'data' ? 'data' : 'power'}.${i}` })
+    if (link) out.set(i, `${link.eq.tag} · ${link.port.label.replace(/\s*\(rear\)$/i, '')}${link.via.length ? ` (via ${link.via.join(', ')})` : ''}`)
+  }
+  return out
+}
 
 /**
  * Draws the wall into `svg` with its top-left at (x, y), scaled so one
@@ -70,6 +92,18 @@ export function drawLedMap(svg: Svg, w: LedWall, view: LedView, x: number, y: nu
     const tw = textWidth(tag, font * 0.85) + font
     svg.rect(p0.x - tw / 2, hy + (e.bottom ? 0 : -font * 1.6), tw, font * 1.6, { fill: color, stroke: color, lw: 0.1, rx: font * 0.3 })
     svg.text(p0.x, hy + (e.bottom ? font * 0.8 : -font * 0.8), tag, { size: font * 0.85, anchor: 'middle', fill: '#fff', weight: 'bold' })
+    // Where the cable comes from: device, then its output – stacked beyond the tag, as wide as the gap to the next chain allows.
+    const src = o.sources?.get(c.index)
+    if (src) {
+      const [dev, ...rest] = src.replace(/ \(via .*\)$/, '').split(' · ')
+      const gap = Math.min(...cs.filter((x) => x !== c).map((x) => Math.abs(center(x.cells[0]).x - p0.x)).filter((d) => d > 0), cw * 6)
+      const maxW = Math.max(gap * 0.94, cw * 0.9)
+      const fs = font * 0.72, dir = e.bottom ? 1 : -1
+      const y1 = hy + dir * (font * 1.6 + fs * 1.0), y2 = y1 + dir * fs * 1.15
+      const lines = e.bottom ? [dev, rest.join(' · ')] : [rest.join(' · '), dev]
+      svg.text(p0.x, y1, lines[0].toUpperCase(), { size: fs, anchor: 'middle', fill: color, weight: 'bold', maxWidth: maxW })
+      if (lines[1]) svg.text(p0.x, y2, lines[1].toUpperCase(), { size: fs, anchor: 'middle', fill: color, maxWidth: maxW })
+    }
   }
 }
 
@@ -122,7 +156,7 @@ export function ledSheets(p: Project, o: LedPrintOptions): string[] {
     const titleH = 10
     const fit = (k: number) => {
       const cell = Math.min(w.panel.widthMM, w.panel.heightMM) * k
-      return Math.max(w.panel.heightMM * k * 0.55, 6) + Math.max(2.2, cell * 0.18) * 1.8 + 2
+      return Math.max(w.panel.heightMM * k * 0.55, 6) + Math.max(2.2, cell * 0.18) * 3.6 + 2
     }
     const roomW = area.w - colW - 12
     let scale = Math.min(roomW / W, (area.h - titleH) / H)
@@ -130,7 +164,20 @@ export function ledSheets(p: Project, o: LedPrintOptions): string[] {
     const pad = fit(scale)
     const ox = area.x + (roomW - W * scale) / 2, oy = area.y + titleH + pad + (area.h - titleH - 2 * pad - H * scale) / 2
     svg.text(area.x + roomW / 2, area.y + 5, `${w.name.toUpperCase()} – ${v === 'data' ? 'DATA FLOW' : 'POWER FLOW'} (VIEWED FROM FRONT)`, { size: 4, anchor: 'middle', weight: 'bold' })
-    drawLedMap(svg, w, v, ox, oy, scale, { mono: false })
+    const sources = wallSources(p, w, v)
+    drawLedMap(svg, w, v, ox, oy, scale, { mono: false, sources })
+    // Where each chain is fed from (wiring diagram), under the stats.
+    if (sources.size) {
+      let ty = area.y + rows.length * 9 + 16
+      svg.text(sx, ty, v === 'data' ? 'PROCESSOR OUTPUTS' : 'CIRCUIT SOURCES', { size: 3, weight: 'bold' }); ty += 5
+      const total = v === 'data' ? st.dataPorts : st.circuits
+      for (let k = 1; k <= total; k++) {
+        if (ty > area.y + area.h - 3) break
+        const src = sources.get(k)
+        svg.text(sx, ty, `${v === 'data' ? 'PORT' : 'CIRCUIT'} ${k}`, { size: 2.3, weight: 'bold', fill: chainColor(v, k) })
+        svg.text(sx + 15, ty, src ? src.toUpperCase() : '— NOT WIRED', { size: 2.3, maxWidth: colW - 15, fill: src ? '#000' : '#c92a2a' }); ty += 4
+      }
+    }
     return svg.toString()
   })
 }

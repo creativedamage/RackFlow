@@ -1,6 +1,6 @@
 import { Slide } from '../slide'
 import { useCallback, useMemo, useState } from 'react'
-import { LED_PANELS, PROCESSOR_PRESETS, derivePanel, defaultLedPrint, ledMapSVG, ledSheets, newLedPanel, newLedWall, nodeGeom, placeInFreeSpace, syncLedWallDevice, wallStats, chains, chainColor, type ChainSettings, type Corner, type LedPanel, type LedPrintOptions, type LedView as View, type LedWall, fmtFtIn, fmtWt, fmtLenPair } from '@core/index'
+import { LED_PANELS, PROCESSOR_PRESETS, derivePanel, defaultLedPrint, ledMapSVG, ledSheets, wallSources, newLedPanel, newLedWall, nodeGeom, placeInFreeSpace, syncLedWallDevice, wallStats, chains, chainColor, type ChainSettings, type Corner, type LedPanel, type LedPrintOptions, type LedView as View, type LedWall, fmtFtIn, fmtWt, fmtLenPair } from '@core/index'
 import { useStore } from '../store'
 import { Empty, Field, Modal, NumberInput, Segmented, Select, TextInput, Toggle, LenInput, WtInput } from '../components/ui'
 import { DrawingDialog } from '../print/DrawingDialog'
@@ -90,7 +90,10 @@ export function LedView() {
 
 function Canvas({ wall, view, setView, onToggle, onPrint }: { wall: LedWall; view: View; setView: (v: View) => void; onToggle: (k: string) => void; onPrint: () => void }) {
   const [editShape, setEditShape] = useState(false)
-  const svg = useMemo(() => ledMapSVG(wall, view, { showRemoved: true, interactive: editShape }), [wall, view, editShape])
+  // Processor output / distro outlet feeding each chain, from the wiring diagram.
+  const project = useStore((s) => s.project)
+  const sources = useMemo(() => wallSources(project, wall, view), [project, wall, view])
+  const svg = useMemo(() => ledMapSVG(wall, view, { showRemoved: true, interactive: editShape, sources }), [wall, view, editShape, sources])
   const cs = useMemo(() => chains(wall, view), [wall, view])
   return (
     <section className="led-canvas">
@@ -113,10 +116,10 @@ function Canvas({ wall, view, setView, onToggle, onPrint }: { wall: LedWall; vie
       <div className="led-legend">
         {cs.map((c) => (
           <span key={c.index} className="led-chip" style={{ ['--c' as string]: chainColor(view, c.index) }}>
-            {view === 'data' ? 'Port' : 'Circuit'} {c.index}: {c.cells.length} panel{c.cells.length === 1 ? '' : 's'}
+            {view === 'data' ? 'Port' : 'Circuit'} {c.index}: {c.cells.length} panel{c.cells.length === 1 ? '' : 's'}{sources.get(c.index) ? ` ◂ ${sources.get(c.index)}` : ''}
           </span>
         ))}
-        <span className="muted small">Dashed line + tag = home run (where the cable from the {view === 'data' ? 'processor' : 'distro'} lands).</span>
+        <span className="muted small">Dashed line + tag = home run (where the cable from the {view === 'data' ? 'processor' : 'distro'} lands).{sources.size < cs.length ? ` Wire the wall’s ${view === 'data' ? 'Data' : 'Power'} inputs on the Wiring Diagram to show what feeds each one.` : ''}</span>
       </div>
     </section>
   )
