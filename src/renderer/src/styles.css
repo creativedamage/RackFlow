@@ -1257,3 +1257,6 @@ input.mono { font-family: var(--mono); }
 .drawing-preview .preview-opts .segmented { display: flex; width: 100%; min-width: 0; box-sizing: border-box; }
 .drawing-preview .preview-opts .segmented button { flex: 1 1 0; min-width: 0; padding-left: 4px; padding-right: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .drawing-preview .preview-opts select, .drawing-preview .preview-opts .select { min-width: 0; max-width: 100%; }
+/* Signal list floats above dialogs (portal), kept inside the window. */
+.sp-pop.floating { position: fixed; z-index: 10000; width: min(560px, calc(100vw - 16px)); box-sizing: border-box; color: var(--text); }
+.ports-bulk { margin: 4px 0 6px; padding: 6px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--text) !important; }

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { produce } from 'immer'
 import {
   BUILT_IN_KEYS, CATEGORIES, CATEGORY_KEYS, CONNECTOR_TYPES, guessMakerCategories, connectorName, DOMAINS, GENDERS, heatBTU, MOUNT_TYPES, port as mkPort, portDomain,
@@ -89,6 +90,18 @@ export function ProductEditor({ initial }: { initial: ProductDefinition }) {
   }
 
   const editPort = (id: string, fn: (x: PortTemplate) => void) => edit((d) => { const x = d.ports.find((q) => q.id === id); if (x) fn(x) })
+  /** A change on a ticked row applies to every ticked row (connector, gender, direction, signals, group, face). */
+  const editPorts = (id: string, fn: (x: PortTemplate) => void) => edit((d) => { const ids = sel.has(id) && sel.size > 1 ? sel : new Set([id]); for (const x of d.ports) if (ids.has(x.id)) fn(x) })
+  const lastTick = useRef<number | null>(null)
+  const tick = (i: number, id: string, on: boolean, shift: boolean) => setSel((s0) => {
+    const n = new Set(s0)
+    // Shift-click ticks (or unticks) the whole range from the last row clicked.
+    const range = shift && lastTick.current != null ? p.ports.slice(Math.min(lastTick.current, i), Math.max(lastTick.current, i) + 1).map((x) => x.id) : [id]
+    for (const r of range) { if (on) n.add(r); else n.delete(r) }
+    lastTick.current = i
+    return n
+  })
+  const allOn = p.ports.length > 0 && p.ports.every((x) => sel.has(x.id)), someOn = !allOn && p.ports.some((x) => sel.has(x.id))
 
   return (
     <Modal title={instance ? `Edit ${instance.tag} · ${initial.manufacturer} ${initial.model}` : (initial.source === 'user' || isBuiltIn) && initial.model !== 'New Product' ? `Edit ${initial.manufacturer} ${initial.model}` : 'Custom Product Builder'} onClose={close} wide
@@ -169,24 +182,26 @@ export function ProductEditor({ initial }: { initial: ProductDefinition }) {
               {PRESETS.map((x) => <option key={x.name} value={x.name}>{x.name}</option>)}
             </select>
             <button onClick={() => setShowSeries((v) => !v)}>+ Add series…</button>
+            <button onClick={() => setSel(allOn ? new Set() : new Set(p.ports.map((x) => x.id)))}>{allOn ? 'Select None' : 'Select All'}</button>
             <button disabled={!sel.size} onClick={() => edit((d) => { d.ports.push(...d.ports.filter((x) => sel.has(x.id)).map((x) => ({ ...structuredClone(x), id: newPortId(), label: `${x.label} copy` }))) })}>Duplicate</button>
             <button className="danger" disabled={!sel.size} onClick={() => { edit((d) => { d.ports = d.ports.filter((x) => !sel.has(x.id)) }); setSel(new Set()) }}>Delete</button>
           </div>
+          {sel.size > 1 && <p className="muted small ports-bulk">{sel.size} ports selected – a change to Connector, Gender, Direction, Signals, Group or Face on any ticked row applies to all {sel.size}. Shift-click a box to tick a range.</p>}
           {showSeries && <SeriesForm onAdd={(ps) => { edit((d) => { d.ports.push(...ps) }); setShowSeries(false) }} />}
           <div className="ports-table-wrap">
             <table className="ports-table">
-              <thead><tr><th /><th>Label</th><th>Connector</th><th>Gender</th><th>Direction</th><th>Signals</th><th>Group</th><th>Face</th><th /></tr></thead>
+              <thead><tr><th><input type="checkbox" title="Select all ports" checked={allOn} ref={(el) => { if (el) el.indeterminate = someOn }} onChange={() => setSel(allOn ? new Set() : new Set(p.ports.map((x) => x.id)))} /></th><th>Label</th><th>Connector</th><th>Gender</th><th>Direction</th><th>Signals</th><th>Group</th><th>Face</th><th /></tr></thead>
               <tbody>
                 {p.ports.map((x, i) => (
                   <tr key={x.id} className={sel.has(x.id) ? 'sel' : ''}>
-                    <td><input type="checkbox" checked={sel.has(x.id)} onChange={(e) => setSel((s) => { const n = new Set(s); if (e.target.checked) n.add(x.id); else n.delete(x.id); return n })} /></td>
+                    <td><input type="checkbox" checked={sel.has(x.id)} onClick={(e) => tick(i, x.id, (e.target as HTMLInputElement).checked, e.shiftKey)} onChange={() => {}} /></td>
                     <td><TextInput value={x.label} onCommit={(v) => editPort(x.id, (q) => { q.label = v })} /></td>
-                    <td><Select value={x.connector} width={130} onChange={(v: ConnectorType) => editPort(x.id, (q) => { q.connector = v; q.gender = typicalPanelGender(v); if (!q.signals.length) q.signals = suggestedSignals(v) })} options={CONNECTOR_TYPES.map((c) => ({ value: c, label: connectorName(c) }))} /></td>
-                    <td><Select value={x.gender} onChange={(v: Gender) => editPort(x.id, (q) => { q.gender = v })} options={GENDERS.map((g) => ({ value: g, label: g }))} /></td>
-                    <td><Select value={x.direction} onChange={(v) => editPort(x.id, (q) => { q.direction = v })} options={DIRS} /></td>
-                    <td><SignalPicker value={x.signals} connector={x.connector} onChange={(v) => editPort(x.id, (q) => { q.signals = v })} /></td>
-                    <td><TextInput value={x.group ?? ''} onCommit={(v) => editPort(x.id, (q) => { q.group = v || undefined })} /></td>
-                    <td><Select value={x.face} onChange={(v) => editPort(x.id, (q) => { q.face = v })} options={[{ value: 'rear', label: 'Rear' }, { value: 'front', label: 'Front' }]} /></td>
+                    <td><Select value={x.connector} width={130} onChange={(v: ConnectorType) => editPorts(x.id, (q) => { q.connector = v; q.gender = typicalPanelGender(v); if (!q.signals.length) q.signals = suggestedSignals(v) })} options={CONNECTOR_TYPES.map((c) => ({ value: c, label: connectorName(c) }))} /></td>
+                    <td><Select value={x.gender} onChange={(v: Gender) => editPorts(x.id, (q) => { q.gender = v })} options={GENDERS.map((g) => ({ value: g, label: g }))} /></td>
+                    <td><Select value={x.direction} onChange={(v) => editPorts(x.id, (q) => { q.direction = v })} options={DIRS} /></td>
+                    <td><SignalPicker value={x.signals} connector={x.connector} onChange={(v) => editPorts(x.id, (q) => { q.signals = v })} /></td>
+                    <td><TextInput value={x.group ?? ''} onCommit={(v) => editPorts(x.id, (q) => { q.group = v || undefined })} /></td>
+                    <td><Select value={x.face} onChange={(v) => editPorts(x.id, (q) => { q.face = v })} options={[{ value: 'rear', label: 'Rear' }, { value: 'front', label: 'Front' }]} /></td>
                     <td className="reorder">
                       <button className="mini" disabled={i === 0} onClick={() => edit((d) => { [d.ports[i - 1], d.ports[i]] = [d.ports[i], d.ports[i - 1]] })} title="Move up">↑</button>
                       <button className="mini" disabled={i === p.ports.length - 1} onClick={() => edit((d) => { [d.ports[i + 1], d.ports[i]] = [d.ports[i], d.ports[i + 1]] })} title="Move down">↓</button>
@@ -211,15 +226,40 @@ export function ProductEditor({ initial }: { initial: ProductDefinition }) {
 
 function SignalPicker({ value, connector, onChange }: { value: SignalType[]; connector: ConnectorType; onChange: (v: SignalType[]) => void }) {
   const [open, setOpen] = useState(false)
+  const btn = useRef<HTMLButtonElement>(null), pop = useRef<HTMLDivElement>(null)
+  const [at, setAt] = useState<{ left: number; top: number; maxH: number } | null>(null)
   const toggle = (s: SignalType) => onChange(value.includes(s) ? value.filter((x) => x !== s) : [...value, s])
   const domains = Object.keys(DOMAINS) as SignalDomain[]
+  // The list floats above the dialog (not clipped by it), kept on screen: flips up / left when there's no room.
+  useLayoutEffect(() => {
+    if (!open || !btn.current) return
+    const place = () => {
+      const r = btn.current!.getBoundingClientRect(), W = Math.min(560, window.innerWidth - 16)
+      const ph = pop.current?.offsetHeight ?? 360
+      const below = window.innerHeight - r.bottom - 8, above = r.top - 8
+      const up = below < Math.min(ph, 300) && above > below
+      const maxH = Math.max(160, Math.min(420, up ? above : below))
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - W - 8))
+      setAt({ left, top: up ? Math.max(8, r.top - Math.min(ph, maxH) - 4) : r.bottom + 4, maxH })
+    }
+    place()
+    window.addEventListener('resize', place); window.addEventListener('scroll', place, true)
+    return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true) }
+  }, [open])
+  useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent) => { if (!pop.current?.contains(e.target as Node) && !btn.current?.contains(e.target as Node)) setOpen(false) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false) } }
+    document.addEventListener('mousedown', close); window.addEventListener('keydown', esc, true)
+    return () => { document.removeEventListener('mousedown', close); window.removeEventListener('keydown', esc, true) }
+  }, [open])
   return (
     <div className="signal-picker">
-      <button className={`sp-button ${value.length ? '' : 'bad'}`} onClick={() => setOpen((o) => !o)}>
+      <button ref={btn} className={`sp-button ${value.length ? '' : 'bad'}`} onClick={() => setOpen((o) => !o)}>
         {value.length ? value.map((s) => SIGNALS[s].name).join(', ') : 'None'}
       </button>
-      {open && (
-        <div className="sp-pop" onMouseLeave={() => setOpen(false)}>
+      {open && createPortal(
+        <div ref={pop} className="sp-pop floating" style={{ left: at?.left ?? -9999, top: at?.top ?? -9999, maxHeight: at?.maxH }}>
           <div className="sp-section"><b>Typical for {connectorName(connector)}</b>
             {suggestedSignals(connector).map((s) => <label key={s}><input type="checkbox" checked={value.includes(s)} onChange={() => toggle(s)} />{SIGNALS[s].name}</label>)}
           </div>
@@ -228,8 +268,7 @@ function SignalPicker({ value, connector, onChange }: { value: SignalType[]; con
               {SIGNAL_TYPES.filter((s) => SIGNALS[s].domain === d).map((s) => <label key={s}><input type="checkbox" checked={value.includes(s)} onChange={() => toggle(s)} />{SIGNALS[s].name}</label>)}
             </div>
           ))}
-        </div>
-      )}
+        </div>, document.body)}
     </div>
   )
 }
