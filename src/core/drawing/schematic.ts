@@ -11,7 +11,7 @@ import { CATEGORIES, type Annotation, type Cable, type EquipmentInstance, type P
 import { DOMAINS } from '../signals'
 import { portDomain } from '../project'
 import { planChannels, type ChannelWire } from '../autolayout'
-import { cardLayout, cardPortLabel, FACE_H, headerHeight, NODE_WIDTH, nodeGeom, SEC_HEAD, splitPorts } from '../diagramgeom'
+import { cardLayout, cardPortLabel, FACE_H, headerHeight, NODE_WIDTH, nodeGeom, SEC_HEAD, splitPorts, flagName } from '../diagramgeom'
 import { cleanPath, crossings, detourBudget, nudgeWires, route, WIRE_CLEAR, type Pt, type Rect } from '../wireroute'
 import { groupsOf } from '../groups'
 import { newSheet, sheetSize, type SheetOptions } from './sheet'
@@ -123,7 +123,7 @@ export function sideReach(p: Project, e: EquipmentInstance, o: Pick<SchematicOpt
     const label = 84
     // Single flag, or (bundled with others to the same device) port text + bracket + device-name flag.
     const flag = Math.max(STUB + Math.max(40, textWidth(`${portRef(oe, op)} (SHT AV1099)`, 7.5) + 14),
-      STUB * 2 + textWidth(op.label, 6.5) + 8 + textWidth(`${oe.tag} · ${oe.product.manufacturer} ${oe.product.model} (SHT AV1099)`, 7.5) + 14)
+      STUB * 2 + textWidth(op.label, 6.5) + 8 + textWidth(`${flagName(oe.tag, oe.product.model)} (SHT AV1099)`, 7.5) + 14)
     const r = o.wires === 'all' ? label : Math.max(label, flag)
     if (g.side === 'left') left = Math.max(left, r); else right = Math.max(right, r)
   }
@@ -415,7 +415,7 @@ function drawWires(svg: Svg, p: Project, o: SchematicOptions, eqs: EquipmentInst
     const y0 = ms[0].here.pt.y, y1 = ms[ms.length - 1].here.pt.y, ym = (y0 + y1) / 2
     svg.line(bx, y0, bx, y1, { lw: 1.4 })
     const there = ms[0].there.eq
-    offSheet(svg, { ...ms[0].here, pt: { x: bx, y: ym } }, '', '', `${there.tag} · ${there.product.manufacturer} ${there.product.model}${ms[0].sht}`.toUpperCase(), '#000')
+    offSheet(svg, { ...ms[0].here, pt: { x: bx, y: ym } }, '', '', `${flagName(there.tag, there.product.model)}${ms[0].sht}`.toUpperCase(), '#000')
   }
 }
 

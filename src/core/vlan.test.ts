@@ -34,3 +34,11 @@ it('prints the VLAN under a switch port on the schematic', () => {
   sw.network = { [port.id]: { vlan: '30' } }
   expect(_ss(p, _ds(p)).join('')).toContain('VLAN 30')
 })
+
+import { flagName as _fn } from './index'
+it('grouped wire flags show just the tag when tag + model is long', () => {
+  expect(_fn('PB-003', 'TT 2×48 (1RU)')).toBe('PB-003')
+  expect(_fn('AMP-01', 'MPA-Q')).toBe('AMP-01 · MPA-Q')
+  expect(_fn('WM-001', '')).toBe('WM-001')
+  expect(_fn('WP-003', 'WP-002')).toBe('WP-003')
+})

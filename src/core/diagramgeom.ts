@@ -225,3 +225,14 @@ export function cardPortLabel(label: string, section: string, faces: boolean): s
   if (faces) t = t.replace(/\s*\(rear\)$/i, '').replace(/\s*\(trunk\)$/i, ' trunk')
   return t
 }
+
+/** Longest "TAG · MODEL" a grouped wire flag shows before it falls back to the tag alone. */
+export const FLAG_NAME_MAX = 18
+/** Name on a grouped off-sheet / stub flag: "AMP-01 · MPA-Q", or just "PB-003" when that would be long. */
+export function flagName(tag: string, model: string, max = FLAG_NAME_MAX): string {
+  const m = model.trim()
+  // A model that is itself a tag-style name ("WP-002") adds nothing next to the tag.
+  if (!m || m.toUpperCase() === tag.toUpperCase() || /^[A-Z]{1,5}-?\d{1,4}$/i.test(m)) return tag
+  const full = `${tag} · ${m}`
+  return full.length <= max ? full : tag
+}

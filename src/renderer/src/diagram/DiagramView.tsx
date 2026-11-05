@@ -8,7 +8,7 @@ import {
 } from '@xyflow/react'
 import {
   addEquipment, addPatchBay, addToGroup, pageNumbers, GENERAL_PAGE, layoutView, setInView, viewOffFlags, viewProject, viewsOf, nodeGeom, placeInFreeSpace, connectMany, groupColor, groupsOf, type BulkResult, candidates as findCandidates, connect, DOMAINS, portDomain, resolve, SIGNALS, validate,
-  type CableId, type EquipmentId, type PortAddress, cableColorHex, needsCasing, clustersOf, clusterColor, addCluster, deleteCluster, renameCluster, clusterShownIn, clusterRect, insideRect, CLUSTER_COLORS } from '@core/index'
+  type CableId, type EquipmentId, type PortAddress, cableColorHex, needsCasing, clustersOf, clusterColor, addCluster, deleteCluster, renameCluster, clusterShownIn, clusterRect, insideRect, CLUSTER_COLORS, flagName } from '@core/index'
 import { useStore } from '../store'
 import { DRAG_MIME, type DragPayload } from '../components/Sidebar'
 import { setViewCenterProvider } from './placement'
@@ -232,7 +232,7 @@ export function DiagramView() {
         type: 'cable' as const, selected: isSel, reconnectable: isSel && !multi.size, zIndex: lifted ? 1000 : 0,
         data: { label: c.label, color, casing: !!jacket && sev !== 'error' && needsCasing(jacket), dashed: sev === 'error', lane: lane + shown.cables.indexOf(c), onSelect: () => select([], c.id),
           mode: wireMode, toText: to ? `${to.equipment.tag} · ${to.port.label}` : undefined, fromText: from ? `${from.equipment.tag} · ${from.port.label}` : undefined,
-          toPort: to?.port.label, fromPort: from?.port.label, toName: to ? `${to.equipment.tag} · ${to.equipment.product.model}` : undefined, fromName: from ? `${from.equipment.tag} · ${from.equipment.product.model}` : undefined },
+          toPort: to?.port.label, fromPort: from?.port.label, toName: to ? flagName(to.equipment.tag, to.equipment.product.model) : undefined, fromName: from ? flagName(from.equipment.tag, from.equipment.product.model) : undefined },
       }
     })
   }, [shown, cableSeverity, selectedCable, selectedCables, selection, select, wireMode])
