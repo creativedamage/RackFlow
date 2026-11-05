@@ -4,7 +4,7 @@
 // cross-sheet runs, and dashed room zones.
 
 import { cableColorHex } from '../cables'
-import { clusterMembership } from '../clusters'
+import { clusterMembership, clusterRect, clusterShownIn, clustersOf } from '../clusters'
 import { viewPrintProject, viewsOf } from '../views'
 import { autoNumber, GENERAL_PAGE, pageNumbers, sheetLabel } from '../sheetnumbers'
 import { CATEGORIES, type Annotation, type Cable, type EquipmentInstance, type PortTemplate, type Project, type WireMode, type NetInfo, type VlanPlan } from '../model'
@@ -133,69 +133,11 @@ export function sideReach(p: Project, e: EquipmentInstance, o: Pick<SchematicOpt
 const ZONE_PAD = 36 // room zone border distance from what it encloses
 
 /**
- * Print positions: your arrangement, packed. Devices keep their columns, rows,
- * order and alignment from the diagram, but the space between them is closed
- * up to just what the drawing needs – room for each side's wire labels and
- * off-sheet flags, the tag above and type line below, and the dashed border
- * between different groups / rooms. Empty space you left on the canvas doesn't
- * end up on paper.
+ * Print positions: exactly where the devices sit on the wiring diagram (the
+ * page or signal view being printed). The sheet is a scaled copy of the screen.
  */
-export function printPositions(p: Project, eqs: EquipmentInstance[], o: Pick<SchematicOptions, 'wires'> & Partial<Pick<SchematicOptions, 'zones' | 'rooms' | 'split'>> = { wires: 'smart' }, groupOf?: Map<string, string>): Map<string, { x: number; y: number }> {
-  const out = new Map<string, { x: number; y: number }>()
-  if (!eqs.length) return out
-  const H = (e: EquipmentInstance) => nodeGeom(e).height + 12 // box incl. the type line
-  const reach = new Map(eqs.map((e) => [e.id as string, sideReach(p, e, o)]))
-  const zm = zoneMode(p, o)
-  const zone = (e: EquipmentInstance) => (zm === 'groups' ? groupOf?.get(e.id) ?? '' : zm === 'rooms' && o.split !== 'room' ? e.room?.trim() ?? '' : '')
-  const zoneGap = (a: EquipmentInstance, b: EquipmentInstance) => (zone(a) === zone(b) ? 0 : ZONE_PAD * 2 + 24)
-  const GAP_X = 28, GAP_Y = 46
-  // Horizontal / vertical extents of a device's drawing (block, badges, labels / tag, type line).
-  const left = (e: EquipmentInstance) => BADGE + reach.get(e.id)!.left
-  const right = (e: EquipmentInstance) => NODE_WIDTH + BADGE + reach.get(e.id)!.right
-  const TOP = 34
-  const bands = (key: (e: EquipmentInstance) => number, tol: number) => {
-    const sorted = [...eqs].sort((a, b) => key(a) - key(b))
-    const out: EquipmentInstance[][] = []
-    for (const e of sorted) { const c = out[out.length - 1]; if (c && key(e) - key(c[0]) < tol) c.push(e); else out.push([e]) }
-    return out
-  }
-  // 1. Columns (devices lined up on screen stay lined up): each slides left until it would
-  // touch a column before it that shares some height with it.
-  const yOverlap = (a: EquipmentInstance, b: EquipmentInstance, pad: number) => a.position.y - TOP - pad < b.position.y + H(b) + pad && b.position.y - TOP - pad < a.position.y + H(a) + pad
-  const xNew = new Map<string, number>()
-  const cols = bands((e) => e.position.x, 60)
-  const startX = Math.min(...eqs.map((e) => e.position.x))
-  const placedCols: { ms: EquipmentInstance[]; x0: number }[] = []
-  for (const c of cols) {
-    const cx0 = Math.min(...c.map((e) => e.position.x))
-    let x = startX
-    for (const pc of placedCols) for (const a of c) for (const q of pc.ms) {
-      const zg = zoneGap(a, q)
-      if (!yOverlap(a, q, zg / 2 + 10)) continue
-      x = Math.max(x, xNew.get(q.id)! + right(q) + left(a) + GAP_X + zg - (a.position.x - cx0))
-    }
-    for (const e of c) xNew.set(e.id, x + (e.position.x - cx0))
-    placedCols.push({ ms: c, x0: x })
-  }
-  // 2. Rows: same again downwards, against the packed columns.
-  const xOverlap = (a: EquipmentInstance, b: EquipmentInstance, pad: number) => xNew.get(a.id)! - left(a) - pad < xNew.get(b.id)! + right(b) + pad && xNew.get(b.id)! - left(b) - pad < xNew.get(a.id)! + right(a) + pad
-  const yNew = new Map<string, number>()
-  const rows = bands((e) => e.position.y, 40)
-  const startY = Math.min(...eqs.map((e) => e.position.y))
-  const placedRows: EquipmentInstance[][] = []
-  for (const r of rows) {
-    const ry0 = Math.min(...r.map((e) => e.position.y))
-    let y = startY
-    for (const pr of placedRows) for (const a of r) for (const q of pr) {
-      const zg = zoneGap(a, q)
-      if (!xOverlap(a, q, zg / 2)) continue
-      y = Math.max(y, yNew.get(q.id)! + H(q) + TOP + GAP_Y + zg - (a.position.y - ry0))
-    }
-    for (const e of r) yNew.set(e.id, y + (e.position.y - ry0))
-    placedRows.push(r)
-  }
-  for (const e of eqs) out.set(e.id, { x: xNew.get(e.id)!, y: yNew.get(e.id)! })
-  return out
+export function printPositions(_p: Project, eqs: EquipmentInstance[], _o: Pick<SchematicOptions, 'wires'> & Partial<Pick<SchematicOptions, 'zones' | 'rooms' | 'split'>> = { wires: 'smart' }, _groupOf?: Map<string, string>): Map<string, { x: number; y: number }> {
+  return new Map(eqs.map((e) => [e.id as string, { x: e.position.x, y: e.position.y }]))
 }
 
 function drawPage(p0: Project, o: SchematicOptions, page: Page, n: number, total: number, sheetOf: Map<string, number>, labels: (string | undefined)[] = []): string {
@@ -218,10 +160,14 @@ function drawPage(p0: Project, o: SchematicOptions, page: Page, n: number, total
   // Bounds in diagram units (room for tags above, category below, stubs and labels at the sides).
   const reachOf = new Map(eqs.map((e) => [e.id as string, sideReach(p, e, o)]))
   const noteXs = notes.flatMap((a) => [a.x, a.x + a.w, ...(a.leader ? [a.leader.x] : [])]), noteYs = notes.flatMap((a) => [a.y, a.y + a.h, ...(a.leader ? [a.leader.y] : [])])
-  const x0 = Math.min(...eqs.map((e) => e.position.x - BADGE - reachOf.get(e.id)!.left - ZONE_PAD), ...noteXs.map((v) => v - 20)) - 20
-  const y0 = Math.min(...eqs.map((e) => e.position.y - 100), ...noteYs.map((v) => v - 30))
-  const x1 = Math.max(...eqs.map((e) => e.position.x + NODE_WIDTH + BADGE + reachOf.get(e.id)!.right + ZONE_PAD), ...noteXs.map((v) => v + 20)) + 20
-  const y1 = Math.max(...eqs.map((e) => e.position.y + geo.get(e.id)!.height + 60), ...noteYs.map((v) => v + 30))
+  // Group boxes exactly as drawn on the diagram (only those with a device of this sheet in them).
+  const zmode = zoneMode(p, o)
+  const boxes = zmode !== 'groups' ? [] : clustersOf(p0).filter((c) => clusterShownIn(c, { page: isView ? null : page.pageId ?? null, view: isView ? page.pageId! : null }, viewIds) && eqs.some((e) => groupOf.get(e.id) === c.id)).map((c) => ({ c, r: clusterRect(p0, c) }))
+  const bx = boxes.flatMap((b) => [b.r.x, b.r.x + b.r.w]), by = boxes.flatMap((b) => [b.r.y - 12, b.r.y + b.r.h])
+  const x0 = Math.min(...eqs.map((e) => e.position.x - BADGE - reachOf.get(e.id)!.left), ...noteXs.map((v) => v - 20), ...bx) - 20
+  const y0 = Math.min(...eqs.map((e) => e.position.y - 40), ...noteYs.map((v) => v - 30), ...by) - 10
+  const x1 = Math.max(...eqs.map((e) => e.position.x + NODE_WIDTH + BADGE + reachOf.get(e.id)!.right), ...noteXs.map((v) => v + 20), ...bx) + 20
+  const y1 = Math.max(...eqs.map((e) => e.position.y + geo.get(e.id)!.height + 30), ...noteYs.map((v) => v + 30), ...by) + 10
   const scale = Math.min(area.w / (x1 - x0), area.h / (y1 - y0), 0.6)
   const ox = area.x + (area.w - (x1 - x0) * scale) / 2, oy = area.y + (area.h - (y1 - y0) * scale) / 2
   const rects: Rect[] = eqs.map((e) => {
@@ -230,9 +176,11 @@ function drawPage(p0: Project, o: SchematicOptions, page: Page, n: number, total
   })
   svg.group(`translate(${ox} ${oy}) scale(${scale}) translate(${-x0} ${-y0})`, (g) => {
     const zm = zoneMode(p, o)
-    if (zm === 'groups') {
-      const names = new Map((p.clusters ?? []).map((c) => [c.id, c.name]))
-      drawZones(g, eqs, geo, reachOf, (e) => { const k = groupOf.get(e.id); return k && names.has(k) ? k : '' }, (k) => names.get(k) ?? '', true)
+    if (zm === 'groups') for (const { c, r } of boxes) {
+      g.rect(r.x, r.y, r.w, r.h, { lw: 1, dash: '14 8', stroke: '#444' })
+      const label = c.name.toUpperCase(), tw = textWidth(label, 12) + 14
+      g.rect(r.x + 10, r.y - 8, tw, 16, { fill: '#fff', stroke: 'none', lw: 0 })
+      g.text(r.x + 15, r.y, label, { size: 12, fill: '#444' })
     } else if (zm === 'rooms' && o.split !== 'room') drawZones(g, eqs, geo, reachOf, (e) => e.room?.trim() ?? '', (k) => k)
     for (const e of eqs) drawDevice(g, e, { ...o, zones: zm }, p.vlans ?? [])
     drawWires(g, p, o, eqs, rects, sheetOf, n, labels)
