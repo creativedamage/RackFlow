@@ -16,7 +16,7 @@ export const DOMAINS: Record<SignalDomain, { name: string; color: string }> = {
 
 export type SignalFamily =
   | 'hdmi' | 'displayPort' | 'dvi' | 'sdi' | 'hdbaseT' | 'analogVideo'
-  | 'analogAudio' | 'speakerLowZ' | 'speakerCV' | 'aes3' | 'madi'
+  | 'analogAudio' | 'speakerLowZ' | 'speakerCV' | 'aes3' | 'madi' | 'ahME'
   | 'ethernet' | 'ipProtocol'
   | 'rs232' | 'rs485' | 'ir' | 'gpio'
   | 'dmx' | 'rfUHF' | 'rfWiFi' | 'usb'
@@ -49,6 +49,8 @@ export const SIGNALS = {
   speaker100V: s('Speaker 100V', 'audio', 'speakerCV', 2),
   aes3: s('AES3', 'audio', 'aes3'),
   madi: s('MADI', 'audio', 'madi'),
+  /** Allen & Heath ME personal-mixing link (40 channels over Cat5e, proprietary – not Ethernet). */
+  ahME: s('A&H ME', 'audio', 'ahME'),
 
   ethernet100M: s('Ethernet 100M', 'network', 'ethernet', 1),
   ethernet1G: s('Ethernet 1G', 'network', 'ethernet', 2),

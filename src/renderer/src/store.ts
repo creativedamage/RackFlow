@@ -5,7 +5,7 @@
 import { create } from 'zustand'
 import { produce } from 'immer'
 import {
-  audit, upgradeBay, nodeGeom, spreadCards, BUILT_IN_MANUFACTURERS, ManufacturerDirectory, BUILT_IN_PATCH_TEMPLATES, BUILT_IN_PRODUCTS, CURRENT_SCHEMA, newProject, ProductLibrary,
+  audit, upgradeBay, addNewCatalogPorts, nodeGeom, spreadCards, BUILT_IN_MANUFACTURERS, ManufacturerDirectory, BUILT_IN_PATCH_TEMPLATES, BUILT_IN_PRODUCTS, CURRENT_SCHEMA, newProject, ProductLibrary,
   type CableId, type EquipmentId, type PatchBayId, type PatchBayTemplate, type ProductDefinition, type Project, type RackId,
   type ValidationIssue, type IssueSubject,
 } from '@core/index'
@@ -258,6 +258,8 @@ export function parseProject(data: string): Project {
   p.patchBays ??= []
   p.racks ??= []
   p.patchBays.forEach(upgradeBay)
+  // Ports added to the built-in catalog since the file was saved (e.g. dLive MixRack ME port).
+  addNewCatalogPorts(p, BUILT_IN_PRODUCTS)
   // 1.8 cards are taller (sections): nudge apart anything that now overlaps.
   if ((p.diagram?.cards ?? 1) < 3) { spreadCards(p, nodeGeom); p.diagram = { ...(p.diagram ?? {}), cards: 3 } }
   return p

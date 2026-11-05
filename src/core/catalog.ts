@@ -228,3 +228,24 @@ export function productProblems(p: ProductDefinition): string[] {
 
 /** Keys of products shipped with the app (a user product with one of these keys is an edited override). */
 export const BUILT_IN_KEYS: ReadonlySet<string> = new Set(BUILT_IN_PRODUCTS.map((p) => p.key))
+
+/**
+ * Ports added to built-in products after a project was saved (e.g. the dLive
+ * MixRack ME port): placed devices pick them up. Only adds – a port whose id or
+ * label is already on the device is left alone, and nothing is removed.
+ */
+export function addNewCatalogPorts(p: { equipment: { product: ProductDefinition }[] }, builtIns: ProductDefinition[]): number {
+  const byKey = new Map(builtIns.map((b) => [b.key, b]))
+  let n = 0
+  for (const e of p.equipment) {
+    if (e.product.source !== 'builtIn') continue
+    const cat = byKey.get(e.product.key)
+    if (!cat) continue
+    const ids = new Set(e.product.ports.map((x) => x.id)), labels = new Set(e.product.ports.map((x) => x.label))
+    const add = cat.ports.filter((x) => !ids.has(x.id) && !labels.has(x.label))
+    if (!add.length) continue
+    e.product.ports = [...e.product.ports, ...structuredClone(add)]
+    n += add.length
+  }
+  return n
+}

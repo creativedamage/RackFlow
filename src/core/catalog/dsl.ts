@@ -82,6 +82,7 @@ export const PORTS: Record<string, PortDef> = {
   euroOut: ['Line Out', 'euroblock', 'male', 'output', LINE, 'Audio Out'],
   aesIn: ['AES In', 'xlr3', 'female', 'input', V('aes3'), 'Digital Audio'],
   aesOut: ['AES Out', 'xlr3', 'male', 'output', V('aes3'), 'Digital Audio'],
+  me: ['ME', 'rj45', 'female', 'bidirectional', V('ahME'), 'Digital Audio'],
   madiIn: ['MADI In', 'bnc', 'female', 'input', V('madi'), 'Digital Audio'],
   madiOut: ['MADI Out', 'bnc', 'female', 'output', V('madi'), 'Digital Audio'],
   madiOptIn: ['MADI Optical In', 'scDuplex', 'female', 'input', V('madi'), 'Digital Audio'],
