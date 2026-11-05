@@ -133,10 +133,12 @@ export function sideReach(p: Project, e: EquipmentInstance, o: Pick<SchematicOpt
 const ZONE_PAD = 36 // room zone border distance from what it encloses
 
 /**
- * Print positions: the diagram's layout, re-spaced so nothing crowds –
- * columns are pushed apart far enough for each side's wire labels and
- * off-sheet flags (and room borders between rooms), then blocks in a column
- * are pushed down so every block keeps its tag above and type line below.
+ * Print positions: the diagram's own layout, as you arranged it. Blocks only
+ * move where they would actually collide on paper – a column that sits on top
+ * of the one before it is nudged right just enough to clear it (and a group /
+ * room border between them), and a block that overlaps the one above it is
+ * nudged down just enough to keep its tag and type line clear. Wire labels and
+ * flags no longer push the whole drawing apart.
  */
 export function printPositions(p: Project, eqs: EquipmentInstance[], o: Pick<SchematicOptions, 'wires'> & Partial<Pick<SchematicOptions, 'zones' | 'rooms' | 'split'>> = { wires: 'smart' }, groupOf?: Map<string, string>): Map<string, { x: number; y: number }> {
   const H = (e: EquipmentInstance) => nodeGeom(e).height + 12 // box incl. the type line
@@ -158,7 +160,8 @@ export function printPositions(p: Project, eqs: EquipmentInstance[], o: Pick<Sch
     const leftReach = Math.max(...c.map((e) => reach.get(e.id)!.left))
     const rooms = new Set(c.map(room))
     const roomGap = [...rooms].some((r) => !prevRooms.has(r)) || [...prevRooms].some((r) => !rooms.has(r)) ? ZONE_PAD * 2 + 20 : 0
-    const need = prevRight + prevReach + BADGE * 2 + leftReach + 40 + roomGap
+    // Just clear the previous column's blocks and badges (plus the zone borders between different zones).
+    const need = prevRight + BADGE * 2 + 24 + (roomGap ? ZONE_PAD * 2 : 0)
     if (x0 < need) offset += need - x0
     for (const e of c) shift.set(e.id, offset)
     prevRight = Math.max(...c.map((e) => e.position.x + offset + NODE_WIDTH))
@@ -169,7 +172,7 @@ export function printPositions(p: Project, eqs: EquipmentInstance[], o: Pick<Sch
   const order = [...eqs].sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x)
   const placed: { e: EquipmentInstance; x: number; y: number }[] = []
   const out = new Map<string, { x: number; y: number }>()
-  const pad = BADGE + 50
+  const pad = BADGE + 8
   for (const e of order) {
     let y = e.position.y
     const x = e.position.x + (shift.get(e.id) ?? 0)
@@ -177,7 +180,7 @@ export function printPositions(p: Project, eqs: EquipmentInstance[], o: Pick<Sch
       again = false
       for (const q of placed) {
         if (!(x - pad < q.x + NODE_WIDTH + pad && q.x - pad < x + NODE_WIDTH + pad)) continue
-        const gap = room(q.e) === room(e) ? 60 : 60 + ZONE_PAD * 2 + 30
+        const gap = room(q.e) === room(e) ? 34 : 34 + ZONE_PAD * 2
         const bottom = q.y + H(q.e) + gap
         if (y + H(e) + gap > q.y && y < bottom) { y = bottom; again = true }
       }
@@ -185,6 +188,22 @@ export function printPositions(p: Project, eqs: EquipmentInstance[], o: Pick<Sch
     placed.push({ e, x, y })
     out.set(e.id, { x, y })
   }
+  // 3. Close up empty space: wide gaps between blocks (as drawn) shrink to a normal gutter,
+  // across and down, so the arrangement keeps its order and alignment but fills the sheet.
+  const MAX_GAP = 90 + ZONE_PAD * 2
+  const squeeze = (axis: 'x' | 'y', span: (e: EquipmentInstance, at: { x: number; y: number }) => [number, number]) => {
+    const iv = eqs.map((e) => ({ id: e.id as string, r: span(e, out.get(e.id)!) })).sort((a, b) => a.r[0] - b.r[0])
+    let reach = -Infinity, cut = 0
+    const shiftBy = new Map<string, number>()
+    for (const it of iv) {
+      if (reach > -Infinity && it.r[0] - reach > MAX_GAP) cut += it.r[0] - reach - MAX_GAP
+      shiftBy.set(it.id, cut)
+      reach = Math.max(reach, it.r[1])
+    }
+    for (const [id, d] of shiftBy) { const q = out.get(id)!; out.set(id, axis === 'x' ? { x: q.x - d, y: q.y } : { x: q.x, y: q.y - d }) }
+  }
+  squeeze('x', (e, at) => [at.x - BADGE - reach.get(e.id)!.left, at.x + NODE_WIDTH + BADGE + reach.get(e.id)!.right])
+  squeeze('y', (e, at) => [at.y - 40, at.y + H(e) + 20])
   return out
 }
 

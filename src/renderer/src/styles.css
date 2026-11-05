@@ -1248,3 +1248,12 @@ input.mono { font-family: var(--mono); }
 .vlan-table input.bad { border-color: var(--danger) !important; }
 .modal.wide:has(.vlan-modal) { height: auto; width: min(1000px, 96vw); }
 .modal.wide:has(.form.vlan-modal) { width: min(620px, 96vw); }
+
+/* Print / export sidebar: everything fits its width (no cut-off segmented controls). */
+.drawing-preview .preview-opts { width: 320px; overflow-x: hidden; box-sizing: border-box; }
+.drawing-preview .preview-opts .field { grid-template-columns: 78px minmax(0, 1fr); }
+.drawing-preview .preview-opts .field-control { min-width: 0; }
+.drawing-preview .preview-opts .field-control > * { max-width: 100%; }
+.drawing-preview .preview-opts .segmented { display: flex; width: 100%; min-width: 0; box-sizing: border-box; }
+.drawing-preview .preview-opts .segmented button { flex: 1 1 0; min-width: 0; padding-left: 4px; padding-right: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drawing-preview .preview-opts select, .drawing-preview .preview-opts .select { min-width: 0; max-width: 100%; }
