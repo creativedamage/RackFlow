@@ -62,8 +62,8 @@ export interface RackflowAPI {
   /** Native Save / Don't Save / Cancel sheet before replacing the open project. */
   /** Writes every export file into a new folder the user picks; returns the folder. */
   /** App-wide saved items (title block templates, numbering standards). */
-  storeGet<T = unknown>(name: 'TitleBlocks' | 'NumberingStandards'): Promise<T | null>
-  storeSet(name: 'TitleBlocks' | 'NumberingStandards', data: unknown): Promise<void>
+  storeGet<T = unknown>(name: 'TitleBlocks' | 'TitleBlockPrefs' | 'NumberingStandards'): Promise<T | null>
+  storeSet(name: 'TitleBlocks' | 'TitleBlockPrefs' | 'NumberingStandards', data: unknown): Promise<void>
   getTheme(): Promise<'system' | 'light' | 'dark'>
   setTheme(t: 'system' | 'light' | 'dark'): Promise<void>
   exportAll(files: { name: string; kind: 'pdf' | 'text'; content: string }[], folderName: string): Promise<string | null>

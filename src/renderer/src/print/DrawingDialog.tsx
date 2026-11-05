@@ -4,7 +4,7 @@ import { api } from '../platform'
 import { useStore } from '../store'
 import { Field, Modal, Select, TextInput, Toggle } from '../components/ui'
 import { pickImage } from '../rack/AccessoryInspector'
-import { TitleBlockEditor } from './TitleBlockEditor'
+import { TitleBlockBuilder, TitleBlockPicker } from './TitleBlockBuilder'
 import { createPortal } from 'react-dom'
 import { RevisionsEditor } from './RevisionsEditor'
 
@@ -36,7 +36,7 @@ export function DrawingDialog<O extends SheetOptions>({ title, name, options, se
   )
   const set = (patch: Partial<SheetOptions>) => setOptions({ ...options, ...patch })
   return (<>
-    {editingTB && createPortal(<TitleBlockEditor onClose={() => setEditingTB(false)} />, document.body)}
+    {editingTB && createPortal(<TitleBlockBuilder onClose={() => setEditingTB(false)} />, document.body)}
     <Modal title={title} onClose={onClose} wide footer={<>
       <span className="muted">{pages.length} sheet{pages.length === 1 ? '' : 's'} · {SHEETS.find((s) => s.key === options.sheet)?.name}</span>
       <span className="spacer" />
@@ -60,10 +60,8 @@ export function DrawingDialog<O extends SheetOptions>({ title, name, options, se
             {info('location', 'Location')}
             {info('designer', 'Designer')}
             {!project.revisions?.length && info('revision', 'Revision')}
-            <Field label="Layout">
-              <span className="row-gap"><span className="small">{titleBlockOf(project).name}</span><button className="mini" onClick={() => setEditingTB(true)}>Edit Title Block…</button></span>
-            </Field>
-            <Field label="Logo">
+            <Field label="Template"><TitleBlockPicker onBuild={() => setEditingTB(true)} /></Field>
+            {!titleBlockOf(project).items && <Field label="Logo">
               <span className="row-gap">
                 {tbLogo ? <img className="tb-logo-thumb" src={tbLogo} alt="" /> : <span className="muted small">None</span>}
                 <button className="mini" onClick={async () => {
@@ -72,7 +70,7 @@ export function DrawingDialog<O extends SheetOptions>({ title, name, options, se
                 }}>{tbLogo ? 'Replace…' : 'Upload…'}</button>
                 {tbLogo && <button className="mini danger" onClick={() => { apply('Title Block Logo', (d) => { d.titleBlock = { ...structuredClone(titleBlockOf(d)), logo: undefined } }); if (options.logoId) set({ logoId: undefined }) }}>Remove</button>}
               </span>
-            </Field>
+            </Field>}
           </>)}
           <h4>Revisions</h4>
           <RevisionsEditor />

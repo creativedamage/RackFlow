@@ -3,7 +3,7 @@
 import type { LogoAsset, Project } from '../model'
 import { Svg } from './svg'
 import { sheetLabel } from '../sheetnumbers'
-import { fieldValue, titleBlockOf, type TBContext } from '../titleblock'
+import { fieldValue, fillVariables, itemRect, titleBlockBoxes, titleBlockOf, type TBContext, type TBSide, type TitleBlockTemplate } from '../titleblock'
 
 export interface SheetSize { key: string; name: string; w: number; h: number }
 /** Landscape dimensions in mm. */
@@ -47,16 +47,33 @@ export function newSheet(p: Project, o: SheetOptions, page: number, pages: numbe
   svg.rect(MARGIN / 2, MARGIN / 2, w - MARGIN, h - MARGIN, { lw: 0.5 })
   let area = { x: MARGIN, y: MARGIN, w: w - MARGIN * 2, h: h - MARGIN * 2 }
   if (o.titleBlock) {
-    const TB_H = Math.max(14, Math.min(80, titleBlockOf(p).height))
-    const top = h - MARGIN / 2 - TB_H
-    titleBlock(svg, p, o, { x: MARGIN / 2, y: top, w: w - MARGIN, h: TB_H }, page, pages, subtitle, sheetNo ?? sheetLabel(o.drawingNumber, page - 1))
-    area = { ...area, h: top - MARGIN - 2 }
-    // Revision block: bottom-right, just above the title block (latest revisions).
+    const tb = titleBlockOf(p)
+    const T = Math.max(14, Math.min(tb.items ? 140 : 80, tb.height))
+    const side: TBSide = tb.items ? tb.side ?? 'bottom' : 'bottom'
+    const r = side === 'bottom' ? { x: MARGIN / 2, y: h - MARGIN / 2 - T, w: w - MARGIN, h: T }
+      : side === 'right' ? { x: w - MARGIN / 2 - T, y: MARGIN / 2, w: T, h: h - MARGIN }
+      : { x: MARGIN / 2, y: MARGIN / 2, w: T, h: h - MARGIN }
+    const ctx: TBContext & { paper?: string } = {
+      drawing: [o.title, subtitle].filter(Boolean).join(' – '),
+      sheet: sheetNo ?? sheetLabel(o.drawingNumber, page - 1) ?? `${page} OF ${pages}`,
+      rev: (p.revisions?.length ? p.revisions[p.revisions.length - 1].rev : p.info.revision) || '',
+      date: new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }),
+      page, pages, pageTitle: subtitle, drawingNo: o.drawingNumber ?? sheetNo, paper: SHEETS.find((s) => s.key === o.sheet)?.name,
+    }
+    if (tb.items) {
+      // Free-form: the strip's inner edge, then every item.
+      if (side === 'bottom') svg.line(r.x, r.y, r.x + r.w, r.y, { lw: 0.5 })
+      else if (side === 'right') svg.line(r.x, r.y, r.x, r.y + r.h, { lw: 0.5 })
+      else svg.line(r.x + r.w, r.y, r.x + r.w, r.y + r.h, { lw: 0.5 })
+      drawFreeItems(svg, p, tb, ctx, r, side)
+    } else titleBlock(svg, p, o, r, page, pages, subtitle, sheetNo ?? sheetLabel(o.drawingNumber, page - 1))
+    area = side === 'bottom' ? { ...area, h: r.y - MARGIN - 2 } : side === 'right' ? { ...area, w: r.x - MARGIN - 2 } : { ...area, x: r.x + r.w + MARGIN / 2 + 2, w: area.w - T - 2 }
+    // Revision block: bottom-right corner of the drawing area (latest revisions).
     const revs = (p.revisions ?? []).slice(-6)
     if (revs.length) {
       const rw = Math.min(170, w * 0.4), rh = 5.5, head = 6
       const bh = head + rh * (revs.length + 1)
-      const bx = w - MARGIN / 2 - rw, by = top - bh
+      const bx = (side === 'right' ? r.x : w - MARGIN / 2) - rw, by = (side === 'bottom' ? r.y : h - MARGIN / 2) - bh
       svg.rect(bx, by, rw, bh, { lw: 0.5, fill: '#fff' })
       svg.text(bx + 2, by + head / 2, 'REVISIONS', { size: 2.6, weight: 'bold' })
       const cols = [{ t: 'REV', w: 0.1 }, { t: 'DATE', w: 0.18 }, { t: 'DESCRIPTION', w: 0.57 }, { t: 'BY', w: 0.15 }]
@@ -73,7 +90,7 @@ export function newSheet(p: Project, o: SheetOptions, page: number, pages: numbe
         svg.line(bx, y, bx + rw, y, { lw: 0.25 })
       }
       row(cols.map((c) => c.t), true)
-      for (const r of revs) row([r.rev, r.date, r.description.toUpperCase(), r.by.toUpperCase()], false)
+      for (const rv of revs) row([rv.rev, rv.date, rv.description.toUpperCase(), rv.by.toUpperCase()], false)
       area = { ...area, h: Math.min(area.h, by - MARGIN - 2) }
     }
   }
@@ -88,7 +105,7 @@ function titleBlock(svg: Svg, p: Project, o: SheetOptions, r: { x: number; y: nu
   const logo = tb.logo?.dataUrl ?? legacy?.dataUrl
   const logoBlack = tb.logo ? !!tb.logo.light : !!legacy?.light
   const logoW = logo ? Math.min(tb.logoWidth, r.w * 0.25) : 0
-  if (logo) {
+  if (logo && logoW) {
     const lx = tb.logoSide === 'right' ? r.x + r.w - logoW : r.x
     svg.image(lx + 2, r.y + 2, logoW - 4, r.h - 4, logo, { black: logoBlack })
     svg.line(tb.logoSide === 'right' ? lx : lx + logoW, r.y, tb.logoSide === 'right' ? lx : lx + logoW, r.y + r.h, { lw: 0.35 })
@@ -98,28 +115,54 @@ function titleBlock(svg: Svg, p: Project, o: SheetOptions, r: { x: number; y: nu
     sheet: sheetNo ?? `${page} OF ${pages}`,
     rev: (p.revisions?.length ? p.revisions[p.revisions.length - 1].rev : p.info.revision) || '',
     date: new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }),
+    page, pages, pageTitle: subtitle, drawingNo: sheetNo ?? o.drawingNumber,
   }
-  const x0 = r.x + (tb.logoSide === 'left' ? logoW : 0), w = r.w - logoW
-  const twoRows = tb.fields.some((f) => f.row === 1)
-  const rowH = twoRows ? r.h / 2 : r.h
-  if (twoRows) svg.line(x0, r.y + rowH, x0 + w, r.y + rowH, { lw: 0.35 })
-  for (const row of [0, 1] as const) {
-    const fs = tb.fields.filter((f) => f.row === row)
-    if (!fs.length) continue
-    const total = fs.reduce((t, f) => t + Math.max(1, f.width), 0)
-    let x = x0
-    const y = r.y + row * rowH
-    fs.forEach((f, i) => {
-      const cw = (w * Math.max(1, f.width)) / total
-      const caption = f.source === 'sheet' && sheetNo ? `${f.label || 'SHEET'}  ·  ${page} OF ${pages}` : f.label
-      if (caption) svg.text(x + 2, y + Math.min(4, rowH * 0.18), caption, { size: 2.2, fill: '#555', baseline: 'middle' })
-      const lines = fieldValue(p, f, ctx).toUpperCase().split('\n').filter((l, k, all) => l || all.length === 1)
-      const size = Math.min(f.big ? 5 : 4, (rowH - (caption ? 6 : 3)) / Math.max(1, lines.length) / 1.2)
-      const top = y + (caption ? 6 : 2) + (rowH - (caption ? 6 : 2) - lines.length * size * 1.2) / 2 + size * 0.6
-      lines.forEach((l, k) => svg.text(x + 2, top + k * size * 1.2, l, { size: k === 0 ? size : size * 0.8, weight: f.big && k === 0 ? 'bold' : 'normal', maxWidth: cw - 4 }))
-      x += cw
-      if (i < fs.length - 1) svg.line(x, y, x, y + rowH, { lw: 0.35 })
-    })
+  const lay = titleBlockBoxes(tb, r, !!logo)
+  const byId = new Map(tb.fields.map((f) => [f.id, f]))
+  // Row dividers and box dividers.
+  const rowYs = [...new Set(lay.fields.map((b) => b.y))].sort((a, b) => a - b)
+  for (const y of rowYs.slice(1)) { const bs = lay.fields.filter((b) => b.y === y); svg.line(Math.min(...bs.map((b) => b.x)), y, Math.max(...bs.map((b) => b.x + b.w)), y, { lw: 0.35 }) }
+  for (const b of lay.fields) {
+    const f = byId.get(b.id)!
+    const last = !lay.fields.some((q) => q.y === b.y && q.x > b.x)
+    if (!last) svg.line(b.x + b.w, b.y, b.x + b.w, b.y + b.h, { lw: 0.35 })
+    const caption = f.source === 'sheet' && sheetNo ? `${f.label || 'SHEET'}  ·  ${page} OF ${pages}` : f.label
+    const al = f.align ?? 'left'
+    const tx = al === 'center' ? b.x + b.w / 2 : al === 'right' ? b.x + b.w - 2 : b.x + 2
+    const anchor = al === 'center' ? 'middle' as const : al === 'right' ? 'end' as const : undefined
+    if (caption) svg.text(b.x + 2, b.y + Math.min(4, b.h * 0.18), caption, { size: 2.2, fill: '#555', baseline: 'middle' })
+    const lines = fieldValue(p, f, ctx, tb).toUpperCase().split('\n').filter((l, k, all) => l || all.length === 1)
+    const size = Math.min(f.big ? 5 : 4, (b.h - (caption ? 6 : 3)) / Math.max(1, lines.length) / 1.2)
+    const top = b.y + (caption ? 6 : 2) + (b.h - (caption ? 6 : 2) - lines.length * size * 1.2) / 2 + size * 0.6
+    lines.forEach((l, k) => svg.text(tx, top + k * size * 1.2, l, { size: k === 0 ? size : size * 0.8, weight: f.big && k === 0 ? 'bold' : 'normal', maxWidth: b.w - 4, ...(anchor ? { anchor } : {}) }))
+  }
+}
+
+const escX = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+/** Draws a free-form title block's items into the strip r. */
+export function drawFreeItems(svg: Svg, p: Project, tb: TitleBlockTemplate, ctx: TBContext & { paper?: string }, r: { x: number; y: number; w: number; h: number }, side: TBSide) {
+  for (const it of tb.items ?? []) {
+    const b = itemRect(it, r, side)
+    if (it.kind === 'rect') svg.rect(Math.min(b.x, b.x + b.w), Math.min(b.y, b.y + b.h), Math.abs(b.w), Math.abs(b.h), { stroke: it.stroke ?? '#000', fill: it.fill || 'none', lw: it.strokeWidth ?? 0.35, rx: it.radius, dash: it.dash ? '2 1' : undefined })
+    else if (it.kind === 'line') svg.line(b.x, b.y, b.x + b.w, b.y + b.h, { stroke: it.stroke ?? '#000', lw: it.strokeWidth ?? 0.35, dash: it.dash ? '2 1' : undefined })
+    else if (it.kind === 'image' && it.src) svg.image(b.x, b.y, b.w, b.h, it.src, { black: !!it.light })
+    else if (it.kind === 'text' && it.text) {
+      const rot = (((it.rotate ?? 0) % 360) + 360) % 360
+      const cx = b.x + b.w / 2, cy = b.y + b.h / 2
+      // Lay the text out in the box as seen when reading it (a quarter-turn swaps width and height).
+      const quarter = rot === 90 || rot === 270
+      const bw = quarter ? Math.abs(b.h) : Math.abs(b.w), bh = quarter ? Math.abs(b.w) : Math.abs(b.h)
+      const size = it.size ?? 3
+      const lines = fillVariables(it.text, p, ctx, tb).split('\n')
+      const lh = size * 1.2, total = lines.length * lh
+      const al = it.align ?? 'left', va = it.vAlign ?? 'top'
+      const x0 = cx - bw / 2, y0 = cy - bh / 2
+      const tx = al === 'center' ? cx : al === 'right' ? x0 + bw : x0
+      const ty = va === 'middle' ? cy - total / 2 + lh / 2 : va === 'bottom' ? y0 + bh - total + lh / 2 : y0 + lh / 2
+      const parts = lines.map((l, k) => `<text x="${(tx).toFixed(2)}" y="${(ty + k * lh).toFixed(2)}" font-family="Helvetica, Arial, sans-serif" font-size="${size}"${it.bold ? ' font-weight="bold"' : ''} text-anchor="${al === 'center' ? 'middle' : al === 'right' ? 'end' : 'start'}" dominant-baseline="middle" fill="${escX(it.color ?? '#000')}">${escX(l)}</text>`)
+      svg.raw(rot ? `<g transform="rotate(${rot} ${cx.toFixed(2)} ${cy.toFixed(2)})">${parts.join('')}</g>` : parts.join(''))
+    }
   }
 }
 

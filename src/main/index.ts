@@ -324,7 +324,7 @@ function registerIPC() {
   })
 
   // Small app-wide JSON stores (title block templates, numbering standards) – shared across projects.
-  const STORES = new Set(['TitleBlocks', 'NumberingStandards'])
+  const STORES = new Set(['TitleBlocks', 'TitleBlockPrefs', 'NumberingStandards'])
   const storeFile = (name: string) => join(app.getPath('userData'), `${name}.json`)
   ipcMain.handle('store:get', async (_e, name: string) => {
     if (!STORES.has(name)) return null

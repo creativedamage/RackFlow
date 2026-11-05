@@ -10,6 +10,9 @@ import {
   type ValidationIssue, type IssueSubject,
 } from '@core/index'
 import { api } from './platform'
+import { defaultTBForProject, refreshDefaultTB } from './print/tbDefault'
+
+void refreshDefaultTB()
 
 export type Mode = 'diagram' | 'rack' | 'patch' | 'sheet' | 'led' | 'boxes'
 
@@ -260,6 +263,8 @@ export function parseProject(data: string): Project {
   p.patchBays.forEach(upgradeBay)
   // Ports added to the built-in catalog since the file was saved (e.g. dLive MixRack ME port).
   addNewCatalogPorts(p, BUILT_IN_PRODUCTS)
+  // A project that never chose a title block uses the ★ default template.
+  if (!p.titleBlock) { const tb = defaultTBForProject(); if (tb) p.titleBlock = tb }
   // 1.8 cards are taller (sections): nudge apart anything that now overlaps.
   if ((p.diagram?.cards ?? 1) < 3) { spreadCards(p, nodeGeom); p.diagram = { ...(p.diagram ?? {}), cards: 3 } }
   return p
@@ -306,5 +311,10 @@ export function loadFile(path: string, data: string) {
 
 export async function newDocument() {
   if (!(await confirmDiscard())) return
-  useStore.getState().load(newProject(), null)
+  // New projects start with the ★ default title block template, if there is one.
+  await refreshDefaultTB()
+  const p = newProject()
+  const tb = defaultTBForProject()
+  if (tb) p.titleBlock = tb
+  useStore.getState().load(p, null)
 }
