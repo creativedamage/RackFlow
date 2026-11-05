@@ -5,7 +5,8 @@ import {
 } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
-import { Modal, NumberInput, Segmented, Select } from '../components/ui'
+import { LenInput, Modal, NumberInput, Segmented, Select } from '../components/ui'
+import { imperial } from '@core/index'
 import { pickImage } from '../rack/AccessoryInspector'
 
 // MARK: Saved templates + the default one (app-wide)
@@ -21,6 +22,8 @@ export { refreshDefaultTB } from './tbDefault'
 import { refreshDefaultTB } from './tbDefault'
 
 const MARGIN = 10
+/** 1 pt in mm (text sizes and line weights are shown in points). */
+const PT = 25.4 / 72
 const ensureItems = (t: TitleBlockTemplate): TitleBlockTemplate => (t.items ? t : { ...t, items: fieldsToItems(t), side: 'bottom' })
 
 // MARK: Variable text input – type freely, ＋ inserts {variables}
@@ -70,6 +73,10 @@ export function TitleBlockBuilder({ onClose }: { onClose: () => void }) {
   const [sel, setSel] = useState<string | null>(null)
   const [paper, setPaper] = useState('ansiB')
   const [snap, setSnap] = useState(true)
+  const [zoom, setZoom] = useState(1)
+  const canvasRef = useRef<HTMLDivElement>(null)
+  // Snap / nudge steps: 1/32" and 1/16" (⌥ 1/64") in inches, ½ mm and 1 mm (⌥ 0.1 mm) in metric.
+  const SNAP = imperial() ? 25.4 / 32 : 0.5, NUDGE = imperial() ? 25.4 / 16 : 1, FINE = imperial() ? 25.4 / 64 : 0.1
   useEffect(() => { void loadTemplates().then(setSaved); void loadTBPrefs().then(setPrefs) }, [])
   const side: TBSide = t.side ?? 'bottom'
   const sheet = SHEETS.find((s) => s.key === paper) ?? SHEETS[0]
@@ -77,7 +84,7 @@ export function TitleBlockBuilder({ onClose }: { onClose: () => void }) {
   const T = t.height
   const strip = side === 'bottom' ? { x: 0, y: 0, w: L, h: T } : { x: 0, y: 0, w: T, h: L }
   // px per mm: a bottom strip fills the width; a side strip fits the canvas height.
-  const k = side === 'bottom' ? 900 / L : 420 / L
+  const k = (side === 'bottom' ? 900 / L : 420 / L) * zoom
   const items = t.items ?? []
   const item = items.find((i) => i.id === sel)
   const upd = (id: string, patch: Partial<TBItem>, record = true) => setT({ ...t, items: items.map((i) => (i.id === id ? { ...i, ...patch } : i)) }, record)
@@ -91,7 +98,7 @@ export function TitleBlockBuilder({ onClose }: { onClose: () => void }) {
 
   // Drag: move, resize (corner) or move a line's end.
   const drag = useRef<Drag | null>(null)
-  const q = (v: number) => (snap ? Math.round(v * 2) / 2 : v)
+  const q = (v: number) => (snap ? Math.round(v / SNAP) * SNAP : v)
   const onMove = (e: PointerEvent) => {
     const d = drag.current
     if (!d) return
@@ -152,7 +159,7 @@ export function TitleBlockBuilder({ onClose }: { onClose: () => void }) {
       const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
       if (arrows[e.key] && item) {
         e.preventDefault()
-        const st = e.altKey ? 0.1 : 1, [dx, dy] = arrows[e.key]
+        const st = e.altKey ? FINE : NUDGE, [dx, dy] = arrows[e.key]
         const along = (side === 'bottom' ? dx : dy) * st, across = (side === 'bottom' ? dy : dx) * st
         upd(item.id, { a: item.a + along / L, b: item.b + across })
       }
@@ -197,9 +204,15 @@ export function TitleBlockBuilder({ onClose }: { onClose: () => void }) {
           <input className="tbb-name" value={t.name} onChange={(e) => setT({ ...t, name: e.target.value }, false)} placeholder="Template name" />
           <Segmented<TBSide> value={side} onChange={(v) => { setT({ ...t, side: v, height: v === 'bottom' ? Math.min(t.height, 60) : Math.max(t.height, 40) }); setSel(null) }}
             options={[{ value: 'bottom', label: 'Bottom' }, { value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }]} />
-          <label className="tbb-inline">{side === 'bottom' ? 'Height' : 'Width'} <NumberInput value={t.height} min={10} max={140} unit="mm" width={70} onCommit={(v) => setT({ ...t, height: v ?? t.height })} /></label>
+          <label className="tbb-inline">{side === 'bottom' ? 'Height' : 'Width'} <LenInput value={t.height} min={10} max={140} width={70} onCommit={(v) => setT({ ...t, height: v ?? t.height })} /></label>
           <label className="tbb-inline">Preview on <Select value={paper} width={170} onChange={setPaper} options={SHEETS.map((s) => ({ value: s.key, label: s.name }))} /></label>
-          <label className="tbb-inline"><input type="checkbox" checked={snap} onChange={(e) => setSnap(e.target.checked)} /> Snap ½ mm</label>
+          <span className="tbb-zoom">
+                <button className="mini" onClick={() => setZoom((z) => Math.max(0.5, +(z / 1.25).toFixed(3)))} title="Zoom out">−</button>
+                <input type="range" min={0.5} max={6} step={0.05} value={zoom} onChange={(e) => setZoom(+e.target.value)} title="Zoom" />
+                <button className="mini" onClick={() => setZoom((z) => Math.min(6, +(z * 1.25).toFixed(3)))} title="Zoom in">+</button>
+                <button className="mini" onClick={() => setZoom(1)} title="Fit the whole title block">Fit</button>
+                <span className="muted small">{Math.round(zoom * 100)}%</span>
+              </span>
         </div>
         <div className="tbb-body">
           <div className="tbb-side">
@@ -238,13 +251,21 @@ export function TitleBlockBuilder({ onClose }: { onClose: () => void }) {
               <button onClick={() => add(side === 'bottom' ? 'line' : 'hline')} title="Divider across the strip">＋ Divider</button>
               <button onClick={() => add(side === 'bottom' ? 'hline' : 'line')} title="Line along the strip">＋ Line</button>
               <button onClick={() => void addImage()}>＋ Image / Logo</button>
+  <label className="tbb-inline"><input type="checkbox" checked={snap} onChange={(e) => setSnap(e.target.checked)} /> Snap {imperial() ? '1/32"' : '½ mm'}</label>
               <span className="spacer" />
               <button disabled={!item} onClick={dup} title="Duplicate (⌘D)">Duplicate</button>
               <button disabled={!item} onClick={() => order(-1)} title="Send backward">↓</button>
               <button disabled={!item} onClick={() => order(1)} title="Bring forward">↑</button>
               <button disabled={!item} className="danger" onClick={del} title="Delete (⌫)">Delete</button>
             </div>
-            <div className={`tbb-canvas ${side}`} onPointerDown={() => setSel(null)}>
+            <div ref={canvasRef} className={`tbb-canvas ${side} ${zoom > 1 ? 'zoomed' : ''}`} onPointerDown={() => setSel(null)}
+              onWheel={(e) => {
+                if (!(e.metaKey || e.ctrlKey)) return
+                e.preventDefault()
+                const el = canvasRef.current!, r = el.getBoundingClientRect()
+                const fx = (e.clientX - r.left + el.scrollLeft) / el.scrollWidth, fy = (e.clientY - r.top + el.scrollTop) / el.scrollHeight
+                setZoom((z) => { const nz = Math.min(6, Math.max(0.5, z * Math.exp(-e.deltaY * 0.004))); requestAnimationFrame(() => { el.scrollLeft = fx * el.scrollWidth - (e.clientX - r.left); el.scrollTop = fy * el.scrollHeight - (e.clientY - r.top) }); return nz })
+              }}>
               <div className="tbb-paper" style={{ width: strip.w * k, height: strip.h * k }}>
                 <div dangerouslySetInnerHTML={{ __html: svg }} />
                 {items.map((it) => {
@@ -261,20 +282,19 @@ export function TitleBlockBuilder({ onClose }: { onClose: () => void }) {
                 })}
               </div>
             </div>
-            <p className="muted small">Drag to move · drag the corner dot to resize (or a line's end) · arrows nudge (⌥ for 0.1 mm) · ⌘D duplicates · ⌫ deletes. Text can hold {'{variables}'} – they fill in from the project and each sheet.</p>
+            <p className="muted small">Drag to move · drag the corner dot to resize (or a line's end) · arrows nudge {imperial() ? '1/16" (⌥ 1/64")' : '1 mm (⌥ 0.1 mm)'} · ⌘-scroll or the slider zooms · ⌘D duplicates · ⌫ deletes. Text can hold {'{variables}'} – they fill in from the project and each sheet.</p>
             {item && R && (
               <div className="tbb-insp">
                 <div className="tbb-pos">
-                  <label>X<NumberInput value={+R.x.toFixed(2)} width={64} onCommit={(v) => setR({ x: v ?? R.x })} /></label>
-                  <label>Y<NumberInput value={+R.y.toFixed(2)} width={64} onCommit={(v) => setR({ y: v ?? R.y })} /></label>
-                  <label>{item.kind === 'line' ? 'ΔX' : 'W'}<NumberInput value={+R.w.toFixed(2)} width={64} onCommit={(v) => setR({ w: v ?? R.w })} /></label>
-                  <label>{item.kind === 'line' ? 'ΔY' : 'H'}<NumberInput value={+R.h.toFixed(2)} width={64} onCommit={(v) => setR({ h: v ?? R.h })} /></label>
-                  <span className="muted small">mm</span>
+                  <label>X<LenInput value={R.x} width={76} onCommit={(v) => setR({ x: v ?? R.x })} /></label>
+                  <label>Y<LenInput value={R.y} width={76} onCommit={(v) => setR({ y: v ?? R.y })} /></label>
+                  <label>{item.kind === 'line' ? 'ΔX' : 'W'}<LenInput value={R.w} width={76} onCommit={(v) => setR({ w: v ?? R.w })} /></label>
+                  <label>{item.kind === 'line' ? 'ΔY' : 'H'}<LenInput value={R.h} width={76} onCommit={(v) => setR({ h: v ?? R.h })} /></label>
                 </div>
                 {item.kind === 'text' && (<>
                   <VariableText value={item.text ?? ''} onChange={(v) => upd(item.id, { text: v }, false)} />
                   <div className="tbb-row">
-                    <label>Size<NumberInput value={item.size ?? 3} min={1} max={30} width={56} unit="mm" onCommit={(v) => upd(item.id, { size: v ?? 3 })} /></label>
+                    <label>Size<NumberInput value={Math.round(((item.size ?? 3) / PT) * 10) / 10} min={3} max={85} width={56} unit="pt" onCommit={(v) => upd(item.id, { size: (v ?? 8.5) * PT })} /></label>
                     <label><input type="checkbox" checked={!!item.bold} onChange={(e) => upd(item.id, { bold: e.target.checked })} /> Bold</label>
                     <Segmented value={item.align ?? 'left'} onChange={(v) => upd(item.id, { align: v })} options={[{ value: 'left', label: '⇤' }, { value: 'center', label: '↔' }, { value: 'right', label: '⇥' }]} />
                     <Segmented value={item.vAlign ?? 'top'} onChange={(v) => upd(item.id, { vAlign: v })} options={[{ value: 'top', label: '⤒' }, { value: 'middle', label: '↕' }, { value: 'bottom', label: '⤓' }]} />
@@ -285,13 +305,13 @@ export function TitleBlockBuilder({ onClose }: { onClose: () => void }) {
                 </>)}
                 {(item.kind === 'rect' || item.kind === 'line') && (
                   <div className="tbb-row">
-                    <label>Line<NumberInput value={item.strokeWidth ?? 0.35} min={0.1} max={3} width={56} unit="mm" onCommit={(v) => upd(item.id, { strokeWidth: v ?? 0.35 })} /></label>
+                    <label>Line<NumberInput value={Math.round(((item.strokeWidth ?? 0.35) / PT) * 100) / 100} min={0.25} max={8} step={0.25} width={56} unit="pt" onCommit={(v) => upd(item.id, { strokeWidth: (v ?? 1) * PT })} /></label>
                     <label>Colour<input type="color" value={item.stroke ?? '#000000'} onChange={(e) => upd(item.id, { stroke: e.target.value })} /></label>
                     <label><input type="checkbox" checked={!!item.dash} onChange={(e) => upd(item.id, { dash: e.target.checked })} /> Dashed</label>
                     {item.kind === 'rect' && (<>
                       <label><input type="checkbox" checked={!!item.fill} onChange={(e) => upd(item.id, { fill: e.target.checked ? '#eeeeee' : undefined })} /> Fill</label>
                       {item.fill && <input type="color" value={item.fill} onChange={(e) => upd(item.id, { fill: e.target.value })} />}
-                      <label>Corners<NumberInput value={item.radius ?? 0} min={0} max={20} width={56} unit="mm" onCommit={(v) => upd(item.id, { radius: v || undefined })} /></label>
+                      <label>Corners<LenInput value={item.radius ?? 0} min={0} max={20} width={64} onCommit={(v) => upd(item.id, { radius: v || undefined })} /></label>
                     </>)}
                   </div>
                 )}

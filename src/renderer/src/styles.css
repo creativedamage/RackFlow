@@ -1322,3 +1322,8 @@ input.mono { font-family: var(--mono); }
 .product-editor .ports-table td select, .product-editor .ports-table td input:not([type='checkbox']), .product-editor .ports-table .sp-button { width: 100% !important; min-width: 0 !important; box-sizing: border-box; }
 .product-editor .ports-table .sp-button { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .product-editor .ports-table .reorder button { padding: 2px 5px; min-width: 0; }
+/* Builder zoom: the strip stays centred when small and scrolls fully when zoomed in. */
+.tbb-canvas { justify-content: normal !important; align-items: normal !important; }
+.tbb-paper { margin: auto; }
+.tbb-zoom { display: inline-flex; align-items: center; gap: 4px; }
+.tbb-zoom input[type=range] { width: 110px; }
