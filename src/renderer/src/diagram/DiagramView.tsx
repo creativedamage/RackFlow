@@ -157,6 +157,9 @@ export function DiagramView() {
   const boxesRef = useRef(boxesShown); boxesRef.current = boxesShown
   const framesRef = useRef(frames); framesRef.current = frames
   const nodesRef = useRef(nodes); nodesRef.current = nodes
+  // Devices that were inside each group box when its drag began – only these move with it
+  // (a box dragged over other devices doesn't pick them up on the way).
+  const boxCrew = useRef(new Map<string, Set<string>>())
   // Notes / callouts / revision notes: local state for smooth dragging and resizing.
   const [notes, setNotes] = useState<NoteNodeType[]>([])
   useEffect(() => {
@@ -268,11 +271,20 @@ export function DiagramView() {
       if (f) moves.set(c.id.slice(6), { dx: c.position.x - f.position.x, dy: c.position.y - f.position.y, dragging: c.dragging })
     }
     // …and dragging a group box moves the devices inside it (resizing doesn't).
-    const cmoves: { r: { x: number; y: number; w: number; h: number }; dx: number; dy: number }[] = []
+    const cmoves: { ids: Set<string>; dx: number; dy: number }[] = []
     for (const c of all) {
       if (c.type !== 'position' || !c.id.startsWith('cbox:') || !c.position || c.dragging === undefined) continue
       const b = boxesRef.current.find((x) => x.id === c.id)
-      if (b) cmoves.push({ r: { x: b.position.x, y: b.position.y, w: b.width ?? 0, h: b.height ?? 0 }, dx: c.position.x - b.position.x, dy: c.position.y - b.position.y })
+      if (!b) continue
+      let crew = boxCrew.current.get(c.id)
+      if (!crew) {
+        // Drag just started: who is in the box right now (devices being dragged themselves excluded).
+        const r = { x: b.position.x, y: b.position.y, w: b.width ?? b.measured?.width ?? 0, h: b.height ?? b.measured?.height ?? 0 }
+        const dragged = new Set(all.filter((x) => x.type === 'position' && x.dragging).map((x) => (x as { id: string }).id))
+        crew = new Set(nodesRef.current.filter((n) => !n.hidden && !dragged.has(n.id) && insideRect(r, n.position, devSize(n))).map((n) => n.id))
+        boxCrew.current.set(c.id, crew)
+      }
+      cmoves.push({ ids: crew, dx: c.position.x - b.position.x, dy: c.position.y - b.position.y })
     }
     const boxChanges = all.filter((c) => 'id' in c && String(c.id).startsWith('cbox:')) as NodeChange<ClusterBoxType>[]
     if (boxChanges.length) setBoxes((bs) => applyNodeChanges(boxChanges.filter((c) => c.type !== 'remove'), bs))
@@ -286,7 +298,7 @@ export function DiagramView() {
         return m ? { ...n, position: { x: n.position.x + m.dx, y: n.position.y + m.dy } } : n
       })
       if (cmoves.length) next = next.map((n) => {
-        const m = !n.hidden && !n.dragging ? cmoves.find((mv) => insideRect(mv.r, n.position, devSize(n))) : undefined
+        const m = !n.dragging ? cmoves.find((mv) => mv.ids.has(n.id)) : undefined
         return m ? { ...n, position: { x: n.position.x + m.dx, y: n.position.y + m.dy } } : n
       })
       if (changes.some((c) => c.type === 'select')) {
@@ -313,7 +325,9 @@ export function DiagramView() {
     // A group box that was dragged: save where it is now, and the devices that moved with it.
     const movedBoxes = draggedAll.filter((n) => n.id.startsWith('cbox:'))
     const clusterIds = new Set(movedBoxes.map((n) => n.id.slice(5)))
-    const clusterMembers = movedBoxes.length ? nodesRef.current.filter((n) => !n.hidden && !draggedAll.some((x) => x.id === n.id) && movedBoxes.some((b) => insideRect({ x: b.position.x, y: b.position.y, w: b.width ?? b.measured?.width ?? 0, h: b.height ?? b.measured?.height ?? 0 }, n.position, devSize(n)))) : []
+    const crewIds = new Set(movedBoxes.flatMap((b) => [...(boxCrew.current.get(b.id) ?? [])]))
+    for (const b of movedBoxes) boxCrew.current.delete(b.id)
+    const clusterMembers = movedBoxes.length ? nodesRef.current.filter((n) => crewIds.has(n.id) && !draggedAll.some((x) => x.id === n.id)) : []
     if (movedBoxes.length) apply('Move Group', (d) => {
       for (const b of movedBoxes) { const x = d.clusters?.find((y) => y.id === b.id.slice(5)); if (x) { x.x = Math.round(b.position.x); x.y = Math.round(b.position.y); if (!x.w) { x.w = Math.round(b.width ?? 400); x.h = Math.round(b.height ?? 300) } } }
       const v = vid ? viewsOf(d).find((y) => y.id === vid) : undefined
