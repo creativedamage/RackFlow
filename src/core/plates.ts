@@ -16,6 +16,8 @@ export interface PlateModule {
   rear: PlateInsert['rear']
   /** Power receptacle: an outlet fed by the box's circuit, no tie line. */
   power?: boolean
+  /** Blank plate / plug: fills a hole, no connector and no port. */
+  blank?: boolean
   group: string
 }
 
@@ -61,7 +63,12 @@ export const PLATE_MODULES: Record<string, PlateModule> = {
   pwrL530: M('L5-30R (power)', 'nemaL5_30', 'female', ['ac120V'], 'Power', 'none', true),
   pwrTrue1: M('powerCON TRUE1 (power)', 'powerCONTrue1', 'female', ['ac120V', 'ac230V'], 'Power', 'none', true),
   pwrSchuko: M('Schuko (power)', 'schuko', 'female', ['ac230V'], 'Power', 'none', true),
+  // Blanks: cover a cut-out with nothing in it (spare / future). No port, no cable.
+  blankD: { ...M('D-Series Blank Plate', 'xlr3', 'female', [], 'Blank', 'none'), blank: true },
+  blankKeystone: { ...M('Keystone Blank', 'rj45', 'female', [], 'Blank', 'none'), blank: true },
+  blankDecora: { ...M('Decora Blank Insert', 'nema5_15', 'female', [], 'Blank', 'none'), blank: true },
 }
+export const isBlankModule = (module: string) => !!PLATE_MODULES[module]?.blank
 export const PLATE_MODULE_KEYS = Object.keys(PLATE_MODULES)
 
 export const PLATE_STYLES: Record<PlateKind, string[]> = {
@@ -81,7 +88,7 @@ export function platePorts(spec: PlateSpec): PortTemplate[] {
   const mps = tiedMultipins(spec)
   for (const ins of spec.inserts) {
     const m = PLATE_MODULES[ins.module]
-    if (!m) continue
+    if (!m || m.blank) continue
     for (let i = 0; i < Math.max(1, ins.count); i++) {
       const n = (used.get(ins.module) ?? 0) + 1
       used.set(ins.module, n)

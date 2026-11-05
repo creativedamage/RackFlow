@@ -80,6 +80,7 @@ const FOOT: Record<string, { w: number; h: number; shape: Shape; icon: string }>
   rj45: { w: 14.5, h: 16, shape: 'keystone', icon: 'rj45' }, mini: { w: 14.5, h: 16, shape: 'keystone', icon: 'mini' }, rca: { w: 14.5, h: 16, shape: 'keystone', icon: 'rca' },
   vga: { w: 31, h: 12.5, shape: 'block', icon: 'de15' }, db9: { w: 31, h: 12.5, shape: 'block', icon: 'de9' }, euro: { w: 22, h: 10, shape: 'block', icon: 'euro' },
   binding: { w: 32, h: 14, shape: 'block', icon: 'posts' },
+  blankD: { w: 26, h: 31, shape: 'd', icon: 'blankD' }, blankKeystone: { w: 14.5, h: 16, shape: 'keystone', icon: 'blankKs' }, blankDecora: { w: 33.3, h: 66.7, shape: 'duplex', icon: 'blankDecora' },
   pwr515: { w: 33.3, h: 66.7, shape: 'duplex', icon: '515' }, pwr520: { w: 33.3, h: 66.7, shape: 'duplex', icon: '520' }, pwrSchuko: { w: 50, h: 50, shape: 'round', icon: 'schuko' },
   pwrL530: { w: 44, h: 44, shape: 'twist', icon: 'L530' },
   // Multipins (chassis flange, approximate – check the maker's drawing for cut-outs)
@@ -252,6 +253,7 @@ export function jackSVG(module: string): string {
       case 'usbB': D(0, 0, 10); L('M -4 -3.65 L 2.6 -3.65 L 4 -2.25 L 4 3.65 L -4 3.65 Z'); break
       case 'usbC': D(0, 0, 10); R(-4.15, -1.3, 8.3, 2.6, 1.3); break
       case 'trs': D(0, 0, 10); C(0, 0, 6); C(0, 0, 3.2); break
+      case 'blankD': R(-hw + 2.5, -hh + 2.5, f.w - 5, f.h - 5, 2.5, 0.2); break
       case 'lc': D(0, 0, 10); R(-7.2, -4, 14.4, 8, 0.8); P.push(lcPort(-3.2, 0.4), lcPort(3.2, 0.4)); break
       default: D(0, 0, 10)
     }
@@ -259,10 +261,12 @@ export function jackSVG(module: string): string {
     R(-hw, -hh, f.w, f.h, 0.6, 0.45)
     if (f.icon === 'rj45') { R(-5.85, -4.6, 11.7, 8.1, 0.4); R(-2.5, 3.5, 5, 1.8) }
     else if (f.icon === 'rca') { C(0, 0, 4.15); C(0, 0, 1.5) }
+    else if (f.icon === 'blankKs') R(-hw + 1.5, -hh + 1.5, f.w - 3, f.h - 3, 0.4, 0.2)
     else { C(0, 0, 3); C(0, 0, 1.75) }
   } else if (f.shape === 'duplex') {
     // Decora face 33.3 × 66.7; outlet faces 38.1 mm (1.5") apart; blades 12.7 mm (½") apart.
     R(-hw, -hh, f.w, f.h, 2, 0.5)
+    if (f.icon === 'blankDecora') return P.join('')
     for (const cy of [-19.05, 19.05]) {
       R(-13, cy - 12.5, 26, 25, 7)
       R(-6.35 - 0.9, cy - 6, 1.8, 6.2, 0.3)          // hot (short)
@@ -395,7 +399,7 @@ export function plateInner(spec0: PlateSpec, o: PlateDrawOpts = {}): string {
     out.push(`<g transform="translate(${n(at.x)} ${n(at.y)})"${o.interactive ? ` data-id="${esc(ins.pid)}" style="cursor:move"` : ''}>${o.interactive ? `<rect x="${-f.w / 2}" y="${-f.h / 2}" width="${f.w}" height="${f.h}" fill="transparent"/>` : ''}${jackSVG(ins.module)}`)
     if (sel) out.push(`<rect x="${-f.w / 2 - 1.5}" y="${-f.h / 2 - 1.5}" width="${f.w + 3}" height="${f.h + 3}" fill="none" stroke="#0a84ff" stroke-width="0.8" stroke-dasharray="2 1"/>`)
     out.push('</g>')
-    if (o.labels !== false && L.labelPos !== 'none') {
+    if (o.labels !== false && L.labelPos !== 'none' && (!PLATE_MODULES[ins.module]?.blank || ins.label?.trim())) {
       const text = (ins.label?.trim() || `${shortModule(ins.module)}${k > 1 || spec.inserts.filter((x) => x.module === ins.module).length > 1 ? ` ${k}` : ''}`).toUpperCase()
       const ly = L.labelPos === 'above' ? at.y - f.h / 2 - 2.2 : at.y + f.h / 2 + 3.6
       out.push(`<text x="${n(at.x)}" y="${n(ly)}" font-family="Helvetica, Arial, sans-serif" font-size="2.8" font-weight="bold" text-anchor="middle" fill="currentColor">${esc(text)}</text>`)

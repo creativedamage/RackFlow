@@ -12,7 +12,7 @@ const REAR_OPTIONS: { value: PlateInsert['rear']; label: string }[] = [
   { value: 'euroblock', label: 'Euroblock (screw terminal)' },
   { value: 'none', label: 'No tie line' },
 ]
-const GROUP_ORDER = ['Audio', 'Multipin', 'Speaker', 'Video', 'Network', 'Data', 'Control', 'Lighting', 'Power']
+const GROUP_ORDER = ['Audio', 'Multipin', 'Speaker', 'Video', 'Network', 'Data', 'Control', 'Lighting', 'Power', 'Blank']
 const KIND_NAME: Record<PlateKind, string> = { wallBox: 'Wall Box', wallPlate: 'Wall Plate', floorBox: 'Floor Box', rackPanel: 'Rack Panel' }
 const short = (k: string) => PLATE_MODULES[k].name.replace(/\s*\(.*\)$/, '')
 
@@ -421,7 +421,8 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
               <input value={oneJack.label ?? ''} placeholder={short(oneJack.module)} onChange={(e) => edit((d) => { const x = d.inserts.find((q) => q.pid === one); if (x) x.label = e.target.value || undefined }, false)} onBlur={() => setPast((p) => [...p, spec])} />
               <label className="field-label">Type</label>
               <Select value={oneJack.module} onChange={(v) => edit((d) => { const x = d.inserts.find((q) => q.pid === one); if (x) { x.module = v; x.rear = PLATE_MODULES[v].rear } })} options={PLATE_MODULE_KEYS.map((k) => ({ value: k, label: PLATE_MODULES[k].name }))} />
-              {!PLATE_MODULES[oneJack.module]?.power && (<>
+              {PLATE_MODULES[oneJack.module]?.blank && <p className="muted small">Blank: covers the hole, no port or cable. Leave the label empty to print nothing under it.</p>}
+              {!PLATE_MODULES[oneJack.module]?.power && !PLATE_MODULES[oneJack.module]?.blank && (<>
                 <label className="field-label">Back of plate</label>
                 <Select value={oneJack.rear} onChange={(v) => edit((d) => { const x = d.inserts.find((q) => q.pid === one); if (x) x.rear = v })} options={REAR_OPTIONS} />
               </>)}

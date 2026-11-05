@@ -63,3 +63,17 @@ describe('rack panels as patch panels', () => {
     expect(p.equipment).toHaveLength(1)
   })
 })
+
+import { isBlankModule, plateInner, platePorts as _pp } from './index'
+describe('blank plates', () => {
+  it('fill a hole with no port, and draw on the face', () => {
+    const spec = withLayout(newPlateSpec('rackPanel'))
+    spec.inserts = [{ module: 'xlrF', count: 1, rear: 'same', pid: 'xlrF.1' }, { module: 'blankD', count: 1, rear: 'none', pid: 'blankD.1' }, { module: 'blankKeystone', count: 1, rear: 'none', pid: 'blankKeystone.1' }]
+    spec.layout!.jacks = autoArrange(spec, { w: spec.layout!.w, h: spec.layout!.h, ru: 1 })
+    expect(isBlankModule('blankD')).toBe(true)
+    expect(_pp(spec).map((x) => x.id)).toEqual(['xlrF.1.f', 'xlrF.1.r'])
+    const svg = plateInner(spec, {})
+    expect(svg).toContain('XLR')
+    expect(svg).not.toContain('BLANK')
+  })
+})
