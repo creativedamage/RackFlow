@@ -140,6 +140,31 @@ function titleBlock(svg: Svg, p: Project, o: SheetOptions, r: { x: number; y: nu
 
 const escX = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
+/** Splits text into lines that fit `width` mm at `size` (paragraph breaks kept). */
+export function wrapText(text: string, width: number, size: number, bold = false): string[] {
+  const em = (bold ? 0.64 : 0.6) * size // average Helvetica glyph width
+  const fits = (s: string) => s.length * em <= width + 0.01
+  const out: string[] = []
+  for (const para of text.split('\n')) {
+    if (!para.trim()) { out.push(''); continue }
+    let line = ''
+    for (const word0 of para.split(/\s+/).filter(Boolean)) {
+      let word = word0
+      const next = line ? `${line} ${word}` : word
+      if (fits(next)) { line = next; continue }
+      if (line) { out.push(line); line = '' }
+      // A word wider than the box: break it.
+      while (!fits(word) && word.length > 1) {
+        let n = Math.max(1, Math.floor(width / em))
+        out.push(word.slice(0, n)); word = word.slice(n)
+      }
+      line = word
+    }
+    out.push(line)
+  }
+  return out
+}
+
 /** Draws a free-form title block's items into the strip r. */
 export function drawFreeItems(svg: Svg, p: Project, tb: TitleBlockTemplate, ctx: TBContext & { paper?: string }, r: { x: number; y: number; w: number; h: number }, side: TBSide) {
   for (const it of tb.items ?? []) {
@@ -153,8 +178,11 @@ export function drawFreeItems(svg: Svg, p: Project, tb: TitleBlockTemplate, ctx:
       // Lay the text out in the box as seen when reading it (a quarter-turn swaps width and height).
       const quarter = rot === 90 || rot === 270
       const bw = quarter ? Math.abs(b.h) : Math.abs(b.w), bh = quarter ? Math.abs(b.w) : Math.abs(b.h)
-      const size = it.size ?? 3
-      const lines = fillVariables(it.text, p, ctx, tb).split('\n')
+      // Wrap to the box width (word by word); if it's still too tall for the box, shrink the text until it fits.
+      const filled = fillVariables(it.text, p, ctx, tb)
+      let size = it.size ?? 3
+      let lines = wrapText(filled, bw, size, !!it.bold)
+      while (lines.length * size * 1.2 > bh + 0.01 && size > 1.2) { size *= 0.92; lines = wrapText(filled, bw, size, !!it.bold) }
       const lh = size * 1.2, total = lines.length * lh
       const al = it.align ?? 'left', va = it.vAlign ?? 'top'
       const x0 = cx - bw / 2, y0 = cy - bh / 2

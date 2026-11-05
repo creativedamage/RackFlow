@@ -25,3 +25,13 @@ describe('title block builder', () => {
     expect(items.some((i) => i.kind === 'line')).toBe(true)
   })
 })
+
+import { wrapText } from './index'
+describe('text boxes wrap', () => {
+  it('breaks lines at words to fit the box', () => {
+    const lines = wrapText('Fountain Campus Creative Studio Audio Video Lighting', 30, 3)
+    expect(lines.length).toBeGreaterThan(2)
+    for (const l of lines) expect(l.length * 0.6 * 3).toBeLessThanOrEqual(30.01)
+    expect(wrapText('A\nB', 100, 3)).toEqual(['A', 'B'])
+  })
+})
