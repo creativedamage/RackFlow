@@ -133,77 +133,68 @@ export function sideReach(p: Project, e: EquipmentInstance, o: Pick<SchematicOpt
 const ZONE_PAD = 36 // room zone border distance from what it encloses
 
 /**
- * Print positions: the diagram's own layout, as you arranged it. Blocks only
- * move where they would actually collide on paper – a column that sits on top
- * of the one before it is nudged right just enough to clear it (and a group /
- * room border between them), and a block that overlaps the one above it is
- * nudged down just enough to keep its tag and type line clear. Wire labels and
- * flags no longer push the whole drawing apart.
+ * Print positions: your arrangement, packed. Devices keep their columns, rows,
+ * order and alignment from the diagram, but the space between them is closed
+ * up to just what the drawing needs – room for each side's wire labels and
+ * off-sheet flags, the tag above and type line below, and the dashed border
+ * between different groups / rooms. Empty space you left on the canvas doesn't
+ * end up on paper.
  */
 export function printPositions(p: Project, eqs: EquipmentInstance[], o: Pick<SchematicOptions, 'wires'> & Partial<Pick<SchematicOptions, 'zones' | 'rooms' | 'split'>> = { wires: 'smart' }, groupOf?: Map<string, string>): Map<string, { x: number; y: number }> {
+  const out = new Map<string, { x: number; y: number }>()
+  if (!eqs.length) return out
   const H = (e: EquipmentInstance) => nodeGeom(e).height + 12 // box incl. the type line
   const reach = new Map(eqs.map((e) => [e.id as string, sideReach(p, e, o)]))
-  // Zone each device sits in – columns of different zones get room for the zone borders.
   const zm = zoneMode(p, o)
-  const room = (e: EquipmentInstance) => (zm === 'groups' ? groupOf?.get(e.id) ?? '' : zm === 'rooms' && o.split !== 'room' ? e.room?.trim() ?? '' : '')
-  // 1. Columns: devices whose x is within 120 of each other move together.
-  const byX = [...eqs].sort((a, b) => a.position.x - b.position.x)
-  const cols: EquipmentInstance[][] = []
-  for (const e of byX) {
-    const c = cols[cols.length - 1]
-    if (c && e.position.x - c[0].position.x < 120) c.push(e); else cols.push([e])
+  const zone = (e: EquipmentInstance) => (zm === 'groups' ? groupOf?.get(e.id) ?? '' : zm === 'rooms' && o.split !== 'room' ? e.room?.trim() ?? '' : '')
+  const zoneGap = (a: EquipmentInstance, b: EquipmentInstance) => (zone(a) === zone(b) ? 0 : ZONE_PAD * 2 + 24)
+  const GAP_X = 28, GAP_Y = 46
+  // Horizontal / vertical extents of a device's drawing (block, badges, labels / tag, type line).
+  const left = (e: EquipmentInstance) => BADGE + reach.get(e.id)!.left
+  const right = (e: EquipmentInstance) => NODE_WIDTH + BADGE + reach.get(e.id)!.right
+  const TOP = 34
+  const bands = (key: (e: EquipmentInstance) => number, tol: number) => {
+    const sorted = [...eqs].sort((a, b) => key(a) - key(b))
+    const out: EquipmentInstance[][] = []
+    for (const e of sorted) { const c = out[out.length - 1]; if (c && key(e) - key(c[0]) < tol) c.push(e); else out.push([e]) }
+    return out
   }
-  const shift = new Map<string, number>()
-  let prevRight = -Infinity, prevRooms = new Set<string>(), prevReach = 0, offset = 0
+  // 1. Columns (devices lined up on screen stay lined up): each slides left until it would
+  // touch a column before it that shares some height with it.
+  const yOverlap = (a: EquipmentInstance, b: EquipmentInstance, pad: number) => a.position.y - TOP - pad < b.position.y + H(b) + pad && b.position.y - TOP - pad < a.position.y + H(a) + pad
+  const xNew = new Map<string, number>()
+  const cols = bands((e) => e.position.x, 60)
+  const startX = Math.min(...eqs.map((e) => e.position.x))
+  const placedCols: { ms: EquipmentInstance[]; x0: number }[] = []
   for (const c of cols) {
-    const x0 = Math.min(...c.map((e) => e.position.x)) + offset
-    const leftReach = Math.max(...c.map((e) => reach.get(e.id)!.left))
-    const rooms = new Set(c.map(room))
-    const roomGap = [...rooms].some((r) => !prevRooms.has(r)) || [...prevRooms].some((r) => !rooms.has(r)) ? ZONE_PAD * 2 + 20 : 0
-    // Just clear the previous column's blocks and badges (plus the zone borders between different zones).
-    const need = prevRight + BADGE * 2 + 24 + (roomGap ? ZONE_PAD * 2 : 0)
-    if (x0 < need) offset += need - x0
-    for (const e of c) shift.set(e.id, offset)
-    prevRight = Math.max(...c.map((e) => e.position.x + offset + NODE_WIDTH))
-    prevReach = Math.max(...c.map((e) => reach.get(e.id)!.right))
-    prevRooms = rooms
-  }
-  // 2. Rows: push blocks down until they clear the ones above them.
-  const order = [...eqs].sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x)
-  const placed: { e: EquipmentInstance; x: number; y: number }[] = []
-  const out = new Map<string, { x: number; y: number }>()
-  const pad = BADGE + 8
-  for (const e of order) {
-    let y = e.position.y
-    const x = e.position.x + (shift.get(e.id) ?? 0)
-    for (let again = true; again;) {
-      again = false
-      for (const q of placed) {
-        if (!(x - pad < q.x + NODE_WIDTH + pad && q.x - pad < x + NODE_WIDTH + pad)) continue
-        const gap = room(q.e) === room(e) ? 34 : 34 + ZONE_PAD * 2
-        const bottom = q.y + H(q.e) + gap
-        if (y + H(e) + gap > q.y && y < bottom) { y = bottom; again = true }
-      }
+    const cx0 = Math.min(...c.map((e) => e.position.x))
+    let x = startX
+    for (const pc of placedCols) for (const a of c) for (const q of pc.ms) {
+      const zg = zoneGap(a, q)
+      if (!yOverlap(a, q, zg / 2 + 10)) continue
+      x = Math.max(x, xNew.get(q.id)! + right(q) + left(a) + GAP_X + zg - (a.position.x - cx0))
     }
-    placed.push({ e, x, y })
-    out.set(e.id, { x, y })
+    for (const e of c) xNew.set(e.id, x + (e.position.x - cx0))
+    placedCols.push({ ms: c, x0: x })
   }
-  // 3. Close up empty space: wide gaps between blocks (as drawn) shrink to a normal gutter,
-  // across and down, so the arrangement keeps its order and alignment but fills the sheet.
-  const MAX_GAP = 90 + ZONE_PAD * 2
-  const squeeze = (axis: 'x' | 'y', span: (e: EquipmentInstance, at: { x: number; y: number }) => [number, number]) => {
-    const iv = eqs.map((e) => ({ id: e.id as string, r: span(e, out.get(e.id)!) })).sort((a, b) => a.r[0] - b.r[0])
-    let reach = -Infinity, cut = 0
-    const shiftBy = new Map<string, number>()
-    for (const it of iv) {
-      if (reach > -Infinity && it.r[0] - reach > MAX_GAP) cut += it.r[0] - reach - MAX_GAP
-      shiftBy.set(it.id, cut)
-      reach = Math.max(reach, it.r[1])
+  // 2. Rows: same again downwards, against the packed columns.
+  const xOverlap = (a: EquipmentInstance, b: EquipmentInstance, pad: number) => xNew.get(a.id)! - left(a) - pad < xNew.get(b.id)! + right(b) + pad && xNew.get(b.id)! - left(b) - pad < xNew.get(a.id)! + right(a) + pad
+  const yNew = new Map<string, number>()
+  const rows = bands((e) => e.position.y, 40)
+  const startY = Math.min(...eqs.map((e) => e.position.y))
+  const placedRows: EquipmentInstance[][] = []
+  for (const r of rows) {
+    const ry0 = Math.min(...r.map((e) => e.position.y))
+    let y = startY
+    for (const pr of placedRows) for (const a of r) for (const q of pr) {
+      const zg = zoneGap(a, q)
+      if (!xOverlap(a, q, zg / 2)) continue
+      y = Math.max(y, yNew.get(q.id)! + H(q) + TOP + GAP_Y + zg - (a.position.y - ry0))
     }
-    for (const [id, d] of shiftBy) { const q = out.get(id)!; out.set(id, axis === 'x' ? { x: q.x - d, y: q.y } : { x: q.x, y: q.y - d }) }
+    for (const e of r) yNew.set(e.id, y + (e.position.y - ry0))
+    placedRows.push(r)
   }
-  squeeze('x', (e, at) => [at.x - BADGE - reach.get(e.id)!.left, at.x + NODE_WIDTH + BADGE + reach.get(e.id)!.right])
-  squeeze('y', (e, at) => [at.y - 40, at.y + H(e) + 20])
+  for (const e of eqs) out.set(e.id, { x: xNew.get(e.id)!, y: yNew.get(e.id)! })
   return out
 }
 
