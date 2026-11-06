@@ -6,12 +6,11 @@ import { applyUnits } from '../units'
 import { setTheme } from '../theme'
 import { setAutoSave } from '../autosave'
 
-type Tab = 'general' | 'files' | 'inventory'
+type Tab = 'general' | 'files'
 
 const TABS: { value: Tab; label: string; icon: React.ReactNode }[] = [
   { value: 'general', label: 'General', icon: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="3.2" /><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8" strokeLinecap="round" /></svg> },
   { value: 'files', label: 'Files & Folders', icon: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"><path d="M3 7v11a1.5 1.5 0 001.5 1.5h15A1.5 1.5 0 0021 18V9a1.5 1.5 0 00-1.5-1.5H11L9 5H4.5A1.5 1.5 0 003 6.5z" /></svg> },
-  { value: 'inventory', label: 'Inventory', icon: <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5" /><path d="M3.5 9h17M3.5 14.5h17M9.5 9v11.5" /></svg> },
 ]
 
 /** Settings (⌘,): a Mac Settings window – icon tabs, right-aligned labels. */
@@ -74,14 +73,6 @@ export function SettingsDialog() {
             </Row>}
           </>}
 
-          {tab === 'inventory' && <>
-            <Row label="Google Sheet:" note="In Google Sheets choose Share › General access › Anyone with the link (Viewer), then Copy link and paste it here. No sign-in or API key needed.">
-              <InventoryLinkField />
-            </Row>
-            <Row label="">
-              <button onClick={() => useStore.getState().set({ mode: 'inventory', showSettings: false })}>Show Inventory</button>
-            </Row>
-          </>}
         </div>
       </div>
     </div>
@@ -90,14 +81,6 @@ export function SettingsDialog() {
 
 function Radio<T extends string>({ name, value, options, onChange }: { name: string; value: T; options: [T, string][]; onChange: (v: T) => void }) {
   return <div className="prefs-radios">{options.map(([v, l]) => <label key={v}><input type="radio" name={name} checked={value === v} onChange={() => onChange(v)} /> {l}</label>)}</div>
-}
-
-function InventoryLinkField() {
-  const url = useSettings((s) => s.inventoryUrl)
-  const [draft, setDraft] = useState(url)
-  useEffect(() => setDraft(url), [url])
-  return <input className="prefs-url" value={draft} placeholder="https://docs.google.com/spreadsheets/d/…" onChange={(e) => setDraft(e.target.value)}
-    onBlur={() => { if (draft.trim() !== url) saveSettings({ inventoryUrl: draft.trim() }) }} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />
 }
 
 function Row({ label, note, children }: { label: string; note?: string; children: React.ReactNode }) {

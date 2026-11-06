@@ -432,8 +432,6 @@ export interface Project {
   clusters?: Cluster[]
   /** VLAN IP plan (Network schedule › VLANs…). */
   vlans?: VlanPlan[]
-  /** Inventory & pricing snapshot from a shared Google Sheet. */
-  inventory?: import('./inventory').InventorySheet
 }
 
 // --- Patch bays (types here to keep the document schema in one file) ---

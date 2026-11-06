@@ -82,11 +82,7 @@ const browserShim: RackflowAPI = {
   chooseFolder: async () => null,
   openPrivacySettings: async () => {},
   revealPath: async () => {},
-  fetchSheet: async (url) => {
-    const r = await fetch(url)
-    if (!r.ok) throw new Error(`The sheet couldn’t be read (HTTP ${r.status}). Share it as “Anyone with the link”.`)
-    return r.text()
-  },
+
   onMenu: (cb) => { menuListeners.add(cb); return () => menuListeners.delete(cb) },
   onOpenFile: (cb) => { openListeners.add(cb); return () => openListeners.delete(cb) },
 }

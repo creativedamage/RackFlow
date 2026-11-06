@@ -14,7 +14,7 @@ import { defaultTBForProject, refreshDefaultTB } from './print/tbDefault'
 
 void refreshDefaultTB()
 
-export type Mode = 'diagram' | 'rack' | 'patch' | 'sheet' | 'led' | 'boxes' | 'inventory'
+export type Mode = 'diagram' | 'rack' | 'patch' | 'sheet' | 'led' | 'boxes'
 
 interface HistoryEntry { project: Project; label: string }
 
@@ -266,6 +266,8 @@ export function parseProject(data: string): Project {
   // Migrations go here as the schema evolves (v1 → v2 …).
   p.patchBays ??= []
   p.racks ??= []
+  // 1.22.0–1.22.2 kept a Google Sheets inventory snapshot; that feature is gone.
+  delete (p as { inventory?: unknown }).inventory
   p.patchBays.forEach(upgradeBay)
   // Ports added to the built-in catalog since the file was saved (e.g. dLive MixRack ME port).
   addNewCatalogPorts(p, BUILT_IN_PRODUCTS)

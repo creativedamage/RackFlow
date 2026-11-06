@@ -9,11 +9,9 @@ export interface AppSettings {
   onLaunch: 'start' | 'reopen'
   /** Where Open / Save dialogs start (null = macOS default). */
   projectsFolder: string | null
-  /** Shared Google Sheet with inventory & pricing (used by every project). */
-  inventoryUrl: string
 }
 
-const DEFAULTS: AppSettings = { onLaunch: 'start', projectsFolder: null, inventoryUrl: '' }
+const DEFAULTS: AppSettings = { onLaunch: 'start', projectsFolder: null }
 
 export const useSettings = create<AppSettings & { loaded: boolean }>(() => ({ ...DEFAULTS, loaded: false }))
 

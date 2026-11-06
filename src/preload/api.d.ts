@@ -10,7 +10,7 @@ export type MenuCommand =
   | 'undo' | 'redo' | 'delete' | 'selectAll' | 'zoomFit'
   | 'mode:diagram' | 'mode:rack' | 'mode:patch' | 'mode:sheet' | 'mode:led' | 'mode:boxes'
   | 'newProduct' | 'newTemplate' | 'toggleInspector' | 'toggleSidebar' | 'share' | 'editDevice' | 'findDevice' | 'tidy' | 'exportAll' | 'numbering' | 'units:imperial' | 'units:metric' | 'theme:system' | 'theme:light' | 'theme:dark'
-  | 'settings' | 'startScreen' | 'mode:inventory' | 'page:new' | 'page:fromSelection' | 'page:bySystem' | 'view:new' | 'sheetNumbers'
+  | 'settings' | 'startScreen' | 'page:new' | 'page:fromSelection' | 'page:bySystem' | 'view:new' | 'sheetNumbers'
   | 'insert:wallBox' | 'insert:wallPlate' | 'insert:floorBox' | 'insert:rackPanel' | 'insert:fiber' | 'insert:rack' | 'insert:led'
 
 export interface AiStatus { hasKey: boolean; model: string; canEncrypt: boolean }
@@ -80,8 +80,6 @@ export interface RackflowAPI {
   /** macOS System Settings › Privacy & Security › Files and Folders. */
   openPrivacySettings(): Promise<void>
   revealPath(path: string): Promise<void>
-  /** Downloads a shared sheet as CSV text (main process – no CORS, no sign-in). */
-  fetchSheet(csvUrl: string): Promise<string>
 
   onMenu(cb: (cmd: MenuCommand) => void): () => void
   onOpenFile(cb: (file: OpenedFile) => void): () => void

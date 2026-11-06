@@ -52,7 +52,6 @@ const api: RackflowAPI = {
   chooseFolder: () => ipcRenderer.invoke('settings:chooseFolder'),
   openPrivacySettings: () => ipcRenderer.invoke('system:openPrivacy'),
   revealPath: (p) => ipcRenderer.invoke('system:reveal', p),
-  fetchSheet: (url) => ipcRenderer.invoke('sheet:fetch', url),
 
   onMenu: (cb) => on<MenuCommand>('menu', cb),
   onOpenFile: (cb) => on<OpenedFile>('open-file', cb),

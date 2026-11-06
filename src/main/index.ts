@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, screen, shell, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, screen, shell, type MenuItemConstructorOptions } from 'electron'
 import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -246,7 +246,6 @@ function buildMenu() {
         cmd('Schedule', 'mode:sheet', 'CmdOrCtrl+4'),
         cmd('LED Walls', 'mode:led', 'CmdOrCtrl+5'),
         cmd('Wall Boxes', 'mode:boxes', 'CmdOrCtrl+6'),
-        cmd('Inventory', 'mode:inventory', 'CmdOrCtrl+7'),
         sep,
         cmd('Show / Hide Sidebar', 'toggleSidebar', 'Ctrl+CmdOrCtrl+S'),
         cmd('Show / Hide Inspector', 'toggleInspector', 'Alt+CmdOrCtrl+I'),
@@ -408,14 +407,7 @@ function registerIPC() {
   ipcMain.handle('system:openPrivacy', () => shell.openExternal(isMac ? 'x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders' : 'ms-settings:privacy'))
   ipcMain.handle('system:reveal', (_e, path: string) => { if (path) shell.showItemInFolder(path) })
 
-  // Inventory: read a shared Google Sheet as CSV (no API, no sign-in).
-  ipcMain.handle('sheet:fetch', async (_e, url: string) => {
-    if (!/^https:\/\//.test(url)) throw new Error('Only https links can be read.')
-    const r = await net.fetch(url, { redirect: 'follow', headers: { Accept: 'text/csv,text/plain,*/*' } })
-    const text = await r.text()
-    if (!r.ok) throw new Error(r.status === 401 || r.status === 403 || r.status === 404 ? 'Google wouldn’t share the sheet. In Google Sheets: Share › General access › “Anyone with the link” (Viewer).' : `The sheet couldn’t be read (HTTP ${r.status}).`)
-    return text
-  })
+
   ipcMain.handle('library:products', () => readAll(libDir('Products')))
   ipcMain.handle('library:saveProduct', (_e, p: { key: string }) => writeItem(libDir('Products'), p.key, p))
   ipcMain.handle('library:deleteProduct', (_e, key: string) => rm(join(libDir('Products'), `${safe(key)}.json`), { force: true }))

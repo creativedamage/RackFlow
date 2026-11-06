@@ -14,8 +14,8 @@ export function Toolbar() {
   const name = useStore((s) => s.project.info.name)
   const dirty = useStore((s) => s.dirty)
   const apply = useStore((s) => s.apply)
-  const sidebarShown = useStore((s) => s.showSidebar && s.mode !== 'sheet' && s.mode !== 'led' && s.mode !== 'boxes' && s.mode !== 'inventory')
-  const canSidebar = useStore((s) => s.mode !== 'sheet' && s.mode !== 'inventory')
+  const sidebarShown = useStore((s) => s.showSidebar && s.mode !== 'sheet' && s.mode !== 'led' && s.mode !== 'boxes')
+  const canSidebar = useStore((s) => s.mode !== 'sheet')
 
   return (
     <header className="toolbar">
@@ -38,7 +38,6 @@ export function Toolbar() {
           { value: 'sheet', label: 'Schedule', title: 'Every cable and device as a spreadsheet (⌘4)' },
           { value: 'led', label: 'LED Walls', title: 'LED wall data & power mapping (⌘5)' },
           { value: 'boxes', label: 'Wall Boxes', title: 'Wall boxes, plates & panels – fabrication sheets (⌘6)' },
-          { value: 'inventory', label: 'Inventory', title: 'Your Google Sheet inventory & pricing vs. the diagram (⌘7)' },
         ]}
       />
 

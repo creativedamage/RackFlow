@@ -10,7 +10,6 @@ import { editSelection } from './product/openEditor'
 import { useEffect } from 'react'
 import { StartScreen } from './components/StartScreen'
 import { SettingsDialog } from './components/SettingsDialog'
-import { InventoryView } from './inventory/InventoryView'
 import { loadSettings } from './settings'
 import { groupSelection, newPageCmd, pagesBySystem } from './diagram/GroupsPanel'
 import { ReactFlowProvider } from '@xyflow/react'
@@ -164,7 +163,6 @@ export function App() {
       case 'newTemplate': s.set({ editingTemplate: newCustomTemplate() }); break
       case 'settings': s.set({ showSettings: true }); break
       case 'startScreen': s.set({ showStart: true }); break
-      case 'mode:inventory': s.set({ mode: 'inventory' }); break
       case 'page:new': newPageCmd(); break
       case 'page:fromSelection': s.set({ mode: 'diagram' }); groupSelection(); break
       case 'page:bySystem': s.set({ mode: 'diagram' }); pagesBySystem(); break
@@ -187,21 +185,21 @@ export function App() {
 
   // The right panel shows only when there's something to inspect (design checks live in the ⚠︎ notifications).
   const hasSubject = useStore((s) => s.selection.length > 0 || !!s.selectedCable || s.selectedCables.length > 0 || (s.mode === 'rack' && (!!s.selectedRack || !!s.selectedAccessory)))
-  const rightAvail = mode !== 'sheet' && mode !== 'led' && mode !== 'boxes' && mode !== 'inventory' && (mode === 'patch' || hasSubject)
+  const rightAvail = mode !== 'sheet' && mode !== 'led' && mode !== 'boxes' && (mode === 'patch' || hasSubject)
   const rightPanel = showInspector && rightAvail
   const peek = useStore((s) => s.peek)
   const hasWalls = useStore((s) => (s.project.ledWalls?.length ?? 0) > 0)
   const hasBoxes = useStore((s) => s.project.equipment.some((e) => e.product.plate))
   const showSidebar = useStore((s) => s.showSidebar)
-  const sidebarOn = showSidebar && mode !== 'sheet' && mode !== 'led' && mode !== 'boxes' && mode !== 'inventory'
+  const sidebarOn = showSidebar && mode !== 'sheet' && mode !== 'led' && mode !== 'boxes'
   const inspW = usePanelWidth('insp')
   const tpW = usePanelWidth('tp')
 
   return (
     <ReactFlowProvider>
-      <div key={units} className={`app ${isMac ? 'mac' : ''} ${rightPanel && mode !== 'diagram' ? '' : 'no-inspector'} ${rightPanel && mode === 'diagram' ? 'insp-float' : ''} mode-${mode} ${sidebarOn ? 'has-sidebar' : 'no-sidebar'} ${mode !== 'sheet' && mode !== 'inventory' ? 'can-sidebar' : ''}`} style={{ ['--insp-w' as string]: `${inspW}px`, ['--tp-w' as string]: `${tpW}px` }}>
+      <div key={units} className={`app ${isMac ? 'mac' : ''} ${rightPanel && mode !== 'diagram' ? '' : 'no-inspector'} ${rightPanel && mode === 'diagram' ? 'insp-float' : ''} mode-${mode} ${sidebarOn ? 'has-sidebar' : 'no-sidebar'} ${mode !== 'sheet' ? 'can-sidebar' : ''}`} style={{ ['--insp-w' as string]: `${inspW}px`, ['--tp-w' as string]: `${tpW}px` }}>
         <Toolbar />
-        {mode !== 'led' && mode !== 'boxes' && mode !== 'inventory' && <Slide open={sidebarOn || (peek === 'left' && mode !== 'sheet')} side="left"><Sidebar peek={!sidebarOn} /></Slide>}
+        {mode !== 'led' && mode !== 'boxes' && <Slide open={sidebarOn || (peek === 'left' && mode !== 'sheet')} side="left"><Sidebar peek={!sidebarOn} /></Slide>}
         <main className="canvas-area">
           {mode === 'diagram' && <DiagramView />}
           {mode === 'rack' && <RackView />}
@@ -209,10 +207,9 @@ export function App() {
           {mode === 'sheet' && <ScheduleView />}
           {mode === 'led' && <LedView />}
           {mode === 'boxes' && <BoxesView />}
-          {mode === 'inventory' && <InventoryView />}
         </main>
         <Slide open={rightPanel || (peek === 'right' && rightAvail)} side="right">{mode === 'patch' ? <TemplatesPanel peek={!rightPanel} /> : <Inspector peek={!rightPanel} />}</Slide>
-        <EdgePeek left={!showSidebar && mode !== 'sheet' && mode !== 'inventory'} right={!showInspector && (rightAvail || (mode === 'led' && hasWalls) || (mode === 'boxes' && hasBoxes))} />
+        <EdgePeek left={!showSidebar && mode !== 'sheet'} right={!showInspector && (rightAvail || (mode === 'led' && hasWalls) || (mode === 'boxes' && hasBoxes))} />
         {rightPanel && <PanelResizer which={mode === 'patch' ? 'tp' : 'insp'} />}
         {editingProduct && <ProductEditor key={editingProduct.key} initial={editingProduct} />}
         {editingPlate && (editingPlate.product.fiber
