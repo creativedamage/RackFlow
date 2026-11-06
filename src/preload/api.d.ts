@@ -10,6 +10,8 @@ export type MenuCommand =
   | 'undo' | 'redo' | 'delete' | 'selectAll' | 'zoomFit'
   | 'mode:diagram' | 'mode:rack' | 'mode:patch' | 'mode:sheet' | 'mode:led' | 'mode:boxes'
   | 'newProduct' | 'newTemplate' | 'toggleInspector' | 'toggleSidebar' | 'share' | 'editDevice' | 'findDevice' | 'tidy' | 'exportAll' | 'numbering' | 'units:imperial' | 'units:metric' | 'theme:system' | 'theme:light' | 'theme:dark'
+  | 'settings' | 'startScreen' | 'mode:inventory' | 'page:new' | 'page:fromSelection' | 'page:bySystem' | 'view:new' | 'sheetNumbers'
+  | 'insert:wallBox' | 'insert:wallPlate' | 'insert:floorBox' | 'insert:rackPanel' | 'insert:fiber' | 'insert:rack' | 'insert:led'
 
 export interface AiStatus { hasKey: boolean; model: string; canEncrypt: boolean }
 
@@ -28,7 +30,7 @@ export interface RackflowAPI {
   platform: string
   openProject(): Promise<OpenedFile | null>
   saveProject(path: string | null, data: string, suggestedName: string): Promise<string | null>
-  setDocumentState(state: { title: string; dirty: boolean; path: string | null }): void
+  setDocumentState(state: { title: string; dirty: boolean; path: string | null; autoSave: boolean }): void
   closeWindow(): void
 
   listUserProducts(): Promise<ProductDefinition[]>
@@ -62,12 +64,24 @@ export interface RackflowAPI {
   /** Native Save / Don't Save / Cancel sheet before replacing the open project. */
   /** Writes every export file into a new folder the user picks; returns the folder. */
   /** App-wide saved items (title block templates, numbering standards). */
-  storeGet<T = unknown>(name: 'TitleBlocks' | 'TitleBlockPrefs' | 'NumberingStandards'): Promise<T | null>
-  storeSet(name: 'TitleBlocks' | 'TitleBlockPrefs' | 'NumberingStandards', data: unknown): Promise<void>
+  storeGet<T = unknown>(name: 'TitleBlocks' | 'TitleBlockPrefs' | 'NumberingStandards' | 'Settings'): Promise<T | null>
+  storeSet(name: 'TitleBlocks' | 'TitleBlockPrefs' | 'NumberingStandards' | 'Settings', data: unknown): Promise<void>
   getTheme(): Promise<'system' | 'light' | 'dark'>
   setTheme(t: 'system' | 'light' | 'dark'): Promise<void>
   exportAll(files: { name: string; kind: 'pdf' | 'text'; content: string }[], folderName: string): Promise<string | null>
   askSaveChanges(name: string): Promise<'save' | 'discard' | 'cancel'>
+
+  /** Start screen: recent projects (paths only – nothing is read until one is opened). */
+  recentList(): Promise<string[]>
+  /** Opens a recent project (arrives through onOpenFile); false if it has gone. */
+  recentOpen(path: string): Promise<boolean>
+  recentForget(path: string): Promise<void>
+  chooseFolder(): Promise<string | null>
+  /** macOS System Settings › Privacy & Security › Files and Folders. */
+  openPrivacySettings(): Promise<void>
+  revealPath(path: string): Promise<void>
+  /** Downloads a shared sheet as CSV text (main process – no CORS, no sign-in). */
+  fetchSheet(csvUrl: string): Promise<string>
 
   onMenu(cb: (cmd: MenuCommand) => void): () => void
   onOpenFile(cb: (file: OpenedFile) => void): () => void

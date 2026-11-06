@@ -327,7 +327,12 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
   const one = sel.size === 1 ? [...sel][0] : null
   const oneJack = one && !isText(one) ? spec.inserts.find((x) => x.pid === one) : undefined
   const oneText = one && isText(one) ? L.texts.find((t) => t.id === one) : undefined
+  const photo = spec.kind === 'rackPanel' || spec.kind === 'wallBox'
   const pad = spec.kind === 'rackPanel' ? 6 : 12
+  // Photo view: room under the panel for its width dimension.
+  const padB = photo ? pad + 12 : pad
+  const ru = spec.kind === 'rackPanel' ? Math.round(L.h / 44.45) : 0
+  const dimText = `${fmtLen(L.w, 2)}${ru ? ` · ${ru}U` : ` × ${fmtLen(L.h, 2)}`}`
   const groups = GROUP_ORDER.map((g) => [g, PLATE_MODULE_KEYS.filter((k) => PLATE_MODULES[k].group === g || (g === 'Power' && PLATE_MODULES[k].power))] as const).filter(([, ks]) => ks.length)
 
   return (
@@ -396,7 +401,7 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
               <label className="pd-snap"><input type="checkbox" checked={snap} onChange={(e) => setSnap(e.target.checked)} /> Snap</label>
               <Select value={L.grid} width={80} onChange={(v) => editL((l) => { l.grid = v })} options={((g0) => (g0.includes(L.grid) ? g0 : [...g0, L.grid].sort((a, b) => a - b)))(imperial() ? [0.79375, 1.5875, 3.175, 6.35, 12.7] : [0.5, 1, 2, 2.5, 5, 10]).map((g) => ({ value: g, label: imperial() ? `${{ 0.79375: '1/32', 1.5875: '1/16', 3.175: '1/8', 6.35: '1/4', 12.7: '1/2' }[g] ?? fmtLen(g, 3)}"` : `${g} mm` }))} />
               <span className="pd-group">
-                <button onClick={() => edit((d) => { d.layout!.jacks = { ...d.layout!.jacks, ...autoArrange(d, { w: d.layout!.w, h: d.layout!.h, ru: spec.kind === 'rackPanel' ? 1 : undefined }) } })} title="Arrange all connectors in neat rows">Auto-arrange</button>
+                <button onClick={() => edit((d) => { d.layout!.jacks = { ...d.layout!.jacks, ...autoArrange(d, { w: d.layout!.w, h: d.layout!.h, ru: spec.kind === 'rackPanel' ? Math.max(1, Math.round(d.layout!.h / 44.45)) : undefined }) } })} title="Arrange all connectors in neat rows">Auto-arrange</button>
                 <button disabled={!sel.size} onClick={duplicate} title="Duplicate (⌘D)">Duplicate</button>
                 <button disabled={!sel.size} className="danger" onClick={() => remove(sel)} title="Delete (⌫)">Delete</button>
                 <button disabled={!past.length} onClick={undo} title="Undo (⌘Z)">Undo</button>
@@ -406,9 +411,16 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
             </div>
             <div className="pd-canvas" onDragOver={(e) => { if (e.dataTransfer.types.includes('text/x-plate-module')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' } }}
               onDrop={(e) => { const k = e.dataTransfer.getData('text/x-plate-module'); if (k && svgRef.current) { e.preventDefault(); addJack(k, toMM(e)) } }}>
-              <svg ref={svgRef} viewBox={`${-pad} ${-pad} ${L.w + pad * 2} ${L.h + pad * 2}`} style={{ width: `${zoom * 100}%`, height: `${zoom * 100}%` }}
+              <svg ref={svgRef} viewBox={`${-pad} ${-pad} ${L.w + pad * 2} ${L.h + pad + padB}`} style={{ width: `${zoom * 100}%`, height: `${zoom * 100}%` }}
                 onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
-                <g dangerouslySetInnerHTML={{ __html: plateInner(spec, { selected: sel, interactive: true, grid: snap ? L.grid : 0 }) }} />
+                <g dangerouslySetInnerHTML={{ __html: plateInner(spec, { selected: sel, interactive: true, grid: snap && !photo ? L.grid : 0, photo }) }} />
+                {photo && (() => {
+                  const y = L.h + 9, tw = dimText.length * 2.1 + 6
+                  return <g stroke="#8e8e93" strokeWidth={0.3} fill="none">
+                    <path d={`M0 ${y - 2.2}V${y + 2.2}M${L.w} ${y - 2.2}V${y + 2.2}M0 ${y}H${L.w / 2 - tw / 2}M${L.w / 2 + tw / 2} ${y}H${L.w}`} />
+                    <text x={L.w / 2} y={y + 1.3} fontSize={3.6} fill="#6e6e73" stroke="none" textAnchor="middle" fontFamily="-apple-system, Helvetica, Arial, sans-serif">{dimText}</text>
+                  </g>
+                })()}
                 {marquee && <rect x={Math.min(marquee.x0, marquee.x1)} y={Math.min(marquee.y0, marquee.y1)} width={Math.abs(marquee.x1 - marquee.x0)} height={Math.abs(marquee.y1 - marquee.y0)} fill="rgba(10,132,255,0.1)" stroke="#0a84ff" strokeWidth={0.4} />}
               </svg>
             </div>

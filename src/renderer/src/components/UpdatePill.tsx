@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { UpdateStatus } from '../../../preload/api'
-import { api } from '../platform'
-import { useStore } from '../store'
+import { api, isElectron } from '../platform'
+import { newDocument, openDocument, saveDocument, useStore } from '../store'
 
 /** Toolbar indicator for app updates: download progress, then "Restart to Update". */
 export function UpdatePill() {
@@ -77,6 +77,14 @@ export function AppMenuButton() {
           <span className="muted small">Version {version}</span>
           <button className="primary" disabled={checking} onClick={() => void check()}>{checking ? 'Checking…' : 'Check for Updates'}</button>
           <button onClick={() => { void api.openReleasePage(); setOpen(false) }}>Release Notes</button>
+          <hr />
+          {!isElectron && <>
+            <button onClick={() => { setOpen(false); void newDocument() }}>New Project</button>
+            <button onClick={() => { setOpen(false); void openDocument() }}>Open…</button>
+            <button onClick={() => { setOpen(false); void saveDocument() }}>Save</button>
+          </>}
+          <button onClick={() => { setOpen(false); useStore.getState().set({ showStart: true }) }}>Start Screen</button>
+          <button onClick={() => { setOpen(false); useStore.getState().set({ showSettings: true }) }}>Settings…</button>
         </div>
       )}
     </div>

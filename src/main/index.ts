@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, screen, shell, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, screen, shell, type MenuItemConstructorOptions } from 'electron'
 import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -9,7 +9,7 @@ import { checkForUpdates, installAndRestart, openReleasePage, startUpdater, upda
 
 const isMac = process.platform === 'darwin'
 let win: BrowserWindow | null = null
-let docState = { title: 'Untitled Project', dirty: false, path: null as string | null }
+let docState = { title: 'Untitled Project', dirty: false, path: null as string | null, autoSave: false }
 let allowClose = false
 let pendingOpen: string | null = null
 
@@ -77,10 +77,12 @@ function createWindow() {
   else void win.loadFile(join(__dirname, '../renderer/index.html'))
 
   win.webContents.once('did-finish-load', () => {
-    // A file double-clicked in Finder wins; otherwise pick up where you left off – the last project.
-    const last = recent.find((p) => existsSync(p))
-    const target = pendingOpen ?? (process.env.RACKFLOW_NO_REOPEN ? null : last ?? null)
-    if (target) { void openPath(target); pendingOpen = null }
+    // A file double-clicked in Finder wins. Otherwise the Start screen shows –
+    // nothing is read from disk at launch, so macOS never asks for folder access
+    // (Downloads, Documents…) just for opening the app. "Reopen last project"
+    // is an opt-in in Settings.
+    const target = pendingOpen ?? (settings.onLaunch === 'reopen' && !process.env.RACKFLOW_NO_REOPEN ? recent[0] ?? null : null)
+    if (target) { void openPath(target, true); pendingOpen = null }
   })
 }
 
@@ -104,6 +106,14 @@ function setTheme(t: Theme) {
   send(`theme:${t}`)
 }
 
+// MARK: Settings (app-wide, read by main for launch behaviour and dialog folders)
+
+interface AppSettings { onLaunch: 'start' | 'reopen'; projectsFolder: string | null }
+let settings: AppSettings = { onLaunch: 'start', projectsFolder: null }
+const settingsFile = () => join(app.getPath('userData'), 'Settings.json')
+async function loadSettings() { try { settings = { ...settings, ...JSON.parse(await readFile(settingsFile(), 'utf8')) } } catch { /* first run */ } }
+const defaultDir = (name?: string) => (settings.projectsFolder ? (name ? join(settings.projectsFolder, name) : settings.projectsFolder) : name)
+
 const recentFile = () => join(app.getPath('userData'), 'Recent.json')
 let recent: string[] = []
 async function loadRecent() { try { recent = (JSON.parse(await readFile(recentFile(), 'utf8')) as string[]).filter((x) => typeof x === 'string') } catch { recent = [] } }
@@ -124,14 +134,15 @@ function recentMenu(): MenuItemConstructorOptions[] {
   return items
 }
 
-async function openPath(path: string) {
+async function openPath(path: string, quiet = false) {
   try {
     const data = await readFile(path, 'utf8')
     const file: OpenedFile = { path, data }
     win?.webContents.send('open-file', file)
     noteRecent(path)
   } catch (err) {
-    dialog.showErrorBox('Couldn’t open file', String(err))
+    // At launch a missing last project just leaves the Start screen up.
+    if (!quiet) dialog.showErrorBox('Couldn’t open file', String(err))
   }
 }
 
@@ -140,6 +151,8 @@ async function openPath(path: string) {
 function buildMenu() {
   const cmd = (label: string, command: MenuCommand, accelerator?: string): MenuItemConstructorOptions =>
     ({ label, accelerator, click: () => send(command) })
+  const sep: MenuItemConstructorOptions = { type: 'separator' }
+  const settingsItem = cmd(isMac ? 'Settings…' : 'Preferences…', 'settings', 'CmdOrCtrl+,')
 
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [{
@@ -147,11 +160,13 @@ function buildMenu() {
       submenu: [
         { role: 'about' as const },
         { label: 'Check for Updates…', click: () => { void checkForUpdates({ userInitiated: true }) } },
-        { type: 'separator' as const },
+        sep,
+        settingsItem,
+        sep,
         { role: 'services' as const },
-        { type: 'separator' as const },
+        sep,
         { role: 'hide' as const }, { role: 'hideOthers' as const }, { role: 'unhide' as const },
-        { type: 'separator' as const },
+        sep,
         { role: 'quit' as const },
       ],
     }] : []),
@@ -161,20 +176,18 @@ function buildMenu() {
         cmd('New Project', 'new', 'CmdOrCtrl+N'),
         cmd('Open…', 'open', 'CmdOrCtrl+O'),
         { label: 'Open Recent', submenu: recentMenu() },
-        { type: 'separator' },
+        cmd('Start Screen', 'startScreen', 'Shift+CmdOrCtrl+N'),
+        sep,
         cmd('Save', 'save', 'CmdOrCtrl+S'),
         cmd('Save As…', 'saveAs', 'Shift+CmdOrCtrl+S'),
-        cmd('Auto Save On / Off', 'autosave:toggle'),
-        { type: 'separator' },
+        { label: 'Auto Save', type: 'checkbox', checked: docState.autoSave, click: () => send('autosave:toggle') },
+        sep,
         cmd('Export / Print…', 'quickPrint', 'CmdOrCtrl+P'),
-        cmd('Share…', 'share', 'Shift+CmdOrCtrl+H'),
         cmd('Export Everything…', 'exportAll', 'Shift+CmdOrCtrl+E'),
-        { type: 'separator' },
-        cmd('Find Device…', 'findDevice', 'Shift+CmdOrCtrl+F'),
-        cmd('New Custom Product…', 'newProduct', 'Alt+CmdOrCtrl+N'),
-        cmd('New Patch Bay Template…', 'newTemplate'),
-        { type: 'separator' },
+        cmd('Share…', 'share', 'Shift+CmdOrCtrl+H'),
+        sep,
         isMac ? { role: 'close' } : { role: 'quit' },
+        ...(isMac ? [] : [sep, settingsItem]),
       ],
     },
     {
@@ -184,13 +197,43 @@ function buildMenu() {
         // because the renderer only handles ⌘Z when focus isn't in an input.
         cmd('Undo', 'undo', 'CmdOrCtrl+Z'),
         cmd('Redo', 'redo', 'Shift+CmdOrCtrl+Z'),
-        { type: 'separator' },
+        sep,
         { role: 'cut' }, { role: 'copy' }, { role: 'paste' },
         cmd('Delete', 'delete'),
-        cmd('Select All Devices', 'selectAll', 'CmdOrCtrl+A'),
-        { type: 'separator' },
+        cmd('Select All', 'selectAll', 'CmdOrCtrl+A'),
+        sep,
         cmd('Edit Selected Device…', 'editDevice', 'CmdOrCtrl+E'),
-        { type: 'separator' },
+        cmd('Find Device Online…', 'findDevice', 'Shift+CmdOrCtrl+F'),
+      ],
+    },
+    {
+      label: 'Insert',
+      submenu: [
+        cmd('Custom Device…', 'newProduct', 'Alt+CmdOrCtrl+N'),
+        cmd('Patch Bay Template…', 'newTemplate'),
+        sep,
+        cmd('Wall Box…', 'insert:wallBox'),
+        cmd('Wall Plate…', 'insert:wallPlate'),
+        cmd('Floor Box / Stage Pocket…', 'insert:floorBox'),
+        cmd('Rack Connector Panel…', 'insert:rackPanel'),
+        cmd('Fiber Enclosure…', 'insert:fiber'),
+        sep,
+        cmd('Rack', 'insert:rack'),
+        cmd('LED Wall…', 'insert:led'),
+      ],
+    },
+    {
+      label: 'Diagram',
+      submenu: [
+        cmd('Tidy Up', 'tidy', 'Alt+CmdOrCtrl+L'),
+        cmd('Zoom to Fit', 'zoomFit', 'CmdOrCtrl+0'),
+        sep,
+        cmd('New Page', 'page:new'),
+        cmd('New Page from Selection', 'page:fromSelection', 'CmdOrCtrl+G'),
+        cmd('Pages by System', 'page:bySystem'),
+        cmd('New Signal View…', 'view:new'),
+        sep,
+        cmd('Sheet Numbers…', 'sheetNumbers'),
         cmd('Numbering Standards…', 'numbering'),
       ],
     },
@@ -200,16 +243,14 @@ function buildMenu() {
         cmd('Wiring Diagram', 'mode:diagram', 'CmdOrCtrl+1'),
         cmd('Rack Elevation', 'mode:rack', 'CmdOrCtrl+2'),
         cmd('Patch Labels', 'mode:patch', 'CmdOrCtrl+3'),
-        cmd('Schedule (Spreadsheet)', 'mode:sheet', 'CmdOrCtrl+4'),
+        cmd('Schedule', 'mode:sheet', 'CmdOrCtrl+4'),
         cmd('LED Walls', 'mode:led', 'CmdOrCtrl+5'),
         cmd('Wall Boxes', 'mode:boxes', 'CmdOrCtrl+6'),
-        { type: 'separator' },
-        cmd('Tidy Up Wiring Diagram', 'tidy', 'Alt+CmdOrCtrl+L'),
-        { type: 'separator' },
-        cmd('Zoom to Fit', 'zoomFit', 'CmdOrCtrl+0'),
-        cmd('Toggle Sidebar', 'toggleSidebar', 'Ctrl+CmdOrCtrl+S'),
-        cmd('Toggle Inspector', 'toggleInspector', 'Alt+CmdOrCtrl+I'),
-        { label: 'Units', submenu: [cmd('Imperial (in, ft, lb)', 'units:imperial'), cmd('Metric (mm, m, kg)', 'units:metric')] },
+        cmd('Inventory', 'mode:inventory', 'CmdOrCtrl+7'),
+        sep,
+        cmd('Show / Hide Sidebar', 'toggleSidebar', 'Ctrl+CmdOrCtrl+S'),
+        cmd('Show / Hide Inspector', 'toggleInspector', 'Alt+CmdOrCtrl+I'),
+        sep,
         {
           label: 'Appearance',
           submenu: (['system', 'light', 'dark'] as const).map((t): MenuItemConstructorOptions => ({
@@ -217,7 +258,7 @@ function buildMenu() {
             type: 'radio', checked: nativeTheme.themeSource === t, click: () => setTheme(t),
           })),
         },
-        { type: 'separator' },
+        sep,
         { role: 'togglefullscreen' },
         ...(app.isPackaged ? [] : [{ role: 'toggleDevTools' as const }, { role: 'reload' as const }]),
       ],
@@ -280,7 +321,7 @@ function registerIPC() {
 
   ipcMain.handle('project:open', async () => {
     if (!win) return null
-    const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: projectFilters })
+    const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: projectFilters, defaultPath: defaultDir() })
     if (r.canceled || !r.filePaths[0]) return null
     const path = r.filePaths[0]
     noteRecent(path)
@@ -291,7 +332,7 @@ function registerIPC() {
     let target = path
     if (!target) {
       if (!win) return null
-      const r = await dialog.showSaveDialog(win, { defaultPath: `${suggested}.rackflow`, filters: projectFilters })
+      const r = await dialog.showSaveDialog(win, { defaultPath: defaultDir(`${suggested}.rackflow`), filters: projectFilters })
       if (r.canceled || !r.filePath) return null
       target = extname(r.filePath) ? r.filePath : `${r.filePath}.rackflow`
     }
@@ -304,7 +345,9 @@ function registerIPC() {
   })
 
   ipcMain.on('doc:state', (_e, s: typeof docState) => {
+    const menuChanged = s.autoSave !== docState.autoSave
     docState = s
+    if (menuChanged) buildMenu()
     if (!win) return
     win.setTitle(`${s.title}${s.dirty && !isMac ? ' •' : ''} — RackFlow`)
     if (isMac) {
@@ -324,7 +367,7 @@ function registerIPC() {
   })
 
   // Small app-wide JSON stores (title block templates, numbering standards) – shared across projects.
-  const STORES = new Set(['TitleBlocks', 'TitleBlockPrefs', 'NumberingStandards'])
+  const STORES = new Set(['TitleBlocks', 'TitleBlockPrefs', 'NumberingStandards', 'Settings'])
   const storeFile = (name: string) => join(app.getPath('userData'), `${name}.json`)
   ipcMain.handle('store:get', async (_e, name: string) => {
     if (!STORES.has(name)) return null
@@ -336,6 +379,42 @@ function registerIPC() {
     const tmp = `${storeFile(name)}.tmp`
     await writeFile(tmp, JSON.stringify(data, null, 1), 'utf8')
     await rename(tmp, storeFile(name))
+    if (name === 'Settings') settings = { ...settings, ...(data as Partial<AppSettings>) }
+  })
+
+  // Start screen: the recent list (no disk access until you pick one).
+  ipcMain.handle('recent:list', () => recent)
+  ipcMain.handle('recent:open', async (_e, path: string) => {
+    if (!recent.includes(path)) return false
+    if (!existsSync(path)) {
+      recent = recent.filter((x) => x !== path)
+      void writeFile(recentFile(), JSON.stringify(recent), 'utf8').catch(() => undefined)
+      buildMenu()
+      return false
+    }
+    await openPath(path)
+    return true
+  })
+  ipcMain.handle('recent:forget', (_e, path: string) => {
+    recent = recent.filter((x) => x !== path)
+    void writeFile(recentFile(), JSON.stringify(recent), 'utf8').catch(() => undefined)
+    buildMenu()
+  })
+  ipcMain.handle('settings:chooseFolder', async () => {
+    if (!win) return null
+    const r = await dialog.showOpenDialog(win, { title: 'Projects Folder', buttonLabel: 'Choose', properties: ['openDirectory', 'createDirectory'], defaultPath: defaultDir() })
+    return r.canceled || !r.filePaths[0] ? null : r.filePaths[0]
+  })
+  ipcMain.handle('system:openPrivacy', () => shell.openExternal(isMac ? 'x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders' : 'ms-settings:privacy'))
+  ipcMain.handle('system:reveal', (_e, path: string) => { if (path) shell.showItemInFolder(path) })
+
+  // Inventory: read a shared Google Sheet as CSV (no API, no sign-in).
+  ipcMain.handle('sheet:fetch', async (_e, url: string) => {
+    if (!/^https:\/\//.test(url)) throw new Error('Only https links can be read.')
+    const r = await net.fetch(url, { redirect: 'follow', headers: { Accept: 'text/csv,text/plain,*/*' } })
+    const text = await r.text()
+    if (!r.ok) throw new Error(r.status === 401 || r.status === 403 || r.status === 404 ? 'Google wouldn’t share the sheet. In Google Sheets: Share › General access › “Anyone with the link” (Viewer).' : `The sheet couldn’t be read (HTTP ${r.status}).`)
+    return text
   })
   ipcMain.handle('library:products', () => readAll(libDir('Products')))
   ipcMain.handle('library:saveProduct', (_e, p: { key: string }) => writeItem(libDir('Products'), p.key, p))
@@ -418,6 +497,7 @@ app.on('second-instance', (_e, argv) => {
 })
 
 app.whenReady().then(async () => {
+  await loadSettings()
   registerIPC()
   ipcMain.handle('update:check', () => checkForUpdates({ userInitiated: true }))
   ipcMain.handle('update:status', () => updateStatus())

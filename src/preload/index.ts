@@ -46,6 +46,14 @@ const api: RackflowAPI = {
   setTheme: (t) => ipcRenderer.invoke('theme:set', t),
   askSaveChanges: (name) => ipcRenderer.invoke('dialog:saveChanges', name),
 
+  recentList: () => ipcRenderer.invoke('recent:list'),
+  recentOpen: (p) => ipcRenderer.invoke('recent:open', p),
+  recentForget: (p) => ipcRenderer.invoke('recent:forget', p),
+  chooseFolder: () => ipcRenderer.invoke('settings:chooseFolder'),
+  openPrivacySettings: () => ipcRenderer.invoke('system:openPrivacy'),
+  revealPath: (p) => ipcRenderer.invoke('system:reveal', p),
+  fetchSheet: (url) => ipcRenderer.invoke('sheet:fetch', url),
+
   onMenu: (cb) => on<MenuCommand>('menu', cb),
   onOpenFile: (cb) => on<OpenedFile>('open-file', cb),
 }

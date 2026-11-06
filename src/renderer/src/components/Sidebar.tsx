@@ -9,6 +9,7 @@ import { addBayToProject } from '../patch/addBay'
 import { addProductToDiagram } from '../diagram/placement'
 import { showContextMenu } from './ContextMenu'
 import { openProductEditor } from '../product/openEditor'
+import { PagesNav } from '../diagram/GroupsPanel'
 import { duplicateProduct, productMenu, removeUserProduct } from '../product/productActions'
 
 export const DRAG_MIME = 'application/x-rackflow'
@@ -39,6 +40,7 @@ const plate = (kind: PlateKind, model: string) => useStore.getState().set({ edit
  */
 export function Sidebar({ peek = false }: { peek?: boolean } = {}) {
   const library = useStore((s) => s.library)
+  const mode = useStore((s) => s.mode)
   const templates = useStore((s) => s.templates)
   const equipment = useStore((s) => s.project.equipment)
   const set = useStore((s) => s.set)
@@ -122,12 +124,13 @@ export function Sidebar({ peek = false }: { peek?: boolean } = {}) {
   return (
     <aside className={`sidebar ${peek ? 'peek' : ''}`}>
       <div className="sb-drag"><SidebarButton /></div>
+      {mode === 'diagram' && <><PagesNav /><div className="sb-divider" /></>}
       <div className="sidebar-head">
         <div className="lib-heading-row">
           <h2>Library</h2>
-          <button className="primary mini" onClick={newMenu} title="Custom device, wall plate, floor box, rack panel, patch bay, LED wall, rack">＋ New ▾</button>
+          <button className="primary mini" onClick={newMenu} title="Custom device, wall plate, floor box, rack panel, patch bay, LED wall, rack">New ▾</button>
         </div>
-        <input className="search" type="search" placeholder="Search devices, makers, models, tags…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input className="search" type="search" placeholder="Search" value={query} onChange={(e) => setQuery(e.target.value)} />
         <div className="lib-filters">
           <select value={show} onChange={(e) => setShow(e.target.value as Show)} title="What to list">
             {SHOW.map((s) => <option key={s.value} value={s.value}>{s.label}{s.value === 'project' ? ` (${equipment.length})` : ''}</option>)}

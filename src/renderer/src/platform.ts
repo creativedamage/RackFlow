@@ -76,6 +76,17 @@ const browserShim: RackflowAPI = {
   aiStatus: async () => ({ hasKey: false, model: 'claude-sonnet-4-5', canEncrypt: false }),
   aiSettings: async () => { throw new Error('AI lookup needs the Mac app.') },
   aiLookup: async () => { throw new Error('AI lookup needs the Mac app.') },
+  recentList: async () => store.get<string>('rf.recent'),
+  recentOpen: async () => false,
+  recentForget: async (p) => store.set('rf.recent', store.get<string>('rf.recent').filter((x) => x !== p)),
+  chooseFolder: async () => null,
+  openPrivacySettings: async () => {},
+  revealPath: async () => {},
+  fetchSheet: async (url) => {
+    const r = await fetch(url)
+    if (!r.ok) throw new Error(`The sheet couldn’t be read (HTTP ${r.status}). Share it as “Anyone with the link”.`)
+    return r.text()
+  },
   onMenu: (cb) => { menuListeners.add(cb); return () => menuListeners.delete(cb) },
   onOpenFile: (cb) => { openListeners.add(cb); return () => openListeners.delete(cb) },
 }

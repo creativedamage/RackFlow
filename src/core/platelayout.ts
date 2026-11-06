@@ -4,6 +4,7 @@
 // in the designer, as the preview on the wiring-diagram card and in print.
 
 import { summarizeLabels, tiedTo } from './multipin'
+import { realDefs, realJackSVG, realScrew } from './platereal'
 import { NEUTRIK_FACES } from './neutrikfaces'
 import type { PlateInsert, PlateKind, PlateLayout, PlateSpec, PlateText, ProductDefinition } from './model'
 import { fiberFaceSize, fiberInner, lcPort } from './fiber'
@@ -125,7 +126,7 @@ export function autoArrange(spec: PlateSpec, size = plateSize(spec)): Record<str
   const jacks = spec.inserts.filter((x) => x.pid)
   const out: Record<string, { x: number; y: number }> = {}
   if (!jacks.length) return out
-  const pad = size.ru ? 22 : size.box ? 18 : 10, gap = 6, lab = 7
+  const pad = size.ru ? 19 : size.box ? 18 : 10, gap = size.ru ? 1.6 : 6, lab = 7
   // Wall plates: one column per gang, jacks stacked down each gang's centre line.
   if (size.gangs && !size.ru) {
     const gw = size.w / size.gangs
@@ -154,6 +155,17 @@ export function autoArrange(spec: PlateSpec, size = plateSize(spec)): Record<str
     const r = rows[rows.length - 1]
     if (r && r.w + gap + f.w <= usableW) { r.items.push(j); r.w += gap + f.w; r.h = Math.max(r.h, f.h + lab) }
     else rows.push({ items: [j], w: f.w, h: f.h + lab })
+  }
+  // Rack panels: one row per rack unit, centred in its U (a little low, leaving room for the label above).
+  if (size.ru && rows.length <= size.ru) {
+    const above = spec.layout?.labelPos === 'above'
+    rows.forEach((r, i) => {
+      const u = Math.min(size.ru! - 1, Math.round(((i + 0.5) * size.ru!) / rows.length - 0.5))
+      const cy = u * 44.45 + 22.225 + (above ? 2 : -2)
+      let x = (size.w - r.w) / 2
+      for (const j of r.items) { const f = footprint(j.module); out[j.pid!] = { x: round1(x + f.w / 2), y: round1(cy) }; x += f.w + gap }
+    })
+    return out
   }
   const total = rows.reduce((t, r) => t + r.h, 0) + gap * (rows.length - 1)
   let y = Math.max(pad / 2, (size.h - total) / 2)
@@ -334,6 +346,8 @@ export interface PlateDrawOpts {
   grid?: number
   /** Rack panels: leave out the outline and ears (the rack elevation draws its own). */
   bare?: boolean
+  /** Designer: draw the panel in its finish with photo-style connectors (print keeps line drawings). */
+  photo?: boolean
 }
 
 /** Inner SVG (mm units) of the plate face; wrap with plateSVG() for a stand-alone image. */
@@ -344,8 +358,15 @@ export function plateInner(spec0: PlateSpec, o: PlateDrawOpts = {}): string {
   const size = plateSize({ ...spec, layout: L })
   const out: string[] = []
   const line = (sw: number) => `fill="none" stroke="currentColor" stroke-width="${sw}"`
-  // Face – outline only, like a CAD panel drawing.
-  if (o.bare) { /* outline and ears come from the rack elevation */ } else if (L.shape === 'round') out.push(`<circle cx="${L.w / 2}" cy="${L.h / 2}" r="${Math.min(L.w, L.h) / 2}" ${line(0.7)}/><circle cx="${L.w / 2}" cy="${L.h / 2}" r="${Math.min(L.w, L.h) / 2 - 6}" ${line(0.3)}/>`)
+  const fin = finishOf(L.finish ?? (spec.kind === 'rackPanel' ? 'black' : 'white'))
+  const photo = !!o.photo && L.shape !== 'round'
+  const ink = photo ? fin.ink : 'currentColor'
+  if (photo) {
+    // The panel itself: finish colour, brushed grain, a soft top-lit sheen.
+    const rx = spec.kind === 'rackPanel' ? 0.8 : 3
+    out.push(realDefs(fin.dark), `<rect x="0" y="0" width="${L.w}" height="${L.h}" rx="${rx}" fill="${fin.fill}" stroke="${fin.edge}" stroke-width="0.6"/>`,
+      `<rect x="0" y="0" width="${L.w}" height="${L.h}" rx="${rx}" fill="url(#rf-brush)"/><rect x="0" y="0" width="${L.w}" height="${L.h}" rx="${rx}" fill="url(#rf-sheen)"/>`)
+  } else if (o.bare) { /* outline and ears come from the rack elevation */ } else if (L.shape === 'round') out.push(`<circle cx="${L.w / 2}" cy="${L.h / 2}" r="${Math.min(L.w, L.h) / 2}" ${line(0.7)}/><circle cx="${L.w / 2}" cy="${L.h / 2}" r="${Math.min(L.w, L.h) / 2 - 6}" ${line(0.3)}/>`)
   else {
     out.push(`<rect x="0" y="0" width="${L.w}" height="${L.h}" rx="${spec.kind === 'rackPanel' ? 0.8 : spec.kind === 'floorBox' ? 6 : 3}" ${line(0.7)}/>`)
     if (spec.kind === 'floorBox') out.push(`<rect x="5" y="5" width="${n(L.w - 10)}" height="${n(L.h - 10)}" rx="3" ${line(0.3)}/>`)
@@ -354,6 +375,8 @@ export function plateInner(spec0: PlateSpec, o: PlateDrawOpts = {}): string {
   const screw = (x: number, y: number, r = 2.2) => out.push(`<circle cx="${n(x)}" cy="${n(y)}" r="${r}" ${line(0.35)}/><line x1="${n(x - r * 0.7)}" y1="${n(y)}" x2="${n(x + r * 0.7)}" y2="${n(y)}" ${line(0.3)}/>`)
   if (size.ru && o.bare) {
     // no ears
+  } else if (size.ru && photo) {
+    for (const ex of [7.9, L.w - 7.9]) for (let u = 0; u < size.ru; u++) for (const hy of [6.35, 38.1]) out.push(realScrew(ex, u * 44.45 + hy, 2.9))
   } else if (size.ru) {
     // EIA-310 ears: slots 6.8 × 3.8 at 7.9 mm from the edge, holes at 6.35 / 22.2 / 38.1 mm per U (outer two used).
     for (const ex of [7.9, L.w - 7.9]) for (let u = 0; u < size.ru; u++) for (const hy of [6.35, 38.1]) {
@@ -369,8 +392,8 @@ export function plateInner(spec0: PlateSpec, o: PlateDrawOpts = {}): string {
   } else if (spec.kind === 'wallBox' && L.shape !== 'round') {
     // Panel on a surface-mount back box: screws ¼" in from each corner, box walls behind shown as hidden (dashed) lines.
     const e = L.w < 100 || L.h < 100 ? 5 : 6.35
-    for (const [x, y] of [[e, e], [L.w - e, e], [e, L.h - e], [L.w - e, L.h - e]]) screw(x, y, 2)
-    out.push(`<rect x="12.7" y="12.7" width="${n(L.w - 25.4)}" height="${n(L.h - 25.4)}" rx="1" ${line(0.25)} stroke-dasharray="2 1.2"/>`)
+    for (const [x, y] of [[e, e], [L.w - e, e], [e, L.h - e], [L.w - e, L.h - e]]) { if (photo) out.push(realScrew(x, y, 2.4)); else screw(x, y, 2) }
+    if (!photo) out.push(`<rect x="12.7" y="12.7" width="${n(L.w - 25.4)}" height="${n(L.h - 25.4)}" rx="1" ${line(0.25)} stroke-dasharray="2 1.2"/>`)
   } else if (spec.kind === 'floorBox' && L.shape !== 'round') {
     for (const [x, y] of [[9, 9], [L.w - 9, 9], [9, L.h - 9], [L.w - 9, L.h - 9]]) screw(x, y, 2.4)
   }
@@ -378,7 +401,7 @@ export function plateInner(spec0: PlateSpec, o: PlateDrawOpts = {}): string {
     const g = o.grid >= 2 ? o.grid : 2
     const dots: string[] = []
     for (let x = g * 5; x < L.w; x += g * 5) for (let y = g * 5; y < L.h; y += g * 5) dots.push(`M ${n(x)} ${n(y)} h 0.01`)
-    out.push(`<path d="${dots.join(' ')}" stroke="currentColor" stroke-opacity="0.2" stroke-width="0.7" stroke-linecap="round"/>`)
+    out.push(`<path d="${dots.join(' ')}" stroke="${ink}" stroke-opacity="${photo ? 0.18 : 0.2}" stroke-width="0.7" stroke-linecap="round"/>`)
   }
   // Jacks + labels. Names first, so a multipin can list the jacks tied to it.
   const names = new Map<string, string>()
@@ -396,16 +419,22 @@ export function plateInner(spec0: PlateSpec, o: PlateDrawOpts = {}): string {
     const k = (counts.get(ins.module) ?? 0) + 1
     counts.set(ins.module, k)
     const sel = o.selected?.has(ins.pid)
-    out.push(`<g transform="translate(${n(at.x)} ${n(at.y)})"${o.interactive ? ` data-id="${esc(ins.pid)}" style="cursor:move"` : ''}>${o.interactive ? `<rect x="${-f.w / 2}" y="${-f.h / 2}" width="${f.w}" height="${f.h}" fill="transparent"/>` : ''}${jackSVG(ins.module)}`)
-    if (sel) out.push(`<rect x="${-f.w / 2 - 1.5}" y="${-f.h / 2 - 1.5}" width="${f.w + 3}" height="${f.h + 3}" fill="none" stroke="#0a84ff" stroke-width="0.8" stroke-dasharray="2 1"/>`)
+    out.push(`<g transform="translate(${n(at.x)} ${n(at.y)})"${o.interactive ? ` data-id="${esc(ins.pid)}" style="cursor:move"` : ''}>${o.interactive ? `<rect x="${-f.w / 2}" y="${-f.h / 2}" width="${f.w}" height="${f.h}" fill="transparent"/>` : ''}${photo ? realJackSVG(ins.module) : jackSVG(ins.module)}`)
+    if (sel) out.push(photo
+      ? `<rect x="${-f.w / 2 - 1.2}" y="${-f.h / 2 - 1.2}" width="${f.w + 2.4}" height="${f.h + 2.4}" rx="3.4" fill="#0a84ff" fill-opacity="0.12" stroke="#0a84ff" stroke-width="0.7"/>`
+      : `<rect x="${-f.w / 2 - 1.5}" y="${-f.h / 2 - 1.5}" width="${f.w + 3}" height="${f.h + 3}" fill="none" stroke="#0a84ff" stroke-width="0.8" stroke-dasharray="2 1"/>`)
     out.push('</g>')
     if (o.labels !== false && L.labelPos !== 'none' && (!PLATE_MODULES[ins.module]?.blank || ins.label?.trim())) {
       const text = (ins.label?.trim() || `${shortModule(ins.module)}${k > 1 || spec.inserts.filter((x) => x.module === ins.module).length > 1 ? ` ${k}` : ''}`).toUpperCase()
-      const ly = L.labelPos === 'above' ? at.y - f.h / 2 - 2.2 : at.y + f.h / 2 + 3.6
-      out.push(`<text x="${n(at.x)}" y="${n(ly)}" font-family="Helvetica, Arial, sans-serif" font-size="2.8" font-weight="bold" text-anchor="middle" fill="currentColor">${esc(text)}</text>`)
+      // Photo view: a label that would fall off the panel goes on the other side of its jack.
+      let above = L.labelPos === 'above'
+      if (photo && !above && at.y + f.h / 2 + 4.2 > L.h - 0.8 && at.y - f.h / 2 - 4.4 > 0) above = true
+      const ly = above ? at.y - f.h / 2 - (photo ? 1.1 : 1.4) : at.y + f.h / 2 + (photo ? 4.2 : 3.6)
+      const lInk = photo && (ly < 0 || ly > L.h || at.x < 0 || at.x > L.w) ? '#6e6e73' : ink
+      out.push(`<text x="${n(at.x)}" y="${n(ly)}" font-family="Helvetica, Arial, sans-serif" font-size="${photo ? 3.9 : 2.8}" font-weight="bold" text-anchor="middle" fill="${lInk}">${esc(text)}</text>`)
       // Multipin: which channels it carries ("M1-8, RET 1-4").
       const sum = summarizeLabels(tiedTo(spec, ins.pid).map((j) => names.get(j.pid!) ?? ''))
-      if (sum) out.push(`<text x="${n(at.x)}" y="${n(L.labelPos === 'above' ? ly - 3.2 : ly + 3.2)}" font-family="Helvetica, Arial, sans-serif" font-size="2.4" text-anchor="middle" fill="currentColor">${esc(sum)}</text>`)
+      if (sum) out.push(`<text x="${n(at.x)}" y="${n(above ? ly - 3.2 : ly + 3.2)}" font-family="Helvetica, Arial, sans-serif" font-size="2.4" text-anchor="middle" fill="${lInk}">${esc(sum)}</text>`)
       // Tied jacks show which multipin they ride on.
       if (o.interactive && ins.tie) out.push(`<text x="${n(at.x + f.w / 2 - 1)}" y="${n(at.y - f.h / 2 + 3)}" font-family="Helvetica, Arial, sans-serif" font-size="2" text-anchor="end" fill="#0a84ff">⇢ ${esc(names.get(ins.tie) ?? '')}</text>`)
     }
@@ -415,7 +444,7 @@ export function plateInner(spec0: PlateSpec, o: PlateDrawOpts = {}): string {
     const sel = o.selected?.has(t.id)
     const lines = t.text.split('\n')
     out.push(`<g${o.interactive ? ` data-id="${esc(t.id)}" style="cursor:move"` : ''}>`)
-    lines.forEach((line, i) => out.push(`<text x="${n(t.x)}" y="${n(t.y + i * t.size * 1.2)}" font-family="Helvetica, Arial, sans-serif" font-size="${t.size}"${t.bold ? ' font-weight="bold"' : ''} text-anchor="${t.align ?? 'middle'}" dominant-baseline="middle" fill="currentColor">${esc(line || ' ')}</text>`))
+    lines.forEach((line, i) => out.push(`<text x="${n(t.x)}" y="${n(t.y + i * t.size * 1.2)}" font-family="Helvetica, Arial, sans-serif" font-size="${t.size}"${t.bold ? ' font-weight="bold"' : ''} text-anchor="${t.align ?? 'middle'}" dominant-baseline="middle" fill="${ink}">${esc(line || ' ')}</text>`))
     if (sel || o.interactive) {
       const w = Math.max(...lines.map((l) => l.length)) * t.size * 0.6 + 2, h = lines.length * t.size * 1.2
       const x0 = t.align === 'start' ? t.x - 1 : t.align === 'end' ? t.x - w + 1 : t.x - w / 2

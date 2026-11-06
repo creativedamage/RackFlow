@@ -1327,3 +1327,4 @@ input.mono { font-family: var(--mono); }
 .tbb-paper { margin: auto; }
 .tbb-zoom { display: inline-flex; align-items: center; gap: 4px; }
 .tbb-zoom input[type=range] { width: 110px; }
+

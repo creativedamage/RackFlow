@@ -14,7 +14,7 @@ import { defaultTBForProject, refreshDefaultTB } from './print/tbDefault'
 
 void refreshDefaultTB()
 
-export type Mode = 'diagram' | 'rack' | 'patch' | 'sheet' | 'led' | 'boxes'
+export type Mode = 'diagram' | 'rack' | 'patch' | 'sheet' | 'led' | 'boxes' | 'inventory'
 
 interface HistoryEntry { project: Project; label: string }
 
@@ -55,6 +55,10 @@ export interface AppState {
   future: HistoryEntry[]
 
   mode: Mode
+  /** Start screen (recent projects, New, Open) – shown at launch until a project is opened. */
+  showStart: boolean
+  /** Settings window open. */
+  showSettings: boolean
   selection: EquipmentId[]
   selectedCable: CableId | null
   /** Several cables picked at once (lasso across wires). */
@@ -146,6 +150,8 @@ export const useStore = create<AppState>((set, get) => ({
   future: [],
 
   mode: 'diagram',
+  showStart: true,
+  showSettings: false,
   selection: [],
   selectedCable: null,
   selectedCables: NO_CABLES,
@@ -207,7 +213,7 @@ export const useStore = create<AppState>((set, get) => ({
     set({ project: next.project, future: future.slice(1), past: [...past, { project, label: next.label }], dirty: changedSinceSave(next.project) })
   },
   load: (project, path) => { rememberSaved(project); set({
-    project, path, dirty: false, past: [], future: [], selection: [], selectedCable: null,
+    project, path, dirty: false, past: [], future: [], selection: [], selectedCable: null, showStart: false,
     selectedRack: project.racks[0]?.id ?? null, selectedBay: project.patchBays[0]?.id ?? null, fitRequest: get().fitRequest + 1,
   }) },
   markSaved: (path) => { rememberSaved(get().project); set({ path, dirty: false, lastSaved: Date.now() }) },

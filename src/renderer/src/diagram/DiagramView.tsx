@@ -17,7 +17,7 @@ import { DeviceNode, NODE_WIDTH, type DeviceNodeType } from './DeviceNode'
 import { GroupFrame, type GroupFrameType } from './GroupFrame'
 import { ClusterBox, type ClusterBoxType } from './ClusterBox'
 import { CableEdge, type CableEdgeType } from './CableEdge'
-import { GroupsPanel, PageTabs, addToViewItems, clearViewWires, moveDevicesToPage, pageMenuItems, useGroupFocus, viewMenuItems } from './GroupsPanel'
+import { usePageShortcuts, addToViewItems, clearViewWires, moveDevicesToPage, pageMenuItems, useGroupFocus, viewMenuItems } from './GroupsPanel'
 import { NoteNode, type NoteNodeType } from './NoteNode'
 import { useWiring } from './wiring'
 import { tidyDiagram } from './tidy'
@@ -50,6 +50,7 @@ export function DiagramView() {
   const select = useStore((s) => s.select)
   const { screenToFlowPosition, fitView, setViewport, getViewport } = useReactFlow()
   const focusGroup = useGroupFocus((s) => s.focus)
+  usePageShortcuts()
   const page = useStore((s) => s.diagramPage)
   const viewId = useStore((s) => s.diagramView)
   const view = useMemo(() => (viewId ? viewsOf(project).find((v) => v.id === viewId) : undefined), [project, viewId])
@@ -320,7 +321,7 @@ export function DiagramView() {
     const pt = pointOf(ev)
     const tab = (document.elementsFromPoint(pt.x, pt.y).find((el) => el instanceof HTMLElement && el.dataset.page !== undefined) as HTMLElement | undefined)
     const devs = draggedAll.filter((n) => n.type === 'device').map((n) => n.id)
-    document.querySelectorAll('.page-tabs .drop').forEach((el) => el.classList.remove('drop'))
+    document.querySelectorAll('.pages-nav .drop').forEach((el) => el.classList.remove('drop'))
     const vid = useStore.getState().diagramView
     // A group box that was dragged: save where it is now, and the devices that moved with it.
     const movedBoxes = draggedAll.filter((n) => n.id.startsWith('cbox:'))
@@ -532,7 +533,6 @@ export function DiagramView() {
 
   return (
     <div className="diagram-wrap">
-    <PageTabs />
     <div className="diagram" onDragOver={(e) => { if (e.dataTransfer.types.includes(DRAG_MIME)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' } }} onDrop={onDrop}>
       <ReactFlow<AnyNode, CableEdgeType>
         nodes={allNodes}
@@ -545,7 +545,7 @@ export function DiagramView() {
         onNodeDrag={(ev) => {
           const pt = pointOf(ev)
           const over = document.elementsFromPoint(pt.x, pt.y).find((el) => el instanceof HTMLElement && el.dataset.page !== undefined)
-          document.querySelectorAll('.page-tabs [data-page]').forEach((el) => el.classList.toggle('drop', el === over))
+          document.querySelectorAll('.pages-nav [data-page]').forEach((el) => el.classList.toggle('drop', el === over))
         }}
         onDelete={onDelete}
         onNodeDoubleClick={(ev, n) => {
@@ -600,7 +600,6 @@ export function DiagramView() {
         <WiringHint />
         <PickedPanel />
         <DiagramTools />
-        {!view && <GroupsPanel />}
         {drawingGroup && (
           <div className="group-draw nodrag nopan"
             onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture(e.pointerId); const b = e.currentTarget.getBoundingClientRect(); setDrawRect({ x0: e.clientX - b.left, y0: e.clientY - b.top, x1: e.clientX - b.left, y1: e.clientY - b.top }) }}
