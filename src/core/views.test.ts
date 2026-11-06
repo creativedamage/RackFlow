@@ -129,3 +129,11 @@ describe('removeViewConnections', () => {
     expect(p.cables.map((c: any) => c.id)).toEqual(['c2'])
   })
 })
+
+it('shows Allen & Heath ME ports in Network views', async () => {
+  const { portInView, BUILT_IN_PRODUCTS } = await import('./index')
+  const rack = BUILT_IN_PRODUCTS.find((x) => x.ports.some((p) => p.signals.includes('ahME')))!
+  const me = rack.ports.find((p) => p.signals.includes('ahME'))!
+  expect(portInView(me, ['network'])).toBe(true)
+  expect(portInView(me, ['audio'])).toBe(true)
+})

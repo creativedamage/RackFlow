@@ -39,6 +39,14 @@ export const isViewId = (p: Project, id: string | undefined | null) => !!id && v
  */
 export const portInView = (port: PortTemplate, domains: SignalDomain[], e?: EquipmentInstance) =>
   (!!port.signals[0] && domains.includes(SIGNALS[port.signals[0]]?.domain)) || (domains.includes('video') && !!e && isLedDataPort(e, port))
+  || (domains.includes('network') && isCatAudioPort(port))
+
+/**
+ * Audio links that run on Cat cable but aren't Ethernet (Allen & Heath ME, and
+ * the like) also show in Network views, where the Cat runs are laid out.
+ */
+export const isCatAudioPort = (port: PortTemplate) =>
+  (port.connector === 'rj45' || port.connector === 'etherCON') && !!port.signals[0] && SIGNALS[port.signals[0]]?.domain === 'audio'
 
 /**
  * LED wall data links run on Ethernet but are video: an LED processor's output

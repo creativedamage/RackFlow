@@ -49,17 +49,24 @@ interface Plan { channel: Map<string, number>; stub: Map<string, boolean>; group
  * channel tracks, which wires become stubs, and stub bundles. Uses the cards
  * as drawn (so signal views with filtered ports line up).
  */
-let cache: { rects: Rect[]; edges: unknown; sel: string; plan: Plan; raw: Map<string, { key: string; pts: Pt[] }> } | null = null
+let cache: { rects: Rect[]; edges: unknown; sel: string; nodes: unknown[]; plan: Plan; raw: Map<string, { key: string; pts: Pt[] }> } | null = null
 function planFor(s: ReactFlowState, rects: Rect[]): Plan {
   const edges = s.edges as CableEdgeType[]
   const sel = edges.filter((e) => e.selected).map((e) => e.id).join()
-  if (cache && cache.edges === edges && cache.sel === sel && (cache.rects === rects || sameRects(cache.rects, rects))) return cache.plan
+  // The devices as drawn right now. The plan also has to be rebuilt when they change – a page
+  // switch or a late measurement can show devices without touching the wires, and a plan made
+  // before they were there left their wires without stubs until the diagram was reopened.
   const geo = new Map<string, { eq: EquipmentInstance; x: number; y: number }>()
+  const nodes: unknown[] = []
   for (const n of s.nodeLookup.values()) {
     if (n.type !== 'device' || n.hidden) continue
     const eq = (n.data as { eq: EquipmentInstance }).eq
-    geo.set(n.id, { eq, x: n.internals.positionAbsolute.x, y: n.internals.positionAbsolute.y })
+    const x = n.internals.positionAbsolute.x, y = n.internals.positionAbsolute.y
+    geo.set(n.id, { eq, x, y })
+    nodes.push(n.id, x, y, eq)
   }
+  const sameNodes = !!cache && cache.nodes.length === nodes.length && cache.nodes.every((v, i) => v === nodes[i])
+  if (cache && sameNodes && cache.edges === edges && cache.sel === sel && (cache.rects === rects || sameRects(cache.rects, rects))) return cache.plan
   const endOf = (dev: string, port: string | null | undefined, far: string): EndInfo | null => {
     const g = geo.get(dev)
     const p = g && port ? nodeGeom(g.eq).port(port) : null
@@ -159,7 +166,7 @@ function planFor(s: ReactFlowState, rects: Rect[]): Plan {
     labels.set(e.id, best)
   }
   const plan = { channel, stub, groups, labels, paths }
-  cache = { rects, edges, sel, plan, raw: rawRoutes }
+  cache = { rects, edges, sel, nodes, plan, raw: rawRoutes }
   return plan
 }
 
