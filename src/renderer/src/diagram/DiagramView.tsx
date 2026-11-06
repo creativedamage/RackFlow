@@ -380,11 +380,46 @@ export function DiagramView() {
     })
   }, [apply])
 
+  // ⌘⌫ deletes from the whole project – in a signal view too, where plain ⌫ only takes devices out of the view.
+  const hardDelete = useRef(false)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || (e.key !== 'Backspace' && e.key !== 'Delete')) return
+      if ((e.target as HTMLElement)?.closest?.('input, textarea, select, [contenteditable]')) return
+      const st = useStore.getState()
+      if (st.mode !== 'diagram' || (!st.selection.length && !st.selectedCable && !st.selectedCables.length)) return
+      hardDelete.current = true
+      // If React Flow doesn't pass the key on (modifier held), delete the selection ourselves.
+      setTimeout(() => {
+        if (!hardDelete.current) return
+        hardDelete.current = false
+        const s2 = useStore.getState()
+        const cables = [...s2.selectedCables, ...(s2.selectedCable ? [s2.selectedCable] : [])]
+        if (s2.selection.length || cables.length) deleteFromProject(new Set<string>(s2.selection), new Set<string>(cables))
+      }, 0)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
+
+  const deleteFromProject = useCallback((ids: Set<string>, cids: Set<string>) => {
+    const devs = [...ids].filter((x) => !x.startsWith('note:'))
+    apply('Delete', (d) => {
+      if (d.annotations) d.annotations = d.annotations.filter((a) => !ids.has(`note:${a.id}`))
+      d.equipment = d.equipment.filter((e) => !ids.has(e.id))
+      d.patchBays = d.patchBays.filter((b) => !ids.has(b.equipment))
+      d.cables = d.cables.filter((c) => !cids.has(c.id) && !ids.has(c.from.equipment) && !ids.has(c.to.equipment))
+    })
+    if (devs.length && useStore.getState().diagramView) useStore.getState().notify(`Deleted ${devs.length} device${devs.length === 1 ? '' : 's'} from the project`, { undo: true })
+    select([], null)
+  }, [apply, select])
+
   const onDelete = useCallback(({ nodes: ns, edges: es }: { nodes: { id: string }[]; edges: { id: string }[] }) => {
     if (!ns.length && !es.length) return
     const ids = new Set(ns.map((n) => n.id))
     const cids = new Set(es.map((e) => e.id))
     const vid = useStore.getState().diagramView
+    if (hardDelete.current) { hardDelete.current = false; deleteFromProject(ids, cids); return }
     if (vid) {
       // In a view, Delete takes devices out of the view; the devices stay in the project.
       const devs = [...ids].filter((x) => !x.startsWith('note:'))
@@ -394,18 +429,12 @@ export function DiagramView() {
         // React Flow also hands over the wires attached to removed devices – those stay; only wires picked on their own are deleted.
         d.cables = d.cables.filter((c) => !cids.has(c.id) || devs.includes(c.from.equipment) || devs.includes(c.to.equipment))
       })
-      if (devs.length) useStore.getState().notify(`Removed ${devs.length} device${devs.length === 1 ? '' : 's'} from this view – still on the main diagram`, { undo: true })
+      if (devs.length) useStore.getState().notify(`Removed ${devs.length} device${devs.length === 1 ? '' : 's'} from this view – still on the main diagram (⌘⌫ deletes from the project)`, { undo: true })
       select([], null)
       return
     }
-    apply('Delete', (d) => {
-      if (d.annotations) d.annotations = d.annotations.filter((a) => !ids.has(`note:${a.id}`))
-      d.equipment = d.equipment.filter((e) => !ids.has(e.id))
-      d.patchBays = d.patchBays.filter((b) => !ids.has(b.equipment))
-      d.cables = d.cables.filter((c) => !cids.has(c.id) && !ids.has(c.from.equipment) && !ids.has(c.to.equipment))
-    })
-    select([], null)
-  }, [apply, select])
+    deleteFromProject(ids, cids)
+  }, [deleteFromProject])
 
   // Live validation while wiring.
   const startWiring = useWiring((s) => s.start)

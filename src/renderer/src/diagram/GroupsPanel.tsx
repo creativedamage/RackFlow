@@ -59,6 +59,16 @@ export function viewMenuItems(ids: string[], viewId: string): MenuItem[] {
   const n = ids.length > 1 ? ` ${ids.length} Devices` : ''
   return ['sep',
     { label: `Remove${n} from This View`, hint: '⌫', onClick: () => { useStore.getState().apply('Remove from View', (d) => setInView(d, viewId, ids, false)) } },
+    { label: `Delete${n} from Project`, hint: '⌘⌫', danger: true, onClick: () => {
+      const set = new Set(ids)
+      useStore.getState().apply('Delete', (d) => {
+        d.equipment = d.equipment.filter((e) => !set.has(e.id))
+        d.patchBays = d.patchBays.filter((b) => !set.has(b.equipment))
+        d.cables = d.cables.filter((c) => !set.has(c.from.equipment) && !set.has(c.to.equipment))
+      })
+      useStore.getState().select([], null)
+      useStore.getState().notify(`Deleted ${ids.length} device${ids.length === 1 ? '' : 's'} from the project`, { undo: true })
+    } },
     { label: 'Show on Main Diagram', onClick: () => { useStore.getState().set({ diagramView: null, diagramPage: null }); setTimeout(() => window.dispatchEvent(new CustomEvent('diagram:locate', { detail: ids[0] })), 50) } },
   ]
 }
