@@ -7,7 +7,7 @@ import {
   type Connection, type Edge, type EdgeChange, type NodeChange, type OnConnectStart, type Viewport,
 } from '@xyflow/react'
 import {
-  addEquipment, addPatchBay, addToGroup, newProject, occupiedBoxes, findFreeSpot, samePage, resolveOverlap, duplicateDevices, type Box, pageNumbers, GENERAL_PAGE, layoutView, setInView, viewOffFlags, viewProject, viewsOf, nodeGeom, placeInFreeSpace, connectMany, groupColor, groupsOf, type BulkResult, candidates as findCandidates, connect, DOMAINS, portDomain, resolve, SIGNALS, validate,
+  addEquipment, addPatchBay, addToGroup, arrange, type ArrangeMode, newProject, occupiedBoxes, findFreeSpot, samePage, resolveOverlap, duplicateDevices, type Box, pageNumbers, GENERAL_PAGE, layoutView, setInView, viewOffFlags, viewProject, viewsOf, nodeGeom, placeInFreeSpace, connectMany, groupColor, groupsOf, type BulkResult, candidates as findCandidates, connect, DOMAINS, portDomain, resolve, SIGNALS, validate,
   type CableId, type EquipmentId, type PortAddress, cableColorHex, needsCasing, clustersOf, clusterColor, addCluster, deleteCluster, renameCluster, clusterShownIn, clusterRect, insideRect, CLUSTER_COLORS, flagName } from '@core/index'
 import { useStore } from '../store'
 import { DRAG_MIME, dragState, type DragPayload } from '../components/Sidebar'
@@ -616,6 +616,56 @@ export function DiagramView() {
     clearGhost()
     if (made.length) { select(made as EquipmentId[]); useStore.getState().notify(`Duplicated as ${tags.join(', ')}`, { undo: true, kind: 'success' }) }
   }
+  // MARK: Align / distribute popover – appears by the pointer when several devices are selected.
+  const [alignPop, setAlignPop] = useState<{ x: number; y: number } | null>(null)
+  const dragging = useRef(false)
+  const showAlignAtPointer = () => {
+    const el = document.querySelector('.diagram') as HTMLElement | null, p = lastPointer.current
+    if (!el || !p) return
+    const r = el.getBoundingClientRect()
+    // Keep it clear of the floating inspector on the right.
+    const insp = document.querySelector('.app.insp-float .inspector:not(.peek)') as HTMLElement | null
+    const right = Math.min(r.right, insp ? insp.getBoundingClientRect().left : r.right) - r.left
+    const W = 320
+    const x = p.x - r.left + 14 + W > right ? p.x - r.left - W - 14 : p.x - r.left + 14
+    setAlignPop({ x: Math.max(8, Math.min(right - W, x)), y: Math.min(r.height - 50, Math.max(8, p.y - r.top + 14)) })
+  }
+  const devCount = selection.length
+  useEffect(() => {
+    if (devCount < 2) { setAlignPop(null); return }
+    if (dragging.current) return
+    // A box-select is still in progress: wait for the mouse to come up.
+    let done = false
+    const up = () => { if (!done) { done = true; showAlignAtPointer() } }
+    window.addEventListener('pointerup', up, { once: true })
+    const t = setTimeout(() => { if (!done && !(window as unknown as { __rfDown?: boolean }).__rfDown) { done = true; showAlignAtPointer() } }, 250)
+    return () => { window.removeEventListener('pointerup', up); clearTimeout(t) }
+  }, [selection])
+  useEffect(() => {
+    const down = () => { (window as unknown as { __rfDown?: boolean }).__rfDown = true }
+    const up = () => { (window as unknown as { __rfDown?: boolean }).__rfDown = false }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAlignPop(null) }
+    window.addEventListener('pointerdown', down, true); window.addEventListener('pointerup', up, true); window.addEventListener('keydown', esc)
+    return () => { window.removeEventListener('pointerdown', down, true); window.removeEventListener('pointerup', up, true); window.removeEventListener('keydown', esc) }
+  }, [])
+  const doArrange = (mode: ArrangeMode) => {
+    const s = useStore.getState(), vid = s.diagramView
+    const boxes = nodesRef.current.filter((n): n is DeviceNodeType => n.type === 'device' && s.selection.includes(n.id as EquipmentId))
+      .map((n) => ({ id: n.id, x: n.position.x, y: n.position.y, ...(() => { const z = devSize(n); return { w: z.w, h: z.h } })() }))
+    if (boxes.length < 2) return
+    const at = arrange(boxes, mode)
+    const label = { left: 'Align Left', center: 'Align Centres', right: 'Align Right', top: 'Align Top', middle: 'Align Middles', bottom: 'Align Bottom', distH: 'Distribute Horizontally', distV: 'Distribute Vertically' }[mode]
+    apply(label, (d) => {
+      const v = vid ? viewsOf(d).find((x) => x.id === vid) : undefined
+      for (const [id, p] of at) {
+        if (v) v.positions[id] = p
+        else { const eq = d.equipment.find((e) => e.id === id); if (eq) eq.position = p }
+      }
+      // Still never on top of other devices: the aligned block slides clear as one piece.
+      if (!v) resolveOverlap(d, [...at.keys()], nodeGeom)
+    })
+  }
+
   // ⌘D duplicates the selection (follows the pointer until you click).
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -671,7 +721,8 @@ export function DiagramView() {
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onNodeDragStop={onNodeDragStop}
+        onNodeDragStop={(ev, n, all) => { dragging.current = false; onNodeDragStop(ev, n, all); if (useStore.getState().selection.length > 1) setTimeout(showAlignAtPointer, 0) }}
+        onNodeDragStart={() => { dragging.current = true; setAlignPop(null) }}
         onNodeDrag={(ev) => {
           const pt = pointOf(ev)
           const over = document.elementsFromPoint(pt.x, pt.y).find((el) => el instanceof HTMLElement && el.dataset.page !== undefined)
@@ -761,9 +812,37 @@ export function DiagramView() {
           </Panel>
         )}
       </ReactFlow>
+      {alignPop && devCount > 1 && !placing && (
+        <div className="align-pop" style={{ left: alignPop.x, top: alignPop.y }} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+          {([['left', 'Align left edges'], ['center', 'Align centres'], ['right', 'Align right edges']] as [ArrangeMode, string][]).map(([m, t]) => <button key={m} className="icon-btn" title={t} onClick={() => doArrange(m)}><AlignIcon m={m} /></button>)}
+          <span className="ap-sep" />
+          {([['top', 'Align top edges'], ['middle', 'Align middles'], ['bottom', 'Align bottom edges']] as [ArrangeMode, string][]).map(([m, t]) => <button key={m} className="icon-btn" title={t} onClick={() => doArrange(m)}><AlignIcon m={m} /></button>)}
+          <span className="ap-sep" />
+          {([['distH', 'Distribute horizontally (equal gaps)'], ['distV', 'Distribute vertically (equal gaps)']] as [ArrangeMode, string][]).map(([m, t]) => <button key={m} className="icon-btn" title={t} onClick={() => doArrange(m)}><AlignIcon m={m} /></button>)}
+          <span className="ap-sep" />
+          <span className="ap-n">{devCount}</span>
+          <button className="icon-btn ap-x" title="Hide (Esc)" onClick={() => setAlignPop(null)}>✕</button>
+        </div>
+      )}
     </div>
     </div>
   )
+}
+
+/** Align / distribute glyphs. */
+function AlignIcon({ m }: { m: ArrangeMode }) {
+  const p = { width: 18, height: 18, viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round' as const }
+  const bar = { fill: 'currentColor', stroke: 'none', opacity: 0.85 }
+  switch (m) {
+    case 'left': return <svg {...p}><path d="M3 2v16" /><rect x="5" y="4" width="11" height="4" rx="1" {...bar} /><rect x="5" y="12" width="7" height="4" rx="1" {...bar} /></svg>
+    case 'center': return <svg {...p}><path d="M10 2v16" strokeDasharray="2 1.5" /><rect x="3" y="4" width="14" height="4" rx="1" {...bar} /><rect x="5.5" y="12" width="9" height="4" rx="1" {...bar} /></svg>
+    case 'right': return <svg {...p}><path d="M17 2v16" /><rect x="4" y="4" width="11" height="4" rx="1" {...bar} /><rect x="8" y="12" width="7" height="4" rx="1" {...bar} /></svg>
+    case 'top': return <svg {...p}><path d="M2 3h16" /><rect x="4" y="5" width="4" height="11" rx="1" {...bar} /><rect x="12" y="5" width="4" height="7" rx="1" {...bar} /></svg>
+    case 'middle': return <svg {...p}><path d="M2 10h16" strokeDasharray="2 1.5" /><rect x="4" y="3" width="4" height="14" rx="1" {...bar} /><rect x="12" y="5.5" width="4" height="9" rx="1" {...bar} /></svg>
+    case 'bottom': return <svg {...p}><path d="M2 17h16" /><rect x="4" y="4" width="4" height="11" rx="1" {...bar} /><rect x="12" y="8" width="4" height="7" rx="1" {...bar} /></svg>
+    case 'distH': return <svg {...p}><path d="M2 3v14M18 3v14" /><rect x="5" y="6" width="3" height="8" rx="1" {...bar} /><rect x="12" y="6" width="3" height="8" rx="1" {...bar} /></svg>
+    case 'distV': return <svg {...p}><path d="M3 2h14M3 18h14" /><rect x="6" y="5" width="8" height="3" rx="1" {...bar} /><rect x="6" y="12" width="8" height="3" rx="1" {...bar} /></svg>
+  }
 }
 
 /** Explains why the hovered target is (in)valid while a wire is in progress. */

@@ -297,3 +297,10 @@ html.vibrant .sidebar.peek, html.vibrant .led-list.peek { background: color-mix(
 /* Plate designer canvas: same fix – zoomed in, every edge can be scrolled to. */
 .pd-canvas { place-items: start !important; }
 .pd-canvas > svg { margin: auto; }
+
+/* Align / distribute popover by the pointer (several devices selected). */
+.align-pop { position: absolute; z-index: 30; display: flex; align-items: center; gap: 1px; padding: 3px; background: var(--n-float); border: 0.5px solid var(--n-sep); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); animation: glass-pop 0.16s var(--ease); }
+.align-pop .icon-btn { width: 28px; height: 26px; padding: 0 !important; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px !important; color: var(--text); }
+.align-pop .ap-sep { width: 1px; height: 16px; background: var(--n-sep); margin: 0 3px; }
+.align-pop .ap-n { font-size: 11px; color: var(--text-2); padding: 0 4px; font-variant-numeric: tabular-nums; }
+.align-pop .ap-x { width: 22px; font-size: 10px; color: var(--text-2); }
