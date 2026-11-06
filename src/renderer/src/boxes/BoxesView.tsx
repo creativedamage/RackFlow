@@ -47,7 +47,7 @@ export function BoxesView() {
     <div className={`boxes-view ${showList ? '' : 'no-list'} ${showNotes && box ? '' : 'no-settings'}`}>
       <Slide open={showList || peek === 'left'} side="left"><aside className={`led-list boxes-list ${showList ? '' : 'peek'}`}>
         <div className="led-list-head">
-          <h3>Wall Boxes</h3>
+          <h3>Boxes &amp; Panels</h3>
           <button className="primary mini" onClick={newMenu}>＋ New ▾</button>
         </div>
         {boxes.length > 0 && <input className="boxes-search" type="search" placeholder="Find a box…" value={q} onChange={(e) => setQ(e.target.value)} />}

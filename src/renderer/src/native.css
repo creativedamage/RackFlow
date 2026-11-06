@@ -18,20 +18,21 @@
   --n-btn-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.12);
   --n-float: rgba(255, 255, 255, 0.92);
   --n-header: #8a8a8e;
+  --n-field: rgba(0, 0, 0, 0.06);
 }
 html.vibrant { --n-sidebar: rgba(232, 232, 236, 0.62); --n-toolbar: rgba(246, 246, 247, 0.92); }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme=light]) {
     --n-sidebar: #2a2a2d; --n-toolbar: #2c2c2f; --n-content: #1e1e20; --n-sep: rgba(255, 255, 255, 0.1);
     --n-row-alt: rgba(255, 255, 255, 0.035); --n-sel: rgba(255, 255, 255, 0.1); --n-btn: #59595d; --n-btn-line: rgba(255, 255, 255, 0.06);
-    --n-btn-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.4); --n-float: rgba(44, 44, 48, 0.94); --n-header: #8d8d93;
+    --n-btn-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.4); --n-float: rgba(44, 44, 48, 0.94); --n-header: #8d8d93; --n-field: rgba(255, 255, 255, 0.09);
   }
   html.vibrant:not([data-theme=light]) { --n-sidebar: rgba(40, 40, 44, 0.55); --n-toolbar: rgba(44, 44, 47, 0.92); }
 }
 :root[data-theme=dark] {
   --n-sidebar: #2a2a2d; --n-toolbar: #2c2c2f; --n-content: #1e1e20; --n-sep: rgba(255, 255, 255, 0.1);
   --n-row-alt: rgba(255, 255, 255, 0.035); --n-sel: rgba(255, 255, 255, 0.1); --n-btn: #59595d; --n-btn-line: rgba(255, 255, 255, 0.06);
-  --n-btn-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.4); --n-float: rgba(44, 44, 48, 0.94); --n-header: #8d8d93;
+  --n-btn-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.4); --n-float: rgba(44, 44, 48, 0.94); --n-header: #8d8d93; --n-field: rgba(255, 255, 255, 0.09);
 }
 html.vibrant[data-theme=dark] { --n-sidebar: rgba(40, 40, 44, 0.55); --n-toolbar: rgba(44, 44, 47, 0.92); }
 
@@ -52,8 +53,7 @@ html.vibrant[data-theme=dark] { --n-sidebar: rgba(40, 40, 44, 0.55); --n-toolbar
 .lib-heading-row h2, .sidebar-head h2 { font-size: 11px !important; font-weight: 700 !important; color: var(--n-header); letter-spacing: 0.01em; }
 .lib-heading-row .primary.mini { background: transparent !important; color: var(--text-2) !important; box-shadow: none !important; border: none !important; padding: 0 6px; font-size: 12px; }
 .lib-heading-row .primary.mini:hover { color: var(--text) !important; background: var(--n-sel) !important; filter: none; }
-.sidebar .search { height: 28px; border-radius: 7px !important; background: rgba(0, 0, 0, 0.055) !important; border: none !important; box-shadow: none !important; padding-left: 10px; }
-[data-theme=dark] .sidebar .search { background: rgba(255, 255, 255, 0.08) !important; }
+.sidebar .search, .led-list .boxes-search { height: 28px; border-radius: 7px !important; background: var(--n-field) !important; border: none !important; box-shadow: none !important; padding-left: 10px; color: var(--text); }
 .lib-filters { gap: 6px; }
 .lib-filters select { height: 24px; font-size: 11.5px; }
 .lib-count-row { padding: 2px 12px 4px; font-size: 11px; }
@@ -285,3 +285,47 @@ html.vibrant .start-screen { background: color-mix(in srgb, var(--canvas) 70%, t
 .modal { background: var(--n-content) !important; }
 .pd-canvas { background: radial-gradient(circle at 50% 40%, #fbfbfc, #ededf0) !important; }
 [data-theme=dark] .pd-canvas { background: radial-gradient(circle at 50% 40%, #2c2c30, #1c1c1f) !important; }
+
+/* ── Sidebar polish (1.22.1) ───────────────────────────────────────────── */
+/* The collapse button sits clear of the traffic lights. */
+.app.mac .sb-drag .sb-toggle { left: 86px !important; top: 26px !important; transform: translateY(-50%); }
+.sb-toggle { color: var(--n-header) !important; }
+/* Sidebar filters: quiet pop-ups, not grey slabs. */
+.sidebar .lib-filters select { background-color: transparent !important; border: 0.5px solid var(--n-sep) !important; box-shadow: none !important; color: var(--text); height: 24px; font-size: 12px; padding: 0 22px 0 8px; border-radius: 6px; }
+.sidebar .lib-filters select:hover { background-color: var(--n-sel) !important; }
+.sidebar-head { gap: 8px; }
+.lib-heading-row { height: 26px; padding: 0 2px 0 4px !important; }
+.sb-section-head .pn-title, .lib-heading-row h2 { font-size: 11px !important; font-weight: 700 !important; color: var(--n-header) !important; letter-spacing: 0.02em !important; }
+.sidebar-head .lib-heading-row + .search { margin-top: 0; }
+.lib-count-row { padding: 6px 14px 4px !important; color: var(--n-header); }
+.lib-row { padding: 4px 8px !important; gap: 10px; }
+.lib-row .dot { width: 8px; height: 8px; }
+.lib-title { font-size: 13px; line-height: 17px; }
+.lib-sub { font-size: 11px; line-height: 14px; color: var(--text-2); }
+.pn-row { height: 26px; }
+.pn-num { opacity: 0.8; }
+
+/* Edge peek: a collapsed sidebar slides in flush with the window edge, below the traffic lights. */
+.sidebar.peek, .led-list.peek {
+  top: 0 !important; bottom: 0 !important; left: 0 !important; border-radius: 0 !important; width: 264px !important;
+  background: var(--n-sidebar) !important; border: none !important; border-right: 1px solid var(--n-sep) !important;
+  box-shadow: 8px 0 30px rgba(0, 0, 0, 0.14) !important; -webkit-backdrop-filter: blur(30px) saturate(180%) !important; backdrop-filter: blur(30px) saturate(180%) !important;
+}
+html.vibrant .sidebar.peek, html.vibrant .led-list.peek { background: color-mix(in srgb, var(--n-content) 82%, transparent) !important; }
+.app.mac .led-list.peek { padding-top: 44px; }
+
+/* LED Walls & Wall Boxes lists: the same source list as the Library. */
+.led-list { background: var(--n-sidebar) !important; border-right: 1px solid var(--n-sep) !important; padding: 0 0 12px; }
+.led-list-head { height: 40px; padding: 0 10px 0 14px !important; }
+.led-list-head h3 { font-size: 11px !important; font-weight: 700; color: var(--n-header); letter-spacing: 0.02em; }
+.led-list-head .primary.mini { background: transparent !important; color: var(--text-2) !important; box-shadow: none !important; border: none !important; padding: 0 6px; font-size: 12px; }
+.led-list-head .primary.mini:hover { background: var(--n-sel) !important; color: var(--text) !important; filter: none; }
+.led-list .boxes-search { display: block; width: calc(100% - 20px); margin: 0 10px 8px; box-sizing: border-box; }
+.led-list .boxes-group { margin: 10px 14px 2px; font-size: 11px; font-weight: 700; color: var(--n-header); text-transform: none; letter-spacing: 0.02em; }
+.led-list-item { width: calc(100% - 16px) !important; margin: 0 8px 1px !important; padding: 6px 10px !important; gap: 1px !important; border-radius: 7px !important; background: transparent !important; border: none !important; box-shadow: none !important; }
+.led-list-item b { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.led-list-item .small { font-size: 11px; line-height: 14px; }
+.led-list-item:hover { background: var(--n-sel) !important; filter: none; }
+.led-list-item.on { background: var(--accent) !important; color: #fff; }
+.led-list-item.on .muted { color: rgba(255, 255, 255, 0.82) !important; }
+.led-list-item.on .boxes-dot { background: #fff; }
