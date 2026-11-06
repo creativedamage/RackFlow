@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { defaultFabrication, fabricationNotes, fabricationSheets, finishOf, makePlateProduct, newPlateSpec, withLayout, type EquipmentInstance, type PlateKind } from '@core/index'
 import { Slide } from '../slide'
 import { useStore } from '../store'
@@ -109,6 +109,44 @@ function Paper({ box }: { box: EquipmentInstance }) {
     return () => ro.disconnect()
   }, [aspect])
   const set = useStore((s) => s.set)
+  // Zoom keeps the point under the pointer (or the middle of the view) still; drag the paper to pan.
+  const anchor = useRef<{ fx: number; fy: number; px: number; py: number } | null>(null)
+  const zoomTo = (next: number, clientX?: number, clientY?: number) => {
+    const el = desk.current
+    const z = Math.max(0.5, Math.min(8, next))
+    if (!el) { setZoom(z); return }
+    const r = el.getBoundingClientRect()
+    const px = clientX != null ? clientX - r.left : el.clientWidth / 2, py = clientY != null ? clientY - r.top : el.clientHeight / 2
+    const paper = el.firstElementChild as HTMLElement | null
+    if (paper) {
+      const pr = paper.getBoundingClientRect()
+      anchor.current = { fx: (r.left + px - pr.left) / pr.width, fy: (r.top + py - pr.top) / pr.height, px, py }
+    }
+    setZoom(z)
+  }
+  useLayoutEffect(() => {
+    const el = desk.current, a = anchor.current, paper = el?.firstElementChild as HTMLElement | null
+    if (!el || !a || !paper) return
+    anchor.current = null
+    el.scrollLeft = paper.offsetLeft + a.fx * paper.offsetWidth - a.px
+    el.scrollTop = paper.offsetTop + a.fy * paper.offsetHeight - a.py
+  }, [zoom])
+  useEffect(() => {
+    const el = desk.current
+    if (!el) return
+    // ⌘-scroll or a trackpad pinch zooms; plain scroll pans (native).
+    const wheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      zoomTo(zoomRef.current * Math.exp(-e.deltaY * (e.ctrlKey && !e.metaKey ? 0.01 : 0.0025)), e.clientX, e.clientY)
+    }
+    el.addEventListener('wheel', wheel, { passive: false })
+    return () => el.removeEventListener('wheel', wheel)
+  }, [])
+  const zoomRef = useRef(zoom)
+  zoomRef.current = zoom
+  const pan = useRef<{ x: number; y: number; sl: number; st: number } | null>(null)
+  const [panning, setPanning] = useState(false)
   return (
     <div className="led-canvas boxes-canvas">
       <div className="led-bar">
@@ -118,9 +156,13 @@ function Paper({ box }: { box: EquipmentInstance }) {
         <button onClick={() => editPlacedDevice(box.id)}>Edit Box…</button>
         <button onClick={() => set({ mode: 'diagram', selection: [box.id] })}>Show in Diagram</button>
         <button onClick={() => openExport()}>Export…</button>
-        <span className="pd-group"><button onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))}>−</button><button onClick={() => setZoom(1)}>Fit</button><button onClick={() => setZoom((z) => Math.min(5, z * 1.25))}>+</button></span>
+        <span className="pd-group"><button onClick={() => zoomTo(zoom / 1.25)} title="Zoom out (⌘-scroll or pinch)">−</button><button onClick={() => setZoom(1)} title="Fit the page">{zoom === 1 ? 'Fit' : `${Math.round(zoom * 100)}%`}</button><button onClick={() => zoomTo(zoom * 1.25)} title="Zoom in (⌘-scroll or pinch)">+</button></span>
       </div>
-      <div className="boxes-desk" ref={desk}>
+      <div className={`boxes-desk ${zoom > 1 ? 'can-pan' : ''} ${panning ? 'panning' : ''}`} ref={desk}
+        onPointerDown={(e) => { const el = desk.current; if (!el || e.button !== 0) return; pan.current = { x: e.clientX, y: e.clientY, sl: el.scrollLeft, st: el.scrollTop }; el.setPointerCapture(e.pointerId); setPanning(true) }}
+        onPointerMove={(e) => { const el = desk.current, p = pan.current; if (!el || !p) return; el.scrollLeft = p.sl - (e.clientX - p.x); el.scrollTop = p.st - (e.clientY - p.y) }}
+        onPointerUp={() => { pan.current = null; setPanning(false) }} onPointerCancel={() => { pan.current = null; setPanning(false) }}
+        onDoubleClick={(e) => zoomTo(zoom >= 2.5 ? 1 : zoom * 2, e.clientX, e.clientY)}>
         <div className="boxes-paper" style={{ width: fitW ? fitW * zoom : '100%' }} dangerouslySetInnerHTML={{ __html: svg }} />
       </div>
     </div>

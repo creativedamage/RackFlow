@@ -288,3 +288,12 @@ html.vibrant .sidebar.peek, html.vibrant .led-list.peek { background: color-mix(
 .drop-ghost span { position: absolute; left: 10px; top: 8px; font-size: 12px; font-weight: 600; color: var(--accent); white-space: nowrap; }
 .diagram.placing, .diagram.placing .react-flow__pane, .diagram.placing .react-flow__node { cursor: copy !important; }
 .place-hint { font-size: 12.5px; padding: 6px 14px !important; color: var(--text); }
+
+/* Wall Boxes sheet: zoomed paper scrolls to every edge (no centring that hides the left side); drag to pan. */
+.boxes-desk { position: relative; justify-content: flex-start !important; align-items: flex-start !important; overscroll-behavior: contain; user-select: none; }
+.boxes-desk > .boxes-paper { margin: auto; }
+.boxes-desk.can-pan { cursor: grab; }
+.boxes-desk.panning { cursor: grabbing; }
+/* Plate designer canvas: same fix – zoomed in, every edge can be scrolled to. */
+.pd-canvas { place-items: start !important; }
+.pd-canvas > svg { margin: auto; }
