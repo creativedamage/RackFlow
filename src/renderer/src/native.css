@@ -329,3 +329,22 @@ html.vibrant .sidebar.peek, html.vibrant .led-list.peek { background: color-mix(
 .led-list-item.on { background: var(--accent) !important; color: #fff; }
 .led-list-item.on .muted { color: rgba(255, 255, 255, 0.82) !important; }
 .led-list-item.on .boxes-dot { background: #fff; }
+
+/* ── Wiring Diagram: tools docked in a bar under the toolbar (not floating) ── */
+.app.mode-diagram .diagram-wrap { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.app.mode-diagram .diagram-wrap .diagram { position: relative !important; inset: auto !important; flex: 1; min-height: 0; }
+.diagram-tools.diagram-bar {
+  position: static !important; flex: none; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px !important; margin: 0 !important;
+  background: var(--n-content) !important; border: none !important; border-bottom: 1px solid var(--n-sep) !important; border-radius: 0 !important; box-shadow: none !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important; font-size: 12.5px; overflow-x: auto; scrollbar-width: none;
+}
+.diagram-bar > * { flex-shrink: 0; }
+.diagram-bar .db-title { font-weight: 600; font-size: 13px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.diagram-bar .db-sep { width: 1px; height: 18px; background: var(--n-sep); margin: 0 2px; }
+.diagram-bar .db-label { color: var(--text-2); margin-left: 6px; }
+.diagram-bar .db-fill { flex: 1; }
+.diagram-bar button { height: 24px; padding: 0 10px; font-size: 12.5px; }
+.diagram-bar .segmented button { height: 20px; padding: 0 10px !important; }
+.diagram-bar .check { color: var(--text); }
+.app.insp-float .inspector:not(.peek) { top: 93px !important; }
+.app.insp-float .panel-resizer { top: 93px; }

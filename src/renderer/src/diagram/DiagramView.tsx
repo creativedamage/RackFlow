@@ -533,6 +533,7 @@ export function DiagramView() {
 
   return (
     <div className="diagram-wrap">
+    <DiagramTools />
     <div className="diagram" onDragOver={(e) => { if (e.dataTransfer.types.includes(DRAG_MIME)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' } }} onDrop={onDrop}>
       <ReactFlow<AnyNode, CableEdgeType>
         nodes={allNodes}
@@ -599,7 +600,6 @@ export function DiagramView() {
         <MiniMap pannable zoomable nodeColor="var(--node-mini)" maskColor="var(--minimap-mask)" />
         <WiringHint />
         <PickedPanel />
-        <DiagramTools />
         {drawingGroup && (
           <div className="group-draw nodrag nopan"
             onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture(e.pointerId); const b = e.currentTarget.getBoundingClientRect(); setDrawRect({ x0: e.clientX - b.left, y0: e.clientY - b.top, x1: e.clientX - b.left, y1: e.clientY - b.top }) }}
@@ -702,11 +702,15 @@ function DiagramTools() {
     const n = tidyDiagram({ selectionOnly: sel })
     if (n) { notify(`Tidied ${n} device${n === 1 ? '' : 's'} by signal flow`, { undo: true, kind: 'success' }); setTimeout(() => void fitView({ padding: 0.12, duration: 300 }), 60) }
   }
+  const pageName = useStore((s) => s.diagramView ? viewsOf(s.project).find((v) => v.id === s.diagramView)?.name : s.diagramPage ? (s.project.groups ?? []).find((g) => g.id === s.diagramPage)?.name : 'All Pages')
   return (
-    <Panel position="top-right" className="diagram-tools">
+    <div className="diagram-tools diagram-bar">
+      <span className="db-title" title="The page or view shown – pick another in the sidebar">{pageName}</span>
+      <span className="db-sep" />
       <button className="primary" onClick={() => tidy(selection.length > 1)} title={selection.length > 1 ? 'Arrange the selected devices by signal flow (⌥⌘L)' : 'Arrange the whole diagram by signal flow: sources left, destinations right, groups kept together (⌥⌘L)'}>
         ✨ Tidy {selection.length > 1 ? 'Selection' : 'Up'}
       </button>
+      <span className="db-label">Wires</span>
       <Segmented<WireMode> value={settings?.wires ?? 'all'} onChange={(v) => set('Wire Style', { wires: v })} options={[
         { value: 'all', label: 'All wires', title: 'Draw every wire in full' },
         { value: 'smart', label: 'Smart', title: 'Long or tangled wires become labelled stubs at each end (like a CAD drawing). Select one to see it in full.' },
@@ -718,12 +722,13 @@ function DiagramTools() {
         { label: 'Revision Note (Δ cloud)', onClick: () => addNote('revision') },
       ])} title="Place a callout, note or revision note anywhere on the diagram">＋ Note ▾</button>
       {viewId && <button className="danger" onClick={() => clearViewWires(viewId)} title="Delete every cable drawn on this view. Cables of other signal types (not on this view) are kept. Undo with ⌘Z.">Remove Connections</button>}
-      <button onClick={() => setPrinting(true)} title="Print or export a CAD-style wiring drawing">Print…</button>
-      {printing && createPortal(<SchematicPrintDialog onClose={() => setPrinting(false)} />, document.body)}
+      <span className="db-fill" />
       <label className="check" title="Re-arrange automatically whenever you add a device or cable">
         <input type="checkbox" checked={!!settings?.autoTidy} onChange={(e) => { set('Auto-Tidy', { autoTidy: e.target.checked }); if (e.target.checked) tidyDiagram({ amend: true }) }} /> Auto-tidy
       </label>
-    </Panel>
+      <button onClick={() => setPrinting(true)} title="Print or export a CAD-style wiring drawing">Print…</button>
+      {printing && createPortal(<SchematicPrintDialog onClose={() => setPrinting(false)} />, document.body)}
+    </div>
   )
 }
 
