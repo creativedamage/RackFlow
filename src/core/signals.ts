@@ -72,6 +72,8 @@ export const SIGNALS = {
   contactClosure: s('Contact Closure', 'control', 'gpio'),
 
   dmx512: s('DMX512', 'lighting', 'dmx'),
+  ltc: s('SMPTE LTC Timecode', 'control', 'gpio'),
+  midi: s('MIDI', 'control', 'gpio'),
 
   rfUHF: s('UHF RF', 'rf', 'rfUHF'),
   rfWiFiAntenna: s('Wi-Fi Antenna', 'rf', 'rfWiFi'),
@@ -133,6 +135,7 @@ export const CONNECTORS = {
   db25: c('DB25', ['analogLine']),
   idcPunchdown: c('IDC Punchdown', ['analogLine']),
   xlr5: c('XLR-5', ['dmx512']),
+  din5: c('5-pin DIN (MIDI)', ['midi']),
   lemo: c('LEMO', ['analogLine']),
   smpteFiber: c('SMPTE Hybrid Fiber', ['sdi12G']),
   sma: c('SMA', ['rfUHF']),

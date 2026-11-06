@@ -103,6 +103,10 @@ export const PORTS: Record<string, PortDef> = {
   dmxIn: ['DMX In', 'xlr5', 'male', 'input', V('dmx512'), 'DMX'],
   dmxThru: ['DMX Thru', 'xlr5', 'female', 'output', V('dmx512'), 'DMX'],
   dmxOut: ['DMX Out', 'xlr5', 'female', 'output', V('dmx512'), 'DMX'],
+  ltcIn: ['LTC In', 'xlr3', 'female', 'input', V('ltc'), 'Timecode'],
+  midiIn: ['MIDI In', 'din5', 'female', 'input', V('midi'), 'MIDI'],
+  midiOut: ['MIDI Out', 'din5', 'female', 'output', V('midi'), 'MIDI'],
+  midiThru: ['MIDI Thru', 'din5', 'female', 'output', V('midi'), 'MIDI'],
   // Control
   rs232: ['RS-232', 'db9', 'female', 'bidirectional', V('rs232'), 'Control'],
   rs232e: ['RS-232', 'euroblock', 'male', 'bidirectional', V('rs232'), 'Control'],
