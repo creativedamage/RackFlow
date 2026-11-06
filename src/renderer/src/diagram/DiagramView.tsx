@@ -3,14 +3,14 @@ import { deviceMenu } from '../product/productActions'
 import { showContextMenu, type MenuItem } from '../components/ContextMenu'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  applyNodeChanges, Background, BackgroundVariant, ConnectionMode, Controls, MiniMap, Panel, ReactFlow, useConnection, useReactFlow,
+  applyNodeChanges, Background, BackgroundVariant, ConnectionMode, Controls, MiniMap, Panel, ReactFlow, useConnection, useReactFlow, ViewportPortal,
   type Connection, type Edge, type EdgeChange, type NodeChange, type OnConnectStart, type Viewport,
 } from '@xyflow/react'
 import {
-  addEquipment, addPatchBay, addToGroup, pageNumbers, GENERAL_PAGE, layoutView, setInView, viewOffFlags, viewProject, viewsOf, nodeGeom, placeInFreeSpace, connectMany, groupColor, groupsOf, type BulkResult, candidates as findCandidates, connect, DOMAINS, portDomain, resolve, SIGNALS, validate,
+  addEquipment, addPatchBay, addToGroup, newProject, occupiedBoxes, findFreeSpot, samePage, resolveOverlap, duplicateDevices, type Box, pageNumbers, GENERAL_PAGE, layoutView, setInView, viewOffFlags, viewProject, viewsOf, nodeGeom, placeInFreeSpace, connectMany, groupColor, groupsOf, type BulkResult, candidates as findCandidates, connect, DOMAINS, portDomain, resolve, SIGNALS, validate,
   type CableId, type EquipmentId, type PortAddress, cableColorHex, needsCasing, clustersOf, clusterColor, addCluster, deleteCluster, renameCluster, clusterShownIn, clusterRect, insideRect, CLUSTER_COLORS, flagName } from '@core/index'
 import { useStore } from '../store'
-import { DRAG_MIME, type DragPayload } from '../components/Sidebar'
+import { DRAG_MIME, dragState, type DragPayload } from '../components/Sidebar'
 import { setViewCenterProvider } from './placement'
 import { pickIndex } from './wiring'
 import { DeviceNode, NODE_WIDTH, type DeviceNodeType } from './DeviceNode'
@@ -377,6 +377,8 @@ export function DiagramView() {
         const eq = d.equipment.find((e) => e.id === n.id)
         if (eq) eq.position = { x: Math.round(n.position.x), y: Math.round(n.position.y) }
       }
+      // Never on top of another device: slide the moved block into the nearest open space.
+      resolveOverlap(d, dragged.map((n) => n.id), nodeGeom)
     })
   }, [apply])
 
@@ -537,25 +539,119 @@ export function DiagramView() {
     if (created) select([], created)
   }, [apply, select])
 
+  // MARK: Drop outlines – a library drag and a duplicate show the device's real size under the pointer,
+  // already moved clear of other devices, and land exactly there.
+  type Ghost = { at: { x: number; y: number }; rects: { x: number; y: number; w: number; h: number; label: string }[] }
+  const [ghost, setGhostState] = useState<Ghost | null>(null)
+  const ghostRef = useRef<Ghost | null>(null)
+  const setGhost = (g: Ghost | null) => { ghostRef.current = g; setGhostState(g) }
+  const dropBoxes = useRef<Box[] | null>(null)
+  const sizeCache = useRef<{ key: string; w: number; h: number; label: string } | null>(null)
+  const clearGhost = () => { setGhost(null); dropBoxes.current = null }
+  const boxesForPage = (ignore: string[] = []) => {
+    const st = useStore.getState()
+    return occupiedBoxes(st.project, nodeGeom, { margin: 16, ignore, among: samePage({ groupId: st.diagramPage }) })
+  }
+  const payloadSize = (pl: DragPayload) => {
+    if (pl.kind !== 'product' && pl.kind !== 'patch') return null
+    const key = `${pl.kind}:${pl.key}`
+    if (sizeCache.current?.key === key) return sizeCache.current
+    const st = useStore.getState(), tmp = newProject()
+    let eq
+    if (pl.kind === 'product') { const prod = st.library.get(pl.key); if (!prod) return null; eq = addEquipment(tmp, prod, { x: 0, y: 0 }) }
+    else { const t = st.templates.find((x) => x.key === pl.key); if (!t) return null; const b = addPatchBay(tmp, t, { x: 0, y: 0 }); eq = tmp.equipment.find((x) => x.id === b.equipment) }
+    if (!eq) return null
+    const g = nodeGeom(eq)
+    sizeCache.current = { key, w: g.width, h: g.height, label: eq.product.model }
+    return sizeCache.current
+  }
+  const onDragOverDiagram = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes(DRAG_MIME)) return
+    e.preventDefault(); e.dataTransfer.dropEffect = 'copy'
+    const pl = dragState.payload
+    if (!pl || useStore.getState().diagramView) return
+    const sz = payloadSize(pl)
+    if (!sz) return
+    const p = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+    dropBoxes.current ??= boxesForPage()
+    const at = findFreeSpot(dropBoxes.current, { width: sz.w, height: sz.h }, { x: p.x - sz.w / 2, y: p.y - 14 }, GRID, GRID)
+    if (ghostRef.current && ghostRef.current.at.x === at.x && ghostRef.current.at.y === at.y) return
+    setGhost({ at, rects: [{ x: at.x, y: at.y, w: sz.w, h: sz.h, label: sz.label }] })
+  }
+
+  // Duplicating: the copies follow the pointer; click drops them, Esc cancels.
+  const placing = useStore((s) => s.placing)
+  const lastPointer = useRef<{ x: number; y: number } | null>(null)
+  const placeBlock = useMemo(() => {
+    if (!placing) return null
+    const eqs = useStore.getState().project.equipment.filter((e) => placing.ids.includes(e.id))
+    if (!eqs.length) return null
+    const x0 = Math.min(...eqs.map((e) => e.position.x)), y0 = Math.min(...eqs.map((e) => e.position.y))
+    const items = eqs.map((e) => { const g = nodeGeom(e); return { dx: e.position.x - x0, dy: e.position.y - y0, w: g.width, h: g.height, label: e.product.model } })
+    return { x0, y0, items, w: Math.max(...items.map((i) => i.dx + i.w)), h: Math.max(...items.map((i) => i.dy + i.h)), boxes: boxesForPage() }
+  }, [placing])
+  const movePlacing = (clientX: number, clientY: number) => {
+    if (!placeBlock) return
+    const p = screenToFlowPosition({ x: clientX, y: clientY })
+    const at = findFreeSpot(placeBlock.boxes, { width: placeBlock.w, height: placeBlock.h }, { x: p.x - placeBlock.w / 2, y: p.y - 14 }, GRID, GRID)
+    if (ghostRef.current && ghostRef.current.at.x === at.x && ghostRef.current.at.y === at.y) return
+    setGhost({ at, rects: placeBlock.items.map((i) => ({ x: at.x + i.dx, y: at.y + i.dy, w: i.w, h: i.h, label: i.label })) })
+  }
+  useEffect(() => {
+    if (!placing) { if (!dragState.payload) clearGhost(); return }
+    if (lastPointer.current) movePlacing(lastPointer.current.x, lastPointer.current.y)
+    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') { useStore.getState().set({ placing: null }); clearGhost() } }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [placeBlock])
+  const commitPlacing = () => {
+    const g = ghostRef.current
+    if (!placing || !placeBlock || !g) return
+    let made: string[] = [], tags: string[] = []
+    apply(placing.ids.length > 1 ? `Duplicate ${placing.ids.length} Devices` : 'Duplicate Device', (d) => {
+      const copies = duplicateDevices(d, placing.ids, { x: g.at.x - placeBlock.x0, y: g.at.y - placeBlock.y0 })
+      made = copies.map((c) => c.id); tags = copies.map((c) => c.tag)
+    })
+    useStore.getState().set({ placing: null })
+    clearGhost()
+    if (made.length) { select(made as EquipmentId[]); useStore.getState().notify(`Duplicated as ${tags.join(', ')}`, { undo: true, kind: 'success' }) }
+  }
+  // ⌘D duplicates the selection (follows the pointer until you click).
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'd' || e.shiftKey || e.altKey) return
+      if ((e.target as HTMLElement)?.closest?.('input, textarea, select, [contenteditable]') || document.querySelector('.modal-backdrop')) return
+      const st = useStore.getState()
+      if (st.mode !== 'diagram' || !st.selection.length) return
+      e.preventDefault()
+      void import('../product/productActions').then((m) => m.duplicatePlaced(String(st.selection[0])))
+    }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [])
+
   const onDrop = useCallback((e: React.DragEvent) => {
     const raw = e.dataTransfer.getData(DRAG_MIME)
     if (!raw) return
     e.preventDefault()
     const payload = JSON.parse(raw) as DragPayload
     const p = screenToFlowPosition({ x: e.clientX, y: e.clientY })
-    const at = { x: Math.round(p.x / GRID) * GRID, y: Math.round(p.y / GRID) * GRID }
+    // Where the outline showed is exactly where it lands.
+    const shown = ghostRef.current?.at
+    const at = shown ?? { x: Math.round(p.x / GRID) * GRID, y: Math.round(p.y / GRID) * GRID }
+    clearGhost()
     const s = useStore.getState()
     if (payload.kind === 'product') {
       const product = s.library.get(payload.key)
       if (!product) return
       let id: EquipmentId | undefined
-      apply(`Add ${product.model}`, (d) => { id = addEquipment(d, product, at).id; placeInFreeSpace(d, id, nodeGeom) })
+      apply(`Add ${product.model}`, (d) => { const eq = addEquipment(d, product, at); id = eq.id; if (shown) eq.position = { ...shown }; else placeInFreeSpace(d, id, nodeGeom) })
       if (id) select([id])
     } else if (payload.kind === 'patch') {
       const t = s.templates.find((x) => x.key === payload.key)
       if (!t) return
       let bay: { id: string; equipment: EquipmentId } | undefined
-      apply('Add Patch Bay', (d) => { bay = addPatchBay(d, t, at); placeInFreeSpace(d, bay.equipment, nodeGeom) })
+      apply('Add Patch Bay', (d) => { bay = addPatchBay(d, t, at); const eq = d.equipment.find((x) => x.id === bay!.equipment); if (shown && eq) eq.position = { ...shown }; else placeInFreeSpace(d, bay.equipment, nodeGeom) })
       if (bay) { select([bay.equipment]); s.set({ selectedBay: bay.id as never }) }
     }
   }, [apply, screenToFlowPosition, select])
@@ -563,7 +659,11 @@ export function DiagramView() {
   return (
     <div className="diagram-wrap">
     <DiagramTools />
-    <div className="diagram" onDragOver={(e) => { if (e.dataTransfer.types.includes(DRAG_MIME)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' } }} onDrop={onDrop}>
+    <div className={`diagram ${placing ? 'placing' : ''}`} onDragOver={onDragOverDiagram} onDrop={onDrop}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) clearGhost() }}
+      onMouseMove={(e) => { lastPointer.current = { x: e.clientX, y: e.clientY }; if (placing) movePlacing(e.clientX, e.clientY) }}
+      onClickCapture={(e) => { if (placing) { e.stopPropagation(); e.preventDefault(); commitPlacing() } }}
+      onContextMenuCapture={(e) => { if (placing) { e.preventDefault(); e.stopPropagation(); useStore.getState().set({ placing: null }); clearGhost() } }}>
       <ReactFlow<AnyNode, CableEdgeType>
         nodes={allNodes}
         edges={edges}
@@ -625,6 +725,12 @@ export function DiagramView() {
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={32} size={1.2} />
+        {ghost && <ViewportPortal>
+          {ghost.rects.map((r, i) => (
+            <div key={i} className="drop-ghost" style={{ transform: `translate(${r.x}px, ${r.y}px)`, width: r.w, height: r.h }}><span>{r.label}</span></div>
+          ))}
+        </ViewportPortal>}
+        {placing && <Panel position="bottom-center" className="picked-panel place-hint">Click to place the {placing.ids.length > 1 ? `${placing.ids.length} copies` : 'copy'} · Esc to cancel</Panel>}
         <Controls showInteractive={false} />
         <MiniMap pannable zoomable nodeColor="var(--node-mini)" maskColor="var(--minimap-mask)" />
         <WiringHint />

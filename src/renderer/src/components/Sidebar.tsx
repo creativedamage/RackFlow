@@ -29,7 +29,17 @@ const PLATE_CATS = new Set<EquipmentCategory>(['wallBox', 'wallPlate', 'floorBox
 const PAGE = 120
 
 const primaryColor = (p: ProductDefinition) => { const d = [...productDomains(p)][0]; return d ? DOMAINS[d].color : '#9aa0a6' }
-const drag = (e: React.DragEvent, payload: DragPayload) => { e.dataTransfer.setData(DRAG_MIME, JSON.stringify(payload)); e.dataTransfer.effectAllowed = 'copy' }
+const BLANK = new Image()
+BLANK.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+/** What's being dragged from the Library right now (dataTransfer can't be read until the drop). */
+export const dragState: { payload: DragPayload | null } = { payload: null }
+window.addEventListener('dragend', () => { dragState.payload = null })
+const drag = (e: React.DragEvent, payload: DragPayload) => {
+  e.dataTransfer.setData(DRAG_MIME, JSON.stringify(payload)); e.dataTransfer.effectAllowed = 'copy'
+  dragState.payload = payload
+  // No browser drag image: the diagram draws the device's real outline under the pointer.
+  if ((payload.kind === 'product' || payload.kind === 'patch') && useStore.getState().mode === 'diagram') e.dataTransfer.setDragImage(BLANK, 0, 0)
+}
 const fold = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 const plate = (kind: PlateKind, model: string) => useStore.getState().set({ editingPlate: { product: makePlateProduct(newPlateSpec(kind), { model }), instanceId: null } })
 

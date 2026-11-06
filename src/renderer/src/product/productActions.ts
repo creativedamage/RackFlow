@@ -56,6 +56,8 @@ export function deviceMenu(id: string): MenuItem[] {
 export function duplicatePlaced(id: string) {
   const s = useStore.getState()
   const ids = s.selection.includes(id as never) ? s.selection.map(String) : [id]
+  // On the diagram the copies follow the pointer – click where they should go.
+  if (s.mode === 'diagram' && !s.diagramView) { s.set({ placing: { ids } }); return }
   let made: string[] = [], tags: string[] = []
   s.apply(ids.length > 1 ? `Duplicate ${ids.length} Devices` : 'Duplicate Device', (d) => {
     const copies = duplicateDevices(d, ids)

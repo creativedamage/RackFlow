@@ -327,21 +327,27 @@ export function planChannels(wires: ChannelWire[], gap = WIRE_TRACK_GAP, spacing
  * other device (with a margin for ports, labels and wires). Searches outward
  * in rings, trying right / below first.
  */
-export function freeSpot(p: Project, size: { width: number; height: number }, preferred: CanvasPoint,
-  geom: (eq: EquipmentInstance) => NodeGeom, opts: { ignore?: string | string[]; margin?: number; grid?: number; among?: (e: EquipmentInstance) => boolean } = {}): CanvasPoint {
-  const margin = opts.margin ?? 60, grid = opts.grid ?? 20
+export interface Box { x0: number; y0: number; x1: number; y1: number }
+
+/** The space devices take up (grown by a margin), for findFreeSpot. */
+export function occupiedBoxes(p: Project, geom: (eq: EquipmentInstance) => NodeGeom,
+  opts: { ignore?: string | string[]; margin?: number; among?: (e: EquipmentInstance) => boolean } = {}): Box[] {
+  const margin = opts.margin ?? 60
   const ignore = new Set(Array.isArray(opts.ignore) ? opts.ignore : opts.ignore ? [opts.ignore] : [])
-  const boxes = p.equipment.filter((e) => !ignore.has(e.id) && (!opts.among || opts.among(e))).map((e) => {
+  return p.equipment.filter((e) => !ignore.has(e.id) && (!opts.among || opts.among(e))).map((e) => {
     const g = geom(e)
-    return { x0: e.position.x - margin, y0: e.position.y - margin - 30, x1: e.position.x + g.width + margin, y1: e.position.y + g.height + margin }
+    return { x0: e.position.x - margin, y0: e.position.y - margin - Math.min(30, margin / 2), x1: e.position.x + g.width + margin, y1: e.position.y + g.height + margin }
   })
+}
+
+/** Nearest grid spot to `preferred` where a block of `size` overlaps none of `boxes`. */
+export function findFreeSpot(boxes: Box[], size: { width: number; height: number }, preferred: CanvasPoint, grid = 20, step = 20): CanvasPoint {
   const fits = (x: number, y: number) => boxes.every((b) => x + size.width <= b.x0 || x >= b.x1 || y + size.height <= b.y0 || y >= b.y1)
   const snap = (v: number) => Math.round(v / grid) * grid
   const px = snap(preferred.x), py = snap(preferred.y)
   if (fits(px, py)) return { x: px, y: py }
-  const step = 40
-  for (let r = 1; r < 400; r++) {
-    // Ring of radius r (in steps): right side, bottom, left, top – nearest first.
+  for (let r = 1; r < 800; r++) {
+    // Ring of radius r (in steps) – nearest first.
     const cands: CanvasPoint[] = []
     for (let k = -r; k <= r; k++) {
       cands.push({ x: px + r * step, y: py + k * step }, { x: px + k * step, y: py + r * step }, { x: px - r * step, y: py + k * step }, { x: px + k * step, y: py - r * step })
@@ -350,8 +356,34 @@ export function freeSpot(p: Project, size: { width: number; height: number }, pr
     const hit = cands.find((c) => fits(c.x, c.y))
     if (hit) return hit
   }
-  // Fallback: below everything.
-  return { x: px, y: Math.max(py, ...boxes.map((b) => b.y1)) + margin }
+  return { x: px, y: Math.max(py, ...boxes.map((b) => b.y1)) }
+}
+
+export function freeSpot(p: Project, size: { width: number; height: number }, preferred: CanvasPoint,
+  geom: (eq: EquipmentInstance) => NodeGeom, opts: { ignore?: string | string[]; margin?: number; grid?: number; among?: (e: EquipmentInstance) => boolean } = {}): CanvasPoint {
+  return findFreeSpot(occupiedBoxes(p, geom, opts), size, preferred, opts.grid ?? 20, 40)
+}
+
+/** Devices that can overlap a device on screen: the same page (or all, for devices on no page). */
+export const samePage = (eq: { groupId?: string | null }) => (e: EquipmentInstance) => (e.groupId ?? null) === (eq.groupId ?? null) || !eq.groupId
+
+/**
+ * Devices never sit on top of each other: if the block `ids` overlaps another
+ * device, the block moves (together) to the nearest open spot. Returns true if it moved.
+ */
+export function resolveOverlap(p: Project, ids: string[], geom: (eq: EquipmentInstance) => NodeGeom, margin = 20): boolean {
+  const block = p.equipment.filter((e) => ids.includes(e.id))
+  if (!block.length) return false
+  const x0 = Math.min(...block.map((e) => e.position.x)), y0 = Math.min(...block.map((e) => e.position.y))
+  const x1 = Math.max(...block.map((e) => e.position.x + geom(e).width)), y1 = Math.max(...block.map((e) => e.position.y + geom(e).height))
+  const boxes = occupiedBoxes(p, geom, { ignore: ids, margin, among: samePage(block[0]) })
+  const hit = (b: Box) => !(x1 <= b.x0 || x0 >= b.x1 || y1 <= b.y0 || y0 >= b.y1)
+  if (!boxes.some(hit)) return false
+  // Search on a fine grid so the block lands as close as possible to where it was dropped.
+  const at = findFreeSpot(boxes, { width: x1 - x0, height: y1 - y0 }, { x: x0, y: y0 }, 1, 20)
+  const dx = at.x - x0, dy = at.y - y0
+  for (const e of block) e.position = { x: Math.round(e.position.x + dx), y: Math.round(e.position.y + dy) }
+  return true
 }
 
 /** Moves a just-added device into the nearest open space. */

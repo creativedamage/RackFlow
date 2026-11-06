@@ -282,3 +282,9 @@ html.vibrant .sidebar.peek, html.vibrant .led-list.peek { background: color-mix(
 .diagram-bar .check { color: var(--text); }
 .app.insp-float .inspector:not(.peek) { top: 93px !important; }
 .app.insp-float .panel-resizer { top: 93px; }
+
+/* Drop outline: a dragged library device or a duplicate, at its real size, where it will land. */
+.drop-ghost { position: absolute; left: 0; top: 0; pointer-events: none; border: 1.5px dashed var(--accent); border-radius: 14px; background: color-mix(in srgb, var(--accent) 9%, transparent); box-shadow: 0 6px 22px rgba(10, 132, 255, 0.18); z-index: 1000; }
+.drop-ghost span { position: absolute; left: 10px; top: 8px; font-size: 12px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+.diagram.placing, .diagram.placing .react-flow__pane, .diagram.placing .react-flow__node { cursor: copy !important; }
+.place-hint { font-size: 12.5px; padding: 6px 14px !important; color: var(--text); }

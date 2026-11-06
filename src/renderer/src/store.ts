@@ -82,6 +82,8 @@ export interface AppState {
   copiedView: string | null
   editingNumbers: boolean
   editingNumbering: boolean
+  /** Duplicating on the diagram: copies follow the pointer until you click to drop them. */
+  placing: { ids: string[] } | null
   /** Appearance: follow macOS, or force light / dark. */
   theme: 'system' | 'light' | 'dark'
   /** Display units (data is always stored metric). */
@@ -152,6 +154,7 @@ export const useStore = create<AppState>((set, get) => ({
   mode: 'diagram',
   showStart: true,
   showSettings: false,
+  placing: null,
   selection: [],
   selectedCable: null,
   selectedCables: NO_CABLES,
