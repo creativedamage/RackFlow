@@ -9,3 +9,16 @@ it('finds Hedgehog and Vista consoles by name', () => {
   expect(tour.ports.some((p) => p.connector === 'din5')).toBe(true)
   expect(tour.ports.some((p) => p.signals.includes('ltc'))).toBe(true)
 })
+
+it('Ross switchers have reference outputs that can feed a reference input', async () => {
+  const { connect, newProject, addEquipment, BUILT_IN_PRODUCTS: B } = await import('./index')
+  const p = newProject()
+  const ross = addEquipment(p, B.find((x) => x.model === 'Carbonite Ultra')!, { x: 0, y: 0 })
+  const deck = addEquipment(p, B.find((x) => x.model === 'HyperDeck Studio HD Plus')!, { x: 400, y: 0 })
+  const out = ross.product.ports.find((x) => x.label === 'Ref Out')!
+  const inp = deck.product.ports.find((x) => x.label === 'Ref In')!
+  expect(out).toBeTruthy()
+  const r = connect(p, { equipment: ross.id, port: out.id }, { equipment: deck.id, port: inp.id })
+  expect(r.allowed).toBe(true)
+  expect(p.cables.length).toBe(1)
+})

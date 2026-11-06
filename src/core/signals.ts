@@ -41,6 +41,7 @@ export const SIGNALS = {
   sdi12G: s('12G-SDI', 'video', 'sdi', 4),
   hdbaseT: s('HDBaseT', 'video', 'hdbaseT'),
   analogComposite: s('Composite', 'video', 'analogVideo'),
+  refSync: s('Reference (Black Burst / Tri-Level)', 'video', 'analogVideo'),
 
   analogMic: s('Mic Level', 'audio', 'analogAudio', 1),
   analogLine: s('Line Level', 'audio', 'analogAudio', 2),

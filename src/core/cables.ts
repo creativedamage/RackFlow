@@ -76,6 +76,7 @@ export const CABLE_CATALOG: CableSpec[] = [
   cable('dp.14', 'DisplayPort 1.4', e('displayPort', 'male'), e('displayPort', 'male'), ['displayPort12', 'displayPort14'], 3, 'V'),
   cable('sdi.12g', '12G-SDI Coax (RG6)', e('bnc', 'male'), e('bnc', 'male'), ['sdiHD', 'sdi3G', 'sdi6G', 'sdi12G'], 70, 'V'),
   cable('sdi.3g', '3G-SDI Coax (RG59)', e('bnc', 'male'), e('bnc', 'male'), ['sdiHD', 'sdi3G', 'analogComposite'], 100, 'V'),
+  cable('ref.coax', 'Reference Coax (RG59, 75Ω)', e('bnc', 'male'), e('bnc', 'male'), ['refSync', 'analogComposite'], 300, 'V'),
   cable('cat6a', 'Cat6A Shielded (U/FTP) – patch', e('rj45', 'male'), e('rj45', 'male'), [], 100, 'N'),
   cable('cat5e', 'Cat5e – patch', e('rj45', 'male'), e('rj45', 'male'), CAT5E, 100, 'N'),
   cable('cat6', 'Cat6 – patch', e('rj45', 'male'), e('rj45', 'male'), [], 100, 'N'),
