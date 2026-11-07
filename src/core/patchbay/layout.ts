@@ -103,7 +103,10 @@ export function layoutLabels(bays: PatchBay[], o: PrintOptions): LabelPage[] {
         const rowFill = bay.rowFill?.[String(row.id)]
         if (rowFill) items.push({ t: 'rect', r: strip, stroke: null, fill: rowFill, lw: 0 })
         const { titleH, normH } = stripBands(bay, row.id, h, o.normals !== false)
-        const cellY = sy + titleH + (g.padTopMM ?? 0), cellH = h - titleH - normH - (g.padTopMM ?? 0) - (g.padBottomMM ?? 0)
+        // Group titles sit above the labels – on a bay's bottom row, below them.
+        const titlesLow = rowOnBottom(bay, row.id)
+        const cellY = sy + (titlesLow ? 0 : titleH) + (g.padTopMM ?? 0), cellH = h - titleH - normH - (g.padTopMM ?? 0) - (g.padBottomMM ?? 0)
+        const titleY = titlesLow ? cellY + cellH + (g.padBottomMM ?? 0) : sy
         const xOf = (ch: number) => x0 + cellSpanMM(g, ch).x - seg.origin
         const arrow = arrowGlyph(bay.arrows?.[String(row.id)])
         const bottomRow = rowOnBottom(bay, row.id)
@@ -121,9 +124,9 @@ export function layoutLabels(bays: PatchBay[], o: PrintOptions): LabelPage[] {
           const a = Math.max(t.start - 1, seg.first), b = Math.min(t.end - 1, seg.last)
           if (a > b) continue
           const tx = xOf(a), tw = xOf(b) + cellSpanMM(g, b).width - tx
-          items.push(...titlePrims(t.text, { x: tx, y: sy, w: tw, h: titleH }, t.style, bay.style.fontFamily))
+          items.push(...titlePrims(t.text, { x: tx, y: titleY, w: tw, h: titleH }, t.style, bay.style.fontFamily))
         }
-        if (titleH > 0) items.push({ t: 'line', x1: bx0, y1: cellY, x2: bx1, y2: cellY, stroke: '#000000', lw: 0.06 })
+        if (titleH > 0) { const ly = titlesLow ? titleY : cellY; items.push({ t: 'line', x1: bx0, y1: ly, x2: bx1, y2: ly, stroke: '#000000', lw: 0.06 }) }
 
         for (let ch = seg.first; ch <= seg.last; ch++) {
           const span = cellSpanMM(g, ch)

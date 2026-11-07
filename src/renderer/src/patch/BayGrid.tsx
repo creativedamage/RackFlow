@@ -117,11 +117,10 @@ function Strip({ bay, row, bank, sel, title, onSel, onEdit }: {
   }
   const enter = (ch: number) => { if (dragging && sel && sel.bay === bay.id && sel.row === row.id) onSel({ ...sel, b: ch }) }
 
-  return (
-    <div className={`pb-strip ${bay.rowTabs?.on ? 'has-tabs' : ''}`} style={{ background: bay.rowFill[String(row.id)] }}>
-      {bay.rowTabs?.on && <RowTab bay={bay} rowId={row.id} />}
-      <div className="pb-strip-body">
-      <div className="pb-titles" style={cols}>
+  // Bottom rows of a bay carry their group titles below the labels (nearest the jacks' bottom edge).
+  const onBottom = rowOnBottom(bay, row.id)
+  const titlesBlock = (
+      <div className={`pb-titles ${onBottom ? 'bottom' : ''}`} style={cols}>
         {titles.map((s: LabelSpan) => (
           <div key={s.id} className={`pb-title ${title === s.id ? 'sel' : ''}`} style={{ gridColumn: `${s.start} / ${s.end + 1}`, ...cssFor(s.style), background: s.style?.fill }}
             onMouseDown={(e) => { e.stopPropagation(); (e.currentTarget.closest('.patch-grid') as HTMLElement | null)?.focus(); onSel({ bay: bay.id, row: row.id, a: s.start, b: s.end }, s.id) }}
@@ -131,6 +130,12 @@ function Strip({ bay, row, bank, sel, title, onSel, onEdit }: {
         ))}
         {titles.length === 0 && <div className="pb-title-hint" style={{ gridColumn: `1 / ${n + 1}` }}>{row.name} · select channels and press ⌘G to add a title</div>}
       </div>
+  )
+  return (
+    <div className={`pb-strip ${bay.rowTabs?.on ? 'has-tabs' : ''}`} style={{ background: bay.rowFill[String(row.id)] }}>
+      {bay.rowTabs?.on && <RowTab bay={bay} rowId={row.id} />}
+      <div className="pb-strip-body">
+      {!onBottom && titlesBlock}
       <div className="pb-cells" style={cols}>
         {Array.from({ length: n }, (_, i) => {
           const ch = i + 1
@@ -151,6 +156,7 @@ function Strip({ bay, row, bank, sel, title, onSel, onEdit }: {
           )
         })}
       </div>
+      {onBottom && titlesBlock}
       </div>
       {bay.rowTabs?.on && <RowTab bay={bay} rowId={row.id} />}
     </div>

@@ -304,3 +304,5 @@ html.vibrant .sidebar.peek, html.vibrant .led-list.peek { background: color-mix(
 .align-pop .ap-sep { width: 1px; height: 16px; background: var(--n-sep); margin: 0 3px; }
 .align-pop .ap-n { font-size: 11px; color: var(--text-2); padding: 0 4px; font-variant-numeric: tabular-nums; }
 .align-pop .ap-x { width: 22px; font-size: 10px; color: var(--text-2); }
+/* Patch Labels: a bay's bottom row has its group titles under the labels, brackets reaching up. */
+.pb-titles.bottom .pb-title .bracket { border-top: none; border-bottom: 1px solid currentColor; margin-top: 0; margin-bottom: 6px; }
