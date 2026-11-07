@@ -297,6 +297,20 @@ async function writeItem(dir: string, key: string, value: unknown) {
 
 // MARK: Print / PDF – render the label HTML in a hidden window at 1:1
 
+/** The sheet size (mm) from a print document's @page rule. */
+function pageOf(html: string): { w: number; h: number } | null {
+  const m = /@page\s*\{\s*size:\s*([\d.]+)mm\s+([\d.]+)mm/.exec(html)
+  return m ? { w: Number(m[1]), h: Number(m[2]) } : null
+}
+/** PDF at exactly the drawing's sheet size and orientation (landscape stays landscape). */
+function pdfOptions(html: string): Electron.PrintToPDFOptions {
+  const pg = pageOf(html)
+  return {
+    preferCSSPageSize: true, printBackground: true, margins: { top: 0, bottom: 0, left: 0, right: 0 },
+    ...(pg ? { landscape: false, pageSize: { width: pg.w / 25.4, height: pg.h / 25.4 } } : {}),
+  }
+}
+
 async function withPrintWindow<T>(html: string, fn: (w: BrowserWindow) => Promise<T>): Promise<T> {
   // A temp file (not a data: URL) so large multi-page jobs aren't size-limited.
   const dir = await mkdtemp(join(tmpdir(), 'rackflow-print-'))
@@ -444,7 +458,7 @@ function registerIPC() {
     for (const f of files) {
       const target = join(dir, f.name)
       if (f.kind === 'text') { await writeFile(target, f.content, 'utf8'); continue }
-      const pdf = await withPrintWindow(f.content, (w) => w.webContents.printToPDF({ preferCSSPageSize: true, printBackground: true, margins: { top: 0, bottom: 0, left: 0, right: 0 } }))
+      const pdf = await withPrintWindow(f.content, (w) => w.webContents.printToPDF(pdfOptions(f.content)))
       await writeFile(target, pdf)
     }
     void shell.openPath(dir)
@@ -455,9 +469,7 @@ function registerIPC() {
     if (!win) return null
     const r = await dialog.showSaveDialog(win, { defaultPath: `${name}.pdf`, filters: [{ name: 'PDF', extensions: ['pdf'] }] })
     if (r.canceled || !r.filePath) return null
-    const pdf = await withPrintWindow(html, (w) => w.webContents.printToPDF({
-      preferCSSPageSize: true, printBackground: true, margins: { top: 0, bottom: 0, left: 0, right: 0 },
-    }))
+    const pdf = await withPrintWindow(html, (w) => w.webContents.printToPDF(pdfOptions(html)))
     await writeFile(r.filePath, pdf)
     void shell.openPath(r.filePath)
     return r.filePath
@@ -466,7 +478,10 @@ function registerIPC() {
   ipcMain.handle('labels:print', (_e, html: string) =>
     withPrintWindow(html, (w) => new Promise<void>((resolve) => {
       // Never "fit to page" – that would ruin the channel pitch.
-      w.webContents.print({ silent: false, printBackground: true, margins: { marginType: 'none' }, scaleFactor: 100 }, () => resolve())
+      // Landscape drawings print landscape on the sheet size they were drawn for (not the printer's default portrait).
+      const pg = pageOf(html)
+      w.webContents.print({ silent: false, printBackground: true, margins: { marginType: 'none' }, scaleFactor: 100,
+        ...(pg ? { landscape: pg.w > pg.h, pageSize: { width: Math.round(Math.min(pg.w, pg.h) * 1000), height: Math.round(Math.max(pg.w, pg.h) * 1000) } } : {}) }, () => resolve())
     })))
 }
 
