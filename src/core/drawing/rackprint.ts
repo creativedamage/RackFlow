@@ -150,7 +150,7 @@ function drawOccupant(svg: Svg, p: Project, rack: Rack, occ: RackOccupant, x: nu
       return
     }
     if (a.kind === 'lacing') { for (let lx = inner.x + 10; lx < inner.x + inner.w - 10; lx += 18) svg.rect(lx, midY - 3, 8, 6, { lw: 0.25 }) }
-    if (label) svg.text(x + w / 2, midY, label, { size: 11, anchor: 'middle' })
+    if (label) svg.text(x + w / 2, midY, label, { size: occ.halfSlot ? 9 : 11, anchor: 'middle' })
     return
   }
   const eq = p.equipment.find((e) => e.id === occ.ref.id)

@@ -1,4 +1,4 @@
-import { ACCESSORY_KEYS, ACCESSORY_KINDS, canHaveLogo, newId, type LogoAsset, type Rack, type RackAccessory } from '@core/index'
+import { ACCESSORY_KEYS, ACCESSORY_KINDS, RackLayout, canHaveLogo, newId, type LogoAsset, type Rack, type RackAccessory } from '@core/index'
 import { useStore } from '../store'
 import { Field, Select, TextInput } from '../components/ui'
 
@@ -67,6 +67,7 @@ export function AccessoryInspector({ rack, acc }: { rack: Rack; acc: RackAccesso
   const stored = useStore((s) => s.project.logos)
   const logos = stored ?? NO_LOGOS
   const meta = ACCESSORY_KINDS[acc.kind]
+  const project = useStore((s) => s.project)
   const upd = (label: string, fn: (a: RackAccessory) => void) => apply(label, (d) => { const a = d.racks.find((r) => r.id === rack.id)?.accessories.find((x) => x.id === acc.id); if (a) fn(a) })
   const logo = logos.find((l) => l.id === acc.logoId)
   return (
@@ -74,8 +75,18 @@ export function AccessoryInspector({ rack, acc }: { rack: Rack; acc: RackAccesso
       <h3>{meta.name}</h3>
       <p className="muted">{rack.name} · U{acc.startUnit}{acc.height > 1 ? `–U${acc.startUnit + acc.height - 1}` : ''} · {acc.face}</p>
       <Field label="Type"><Select value={acc.kind} onChange={(k) => upd('Panel Type', (a) => { a.kind = k; if (!ACCESSORY_KINDS[k].heights.includes(a.height)) a.height = ACCESSORY_KINDS[k].heights[0] })} options={ACCESSORY_KEYS.map((k) => ({ value: k, label: ACCESSORY_KINDS[k].name }))} /></Field>
-      <Field label="Height"><Select value={acc.height} onChange={(h) => upd('Panel Height', (a) => { a.height = h })} options={meta.heights.map((h) => ({ value: h, label: `${h}U` }))} /></Field>
-      <Field label="Label" hint="Text shown on printed elevations"><TextInput value={acc.label ?? ''} placeholder={meta.label || 'none'} onCommit={(v) => upd('Panel Label', (a) => { a.label = v.trim() || undefined })} /></Field>
+      <Field label="Height"><Select value={acc.height} onChange={(h) => upd('Panel Height', (a) => { a.height = h; if (h > 1) delete a.half })} options={meta.heights.map((h) => ({ value: h, label: `${h}U` }))} /></Field>
+      {acc.height === 1 && <Field label="Width" hint="A ½-width 1U panel shares the unit with ½-width gear or another ½ panel">
+        <Select value={acc.half ?? 'full'} onChange={(w) => {
+          if (w === 'full' || w === acc.half) { if (w === 'full' && acc.half) { const lay = RackLayout.of(project, rack.id); const other = acc.half === 'left' ? 'right' : 'left'
+            if (lay && !lay.canPlace(1, meta.depthMM, acc.startUnit, acc.face, { kind: 'accessory', id: acc.id }, other)) { useStore.getState().notify('The other half of this unit is taken', { kind: 'warning' }); return } }
+            if (w === 'full') upd('Panel Width', (a) => { delete a.half }); return }
+          const lay = RackLayout.of(project, rack.id)
+          if (lay && !lay.canPlace(1, meta.depthMM, acc.startUnit, acc.face, { kind: 'accessory', id: acc.id }, w)) { useStore.getState().notify(`The ${w} half of this unit is taken`, { kind: 'warning' }); return }
+          upd('Panel Width', (a) => { a.half = w })
+        }} options={[{ value: 'full' as const, label: 'Full width' }, { value: 'left' as const, label: '½ – left half' }, { value: 'right' as const, label: '½ – right half' }]} />
+      </Field>}
+      <Field label="Label" hint="Text on the elevation and printed rack drawings – e.g. what sits there that isn’t on the wiring diagram"><TextInput value={acc.label ?? ''} placeholder={meta.label || 'none'} onCommit={(v) => upd('Panel Label', (a) => { a.label = v.trim() || undefined })} /></Field>
       {canHaveLogo(acc.kind) && (<>
         <h4>Logo</h4>
         {logo ? <div className={`logo-preview finish-${acc.finish ?? 'black'}`}><img src={logo.dataUrl} alt={logo.name} /></div> : <p className="muted small">No logo on this panel. Upload one, or pick one you've already added.</p>}

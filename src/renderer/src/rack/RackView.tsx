@@ -37,10 +37,10 @@ export function RackView() {
       </div>
       <div className="panel-palette" title="Drag a panel into a rack">
         <span className="muted small">Panels:</span>
-        {PALETTE.map(([kind, h]) => (
-          <div key={`${kind}${h}`} className={`palette-chip acc-${kind}`} draggable
-            onDragStart={(ev) => { const s = JSON.stringify({ kind: 'rack-acc', acc: kind, height: h } satisfies DragPayload); dragCache = s; ev.dataTransfer.setData(DRAG_MIME, s) }}>
-            {ACCESSORY_KINDS[kind].name} {h}U
+        {PALETTE.map(([kind, h, half]) => (
+          <div key={`${kind}${h}${half ? 'h' : ''}`} className={`palette-chip acc-${kind}`} draggable title={half ? 'Half-width 1U blank – label it with anything you don’t want on the drawing (chargers, small boxes…)' : undefined}
+            onDragStart={(ev) => { const s = JSON.stringify({ kind: 'rack-acc', acc: kind, height: h, ...(half ? { half: true } : {}) } satisfies DragPayload); dragCache = s; ev.dataTransfer.setData(DRAG_MIME, s) }}>
+            {half ? '½ ' : ''}{ACCESSORY_KINDS[kind].name} {h}U
           </div>
         ))}
       </div>
@@ -87,7 +87,7 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
     useStore.getState().notify(n ? `Added ${n} blank panel${n === 1 ? '' : 's'}` : 'No empty spaces to fill', { undo: !!n })
   }
 
-  type Target = { what: 'multi'; moves: { id: string; start: number; h: number }[]; ok: boolean } | { what: 'eq'; id: EquipmentId; h: number; start: number | null; slot?: 'left' | 'right' | null } | { what: 'acc'; acc: AccessoryKind; h: number; start: number | null } | { what: 'move'; id: string; from: string; h: number; start: number | null }
+  type Target = { what: 'multi'; moves: { id: string; start: number; h: number }[]; ok: boolean } | { what: 'eq'; id: EquipmentId; h: number; start: number | null; slot?: 'left' | 'right' | null } | { what: 'acc'; acc: AccessoryKind; h: number; start: number | null; slot?: 'left' | 'right' | null } | { what: 'move'; id: string; from: string; h: number; start: number | null; slot?: 'left' | 'right' | null }
   const dragTarget = (e: React.DragEvent): Target | null => {
     const raw = e.dataTransfer.getData(DRAG_MIME) || dragCache
     if (!raw) return null
@@ -124,10 +124,19 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
       }
       return { what: 'eq', id: eq.id, h, start: at(h, eq.product.physical.depthMM, { kind: 'equipment', id: eq.id }) }
     }
+    const prefer = e.clientX - rect.left - rail < bodyW / 2 ? 'left' : 'right'
+    if (p.kind === 'rack-acc' && p.half) {
+      const spot = layout.nearestSpot(1, ACCESSORY_KINDS[p.acc].depthMM, Math.max(1, unitAtCursor), face, undefined, true, prefer)
+      return { what: 'acc', acc: p.acc, h: 1, start: spot?.start ?? null, slot: spot?.slot ?? null }
+    }
     if (p.kind === 'rack-acc') return { what: 'acc', acc: p.acc, h: p.height, start: at(p.height, ACCESSORY_KINDS[p.acc].depthMM) }
     if (p.kind === 'rack-acc-move') {
       const src = project.racks.find((r) => r.id === p.rack)?.accessories.find((a) => a.id === p.id)
       if (!src) return null
+      if (src.half && src.height === 1) {
+        const spot = layout.nearestSpot(1, ACCESSORY_KINDS[src.kind]?.depthMM ?? 25, Math.max(1, unitAtCursor), face, p.rack === rack.id ? { kind: 'accessory', id: p.id } : undefined, true, prefer)
+        return { what: 'move', id: p.id, from: p.rack, h: 1, start: spot?.start ?? null, slot: spot?.slot ?? null }
+      }
       return { what: 'move', id: p.id, from: p.rack, h: src.height, start: at(src.height, ACCESSORY_KINDS[src.kind]?.depthMM ?? 25, p.rack === rack.id ? { kind: 'accessory', id: p.id } : undefined) }
     }
     return null
@@ -160,7 +169,7 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
           const t = dragTarget(e)
           if (t?.what === 'multi') { setGhost(null); setGhosts(t.moves.map((m) => ({ start: m.start, height: m.h, ok: t.ok }))); return }
           setGhosts(null)
-          setGhost(t ? { start: t.start ?? 1, height: t.h, ok: t.start != null, slot: t.what === 'eq' ? t.slot : null } : null)
+          setGhost(t ? { start: t.start ?? 1, height: t.h, ok: t.start != null, slot: t.slot ?? null } : null)
         }}
         onDragLeave={() => { setGhost(null); setGhosts(null) }}
         onDrop={(e) => {
@@ -182,14 +191,14 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
           })
           else if (t.what === 'acc') {
             let added: RackAccessory | null = null
-            apply(`Add ${ACCESSORY_KINDS[t.acc].name}`, (d) => { added = addAccessory(d, rack.id, t.acc, t.h, t.start!, face, t.acc === 'logo' && logos[0] ? { logoId: logos[0].id } : {}) })
+            apply(`Add ${ACCESSORY_KINDS[t.acc].name}`, (d) => { added = addAccessory(d, rack.id, t.acc, t.h, t.start!, face, { ...(t.acc === 'logo' && logos[0] ? { logoId: logos[0].id } : {}), ...(t.slot ? { half: t.slot } : {}) }) })
             if (added) setState({ selectedAccessory: { rack: rack.id, id: (added as RackAccessory).id }, selection: [], selectedCable: null, showInspector: true })
           } else apply('Move Panel', (d) => {
             const from = d.racks.find((r) => r.id === t.from), to = d.racks.find((r) => r.id === rack.id)
             const a = from?.accessories.find((x) => x.id === t.id)
             if (!from || !to || !a) return
             from.accessories = from.accessories.filter((x) => x.id !== t.id)
-            to.accessories.push({ ...a, startUnit: t.start!, face })
+            to.accessories.push({ ...a, startUnit: t.start!, face, ...(t.slot ? { half: t.slot } : {}) })
           })
         }}
       >
@@ -207,7 +216,8 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
           const id = o.ref.kind === 'equipment' ? o.ref.id : null
           const acc = o.ref.kind === 'accessory' ? rack.accessories.find((a) => a.id === o.ref.id) : undefined
           if (acc) return <AccessoryItem key={`acc:${acc.id}`} rack={rack} acc={acc} other={other} selected={selAcc?.id === acc.id}
-            style={{ top: yOf(o.high), height: (o.high - o.low + 1) * unitPx - 1, left: rail, width: bodyW }} logo={logos.find((l) => l.id === acc.logoId)?.dataUrl} />
+            canSwap={!!o.halfSlot && layout.canPlace(1, o.depthMM, o.low, o.face, o.ref, o.halfSlot === 'left' ? 'right' : 'left')}
+            style={{ top: yOf(o.high), height: (o.high - o.low + 1) * unitPx - 1, left: rail + (o.halfSlot === 'right' ? bodyW / 2 : 0), width: o.halfSlot ? bodyW / 2 : bodyW }} logo={logos.find((l) => l.id === acc.logoId)?.dataUrl} />
           const selected = id != null && selection.includes(id)
           const height = (o.high - o.low + 1) * unitPx - 1
           return (
@@ -261,9 +271,9 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
   )
 }
 
-const PALETTE: [AccessoryKind, number][] = [['blank', 1], ['blank', 2], ['logo', 1], ['logo', 2], ['brush', 1], ['vent', 1], ['lacing', 1], ['shelf', 2], ['drawer', 2]]
+const PALETTE: [AccessoryKind, number, boolean?][] = [['blank', 1], ['blank', 1, true], ['blank', 2], ['logo', 1], ['logo', 2], ['brush', 1], ['vent', 1], ['lacing', 1], ['shelf', 2], ['drawer', 2]]
 
-function AccessoryItem({ rack, acc, other, selected, style, logo }: { rack: Rack; acc: RackAccessory; other: boolean; selected: boolean; style: React.CSSProperties; logo?: string }) {
+function AccessoryItem({ rack, acc, other, selected, style, logo, canSwap }: { rack: Rack; acc: RackAccessory; other: boolean; selected: boolean; style: React.CSSProperties; logo?: string; canSwap?: boolean }) {
   const apply = useStore((s) => s.apply)
   const setState = useStore((s) => s.set)
   const remove = () => { apply(`Remove ${ACCESSORY_KINDS[acc.kind].name}`, (d) => { const r = d.racks.find((x) => x.id === rack.id); if (r) r.accessories = r.accessories.filter((a) => a.id !== acc.id) }); setState({ selectedAccessory: null }) }
@@ -279,10 +289,11 @@ function AccessoryItem({ rack, acc, other, selected, style, logo }: { rack: Rack
           { label: acc.logoId ? 'Change Logo…' : 'Add Logo…', onClick: () => void uploadLogo().then((id) => { if (id) apply('Panel Logo', (d) => { const a = d.racks.find((r) => r.id === rack.id)?.accessories.find((x) => x.id === acc.id); if (a) a.logoId = id }) }) },
           ...(acc.logoId ? [{ label: 'Remove Logo', onClick: () => apply('Remove Logo', (d) => { const a = d.racks.find((r) => r.id === rack.id)?.accessories.find((x) => x.id === acc.id); if (a) delete a.logoId }) }] : []),
           'sep' as const] : []),
-        ...ACCESSORY_KINDS[acc.kind].heights.map((h) => ({ label: `${h}U${h === acc.height ? ' ✓' : ''}`, onClick: () => apply('Panel Height', (d) => { const a = d.racks.find((r) => r.id === rack.id)?.accessories.find((x) => x.id === acc.id); if (a) a.height = h }) })),
+        ...(acc.half ? [{ label: `Move to ${acc.half === 'left' ? 'Right' : 'Left'} Half`, disabled: !canSwap, onClick: () => apply('Move Half Panel', (d) => { const a = d.racks.find((r) => r.id === rack.id)?.accessories.find((x) => x.id === acc.id); if (a) a.half = a.half === 'left' ? 'right' : 'left' }) }, 'sep' as const] : []),
+        ...(acc.half ? [] : ACCESSORY_KINDS[acc.kind].heights.map((h) => ({ label: `${h}U${h === acc.height ? ' ✓' : ''}`, onClick: () => apply('Panel Height', (d) => { const a = d.racks.find((r) => r.id === rack.id)?.accessories.find((x) => x.id === acc.id); if (a) a.height = h }) }))),
         'sep', { label: 'Remove Panel', danger: true, onClick: remove },
       ]) }}
-      title={`${ACCESSORY_KINDS[acc.kind].name} ${acc.height}U · drag to move · right-click for options · Delete removes`}>
+      title={`${acc.half ? '½ ' : ''}${ACCESSORY_KINDS[acc.kind].name} ${acc.height}U · drag to move · right-click for options · Delete removes`}>
       {logo && <img className="acc-logo" src={logo} alt="" />}
       {(!logo || acc.label?.trim()) && <span className="acc-label">{(logo ? acc.label : label) || (acc.kind === 'logo' ? 'LOGO PANEL – choose an image' : '')}</span>}
     </div>

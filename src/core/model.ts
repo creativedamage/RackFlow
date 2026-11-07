@@ -351,6 +351,8 @@ export interface RackAccessory {
   logoId?: string
   /** Logo blanks: background colour of the panel face. */
   finish?: 'black' | 'white' | 'silver'
+  /** ½-width 1U panel: which half of the unit it covers (unset = full width). */
+  half?: 'left' | 'right'
 }
 
 export interface Rack {

@@ -24,9 +24,11 @@ export function addAccessory(p: Project, rackId: string, kind: AccessoryKind, he
   const rack = p.racks.find((r) => r.id === rackId)
   if (!rack) return null
   const layout = RackLayout.of(p, rack.id)
-  const at = layout?.nearestFreeStart(height, ACCESSORY_KINDS[kind].depthMM, start, face)
+  const half = extra.half && height === 1 ? extra.half : undefined
+  const spot = half ? layout?.nearestSpot(1, ACCESSORY_KINDS[kind].depthMM, start, face, undefined, true, half) : null
+  const at = half ? spot?.start : layout?.nearestFreeStart(height, ACCESSORY_KINDS[kind].depthMM, start, face)
   if (at == null) return null
-  const a: RackAccessory = { id: newId<RackAccessory['id']>(), kind, startUnit: at, height, face, ...extra }
+  const a: RackAccessory = { id: newId<RackAccessory['id']>(), kind, startUnit: at, height, face, ...extra, ...(half ? { half: spot!.slot ?? half } : {}) }
   rack.accessories.push(a)
   return a
 }
@@ -62,6 +64,19 @@ export function fillWithBlanks(p: Project, rackId: string, face: RackFace, opts:
     spans = spans.filter(([lo, hi]) => lo > bottom && hi < top)
   }
   let n = 0
+  // Units with only one half filled (½-width gear or panels) get a ½ blank in the other half.
+  const layout = RackLayout.of(p, rack.id)!
+  const mine = layout.occupants.filter((o) => o.face === face || o.depthMM > rack.spec.mountingDepthMM * 0.8)
+  const occ = layout.occupants.filter((o) => o.face === face)
+  const top = occ.length ? Math.max(...occ.map((o) => o.high)) : 0, bottom = occ.length ? Math.min(...occ.map((o) => o.low)) : 0
+  for (let u = 1; u <= rack.spec.rackUnits; u++) {
+    const here = mine.filter((o) => o.low <= u && o.high >= u)
+    if (!here.length || here.some((o) => !o.halfSlot)) continue
+    const taken = new Set(here.map((o) => o.halfSlot))
+    if (taken.size !== 1 || (opts.onlyBetween && !(u >= bottom && u <= top))) continue
+    rack.accessories.push({ id: newId<RackAccessory['id']>(), kind: 'blank', startUnit: u, height: 1, face, half: taken.has('left') ? 'right' : 'left' })
+    n++
+  }
   for (const [lo, hi] of spans) {
     let u = hi
     while (u >= lo) {
