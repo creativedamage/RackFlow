@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { autoAssignIps, autoAssignByVlan, duplicateIps, ipVlanIssue, networkRows, prefixMask, rowSwitch, rowSwitchPort, rowVlan, setNet, subnetOf, startOf, intToIp, validIp, vlanPlan, vlansOf, type NetworkRow, type VlanPlan } from '@core/index'
+import { autoAssignIps, autoAssignByVlan, inSubnet, type VlanAssignResult, duplicateIps, ipVlanIssue, networkRows, prefixMask, rowSwitch, rowSwitchPort, rowVlan, setNet, subnetOf, startOf, intToIp, validIp, vlanPlan, vlansOf, type NetworkRow, type VlanPlan } from '@core/index'
 import { useStore } from '../store'
 import { Modal, Select, Toggle } from '../components/ui'
 import { Sheet, type SheetColumn } from './Sheet'
@@ -35,6 +35,15 @@ export function NetworkSheet() {
       && (!s || [r.info.ip, r.eq.tag, r.eq.product.manufacturer, r.eq.product.model, r.eq.room, r.interface, rowSwitch(r), rowSwitchPort(r), r.info.vlan, r.info.notes].join(' ').toLowerCase().includes(s)))
   }, [all, q, showSwitches])
 
+  // VLANs to pick from: the planned ones, plus any ID already used on a switch port or interface.
+  const vlanChoices = useMemo(() => {
+    const plans = vlansOf(project)
+    const used = new Set(all.map((r) => r.info.vlan?.trim()).filter(Boolean) as string[])
+    for (const e of project.equipment) for (const n of Object.values(e.network ?? {})) if (n.vlan?.trim()) used.add(n.vlan.trim())
+    const extra = [...used].filter((v) => !plans.some((p) => p.vlan.trim() === v)).map((v) => ({ vlan: v, name: '(no subnet set)' }))
+    return [...plans.map((p) => ({ vlan: p.vlan.trim(), name: p.name ?? '' })), ...extra].sort((a, b) => Number(a.vlan) - Number(b.vlan) || a.vlan.localeCompare(b.vlan))
+  }, [project, all])
+
   const columns = useMemo<SheetColumn<NetworkRow>[]>(() => [
     { key: 'ip', title: 'IP Address', width: 140, get: (r) => r.info.ip ?? '', set: () => {},
       render: (r) => {
@@ -51,17 +60,24 @@ export function NetworkSheet() {
       render: (r) => r.isSwitch ? <span className="muted">—</span> : <span className={r.info.switchTag ? 'net-manual' : ''} title={r.link ? `Traced from the wiring${r.link.via.length ? ` via ${r.link.via.join(' → ')}` : ''}${r.link.direct ? ' (not a switch)' : ''}` : r.info.switchTag ? 'Typed in (not wired)' : 'Not wired to a switch yet – type one in or cable it on the diagram'}>{rowSwitch(r)}{r.link?.direct && !r.info.switchTag ? ' (direct)' : ''}</span> },
     { key: 'port', title: 'Switch Port', width: 110, get: (r) => (r.isSwitch ? '' : rowSwitchPort(r)), set: () => {},
       render: (r) => r.isSwitch ? '' : <span className={r.info.switchPort ? 'net-manual' : ''}>{rowSwitchPort(r)}</span> },
-    { key: 'vlan', title: 'VLAN', width: 70, get: (r) => r.info.vlan ?? '', set: () => {},
-      render: (r) => { const v = rowVlan(r); return <span className={v.inherited ? 'muted' : ''} title={v.inherited && v.vlan ? `From ${rowSwitch(r)} ${rowSwitchPort(r)} (switch port VLAN) – type to set this interface’s own` : undefined}>{v.vlan}</span> } },
+    { key: 'vlan', title: 'VLAN', width: 150, get: (r) => rowVlan(r).vlan, value: (r) => r.info.vlan ?? '', set: () => {},
+      options: (r) => {
+        const sp = r.link && !r.link.direct ? r.link.eq.network?.[r.link.port.id] : undefined
+        const inherit = sp && sp.mode !== 'trunk' && sp.vlan ? ` (switch port: ${sp.vlan})` : ''
+        return [{ value: '', label: `—${inherit}` }, ...vlanChoices.map((v) => ({ value: v.vlan, label: v.name ? `${v.vlan} – ${v.name}` : v.vlan }))]
+      },
+      render: (r) => { const v = rowVlan(r), pl = vlanPlan(project, v.vlan); return <span className={`net-vlan-cell ${v.inherited ? 'muted' : ''}`} title={v.inherited && v.vlan ? `From ${rowSwitch(r)} ${rowSwitchPort(r)} (switch port VLAN) – pick one to set this interface’s own` : 'Double-click (or Enter) to pick a VLAN – the IP is filled in from that VLAN'}>{v.vlan}{pl?.name ? <span className="muted"> {pl.name}</span> : null}<i>▾</i></span> } },
     { key: 'mask', title: 'Subnet Mask', width: 120, get: (r) => { const pl = vlanPlan(project, rowVlan(r).vlan); return pl && subnetOf(pl) ? `${prefixMask(pl.prefix)} (/${pl.prefix})` : '' } },
     { key: 'gw', title: 'Gateway', width: 110, get: (r) => vlanPlan(project, rowVlan(r).vlan)?.gateway ?? '' },
     { key: 'cable', title: 'Cable', width: 90, get: (r) => r.link?.cable ?? '' },
     { key: 'notes', title: 'Notes', width: 260, get: (r) => r.info.notes ?? '', set: () => {} },
-  ], [dupes, project])
+  ], [dupes, project, vlanChoices])
 
   const commit = useCallback((label: string, changes: { row: NetworkRow; col: SheetColumn<NetworkRow>; value: string }[]) => {
     let bad = 0
-    apply(label, (d) => {
+    const vlanKeys = changes.filter((ch) => ch.col.key === 'vlan').map((ch) => ch.row.key)
+    let res: VlanAssignResult | null = null
+    apply(vlanKeys.length ? (vlanKeys.length > 1 ? `Set VLAN on ${vlanKeys.length}` : 'Set VLAN') : label, (d) => {
       for (const ch of changes) {
         const eq = d.equipment.find((e) => e.id === ch.row.eq.id)
         if (!eq) continue
@@ -79,7 +95,23 @@ export function NetworkSheet() {
       }
       const bays = new Map(d.patchBays.map((b) => [b.equipment, b]))
       for (const e of d.equipment) { const b = bays.get(e.id); if (b) b.name = e.tag }
+      // A new VLAN gives the interface an address in that VLAN's subnet (one that already fits is kept).
+      if (vlanKeys.length) {
+        const byKey = new Map(networkRows(d).map((r) => [r.key, r]))
+        for (const k of vlanKeys) {
+          const r = byKey.get(k), pl = r && vlanPlan(d, rowVlan(r).vlan)
+          if (r && pl && r.info.ip && !inSubnet(r.info.ip, pl)) { const eq = d.equipment.find((e) => e.id === r.eq.id); if (eq) setNet(eq, r.portId, { ip: '' }) }
+        }
+        res = autoAssignByVlan(d, vlanKeys, { onlyEmpty: true })
+      }
     })
+    const r = res as VlanAssignResult | null
+    if (r) {
+      const parts = [r.assigned ? `${r.assigned} IP address${r.assigned === 1 ? '' : 'es'} assigned` : '',
+        r.noPlan.length ? `VLAN ${r.noPlan.join(', ')} has no subnet yet – set it under VLANs… to get addresses` : '',
+        r.full.length ? `VLAN ${r.full.join(', ')} is full` : ''].filter(Boolean)
+      if (parts.length) notify(parts.join(' · '), { kind: r.noPlan.length || r.full.length ? 'warning' : 'success', undo: !!r.assigned })
+    }
     if (bad) notify(`${bad} address${bad === 1 ? ' isn’t a' : 'es aren’t'} valid IPv4 (e.g. 192.168.1.20 or 10.0.0.5/24) – highlighted in red`, { kind: 'warning' })
   }, [apply, notify])
 

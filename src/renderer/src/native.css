@@ -306,3 +306,7 @@ html.vibrant .sidebar.peek, html.vibrant .led-list.peek { background: color-mix(
 .align-pop .ap-x { width: 22px; font-size: 10px; color: var(--text-2); }
 /* Patch Labels: a bay's bottom row has its group titles under the labels, brackets reaching up. */
 .pb-titles.bottom .pb-title .bracket { border-top: none; border-bottom: 1px solid currentColor; margin-top: 0; margin-bottom: 6px; }
+
+/* Toast Undo: light text on the dark toast (the native button style made it white on white). */
+.toast .toast-action, .toast-action { background: rgba(255,255,255,.16) !important; color: #fff !important; border: none !important; box-shadow: none !important; }
+.toast-action:hover { background: rgba(255,255,255,.28) !important; }

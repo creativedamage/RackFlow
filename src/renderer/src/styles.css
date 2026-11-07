@@ -844,6 +844,8 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 
 /* Network sheet */
 .net-bad { color: var(--danger); font-weight: 600; }
+.net-vlan-cell { display: flex; gap: 4px; align-items: center; width: 100%; }
+.net-vlan-cell > i { margin-left: auto; font-style: normal; opacity: .45; font-size: 10px; }
 .net-manual { font-style: italic; }
 .net-switch-row .xsheet-td { background: var(--bg-2); }
 

@@ -211,11 +211,18 @@ export function Sheet<R>({ rows, columns, rowKey, commit, onSelectionChange, row
             return (
               <div key={col.key} data-cell={`${r}:${c}`}
                 className={`xsheet-td ${selRect(r, c) ? 'sel' : ''} ${active ? 'active' : ''} ${col.set ? 'editable' : 'ro'} ${col.align ?? (col.numeric ? 'right' : '')}`}
-                onMouseDown={(e) => { if (!isEdit) cellDown(e, r, c) }} onMouseEnter={() => cellEnter(r, c)} onDoubleClick={() => startEdit(r, c)}>
+                onMouseDown={(e) => { if (!isEdit) cellDown(e, r, c) }} onMouseEnter={() => cellEnter(r, c)} onDoubleClick={() => startEdit(r, c)}
+                onClick={(e) => { if (!isEdit && col.options && col.set && !e.shiftKey && !e.metaKey && !e.ctrlKey && box.top === box.bottom) startEdit(r, c) }}>
                 {isEdit ? (
                   col.options ? (
-                    <select ref={(el) => { input.current = el }} value={editing.draft}
-                      onChange={(e) => { const v = e.target.value; setEditing({ ...editing, draft: v }); commit(`Edit ${col.title}`, [{ row, col, value: v }]); setEditing(null); requestAnimationFrame(focusGrid) }}
+                    <select ref={(el) => { input.current = el; if (el && !el.dataset.opened) { el.dataset.opened = '1'; requestAnimationFrame(() => { try { el.showPicker?.() } catch { /* not supported */ } }) } }} value={editing.draft}
+                      onChange={(e) => {
+                        const v = e.target.value; setEditing({ ...editing, draft: v })
+                        // Picked from a dropdown with several rows selected: every selected row in this column gets it.
+                        const inBox = r >= box.top && r <= box.bottom && c >= box.left && c <= box.right
+                        const many = inBox ? cellsIn().filter((x) => x.col === col) : []
+                        commit(`Edit ${col.title}`, (many.length > 1 ? many.map((x) => x.row) : [row]).map((rw) => ({ row: rw, col, value: v }))); setEditing(null); requestAnimationFrame(focusGrid)
+                      }}
                       onBlur={() => { setEditing(null) }} onKeyDown={(e) => { if (e.key === 'Escape') { setEditing(null); focusGrid() } }}>
                       {col.options(row).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
