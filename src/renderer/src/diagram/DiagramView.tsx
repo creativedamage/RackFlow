@@ -20,7 +20,6 @@ import { CableEdge, type CableEdgeType } from './CableEdge'
 import { usePageShortcuts, addToViewItems, clearViewWires, moveDevicesToPage, pageMenuItems, useGroupFocus, viewMenuItems } from './GroupsPanel'
 import { NoteNode, type NoteNodeType } from './NoteNode'
 import { useWiring } from './wiring'
-import { tidyDiagram } from './tidy'
 import { SchematicPrintDialog } from '../print/SchematicPrint'
 import { createPortal } from 'react-dom'
 import { Segmented } from '../components/ui'
@@ -37,6 +36,7 @@ const pointOf = (e: MouseEvent | TouchEvent | React.MouseEvent) => ('touches' in
 
 /** Zoom / position per page or view, kept while the app is open (survives switching tabs). */
 const viewports = new Map<string, Viewport>()
+let seenLocate = 0
 let seenFit = 0
 
 export function DiagramView() {
@@ -48,7 +48,7 @@ export function DiagramView() {
   const fitRequest = useStore((s) => s.fitRequest)
   const apply = useStore((s) => s.apply)
   const select = useStore((s) => s.select)
-  const { screenToFlowPosition, fitView, setViewport, getViewport } = useReactFlow()
+  const { screenToFlowPosition, fitView, setViewport, getViewport, getNode, getNodesBounds } = useReactFlow()
   const focusGroup = useGroupFocus((s) => s.focus)
   usePageShortcuts()
   const page = useStore((s) => s.diagramPage)
@@ -185,7 +185,6 @@ export function DiagramView() {
   }, [issues])
 
   const wireMode = project.diagram?.wires ?? 'all'
-  const autoTidy = !!project.diagram?.autoTidy
   // On a page, newly added devices join that page.
   const knownIds = useRef(new Set(project.equipment.map((e) => e.id as string)))
   useEffect(() => {
@@ -203,14 +202,6 @@ export function DiagramView() {
   useEffect(() => {
     if (view && shown.equipment.some((e) => !view.positions[e.id])) useStore.getState().amend((d) => { layoutView(d, view.id, nodeGeom, { onlyNew: true }) })
   }, [view, shown])
-
-  // Auto-tidy: when devices or cables are added, re-arrange in the same undo step.
-  const counts = useRef({ e: project.equipment.length, c: project.cables.length })
-  useEffect(() => {
-    const prev = counts.current
-    counts.current = { e: project.equipment.length, c: project.cables.length }
-    if (autoTidy && (project.equipment.length > prev.e || project.cables.length > prev.c)) tidyDiagram({ amend: true })
-  }, [project.equipment.length, project.cables.length, autoTidy])
 
   const edges: CableEdgeType[] = useMemo(() => {
     const sel = new Set(selection)
@@ -254,6 +245,22 @@ export function DiagramView() {
     window.addEventListener('diagram:locate', on)
     return () => window.removeEventListener('diagram:locate', on)
   }, [fitView])
+  // Design check ▸ click an issue → frame the device(s) it's about (after any page / view switch has drawn).
+  const locate = useStore((s) => s.locate)
+  useEffect(() => {
+    if (!locate || locate.seq === seenLocate) return
+    const t = setTimeout(() => {
+      seenLocate = locate.seq
+      // Both ends if they fit at a readable size, else the first device (the one the issue names).
+      const el = document.querySelector('.diagram')?.getBoundingClientRect()
+      const ns = locate.ids.map((id) => getNode(id)).filter((n): n is NonNullable<typeof n> => !!n)
+      if (!ns.length) return
+      const b = getNodesBounds(ns)
+      const both = ns.length > 1 && !!el && Math.min(el.width / (b.width * 1.5), el.height / (b.height * 1.5)) >= 0.45
+      void fitView({ nodes: (both ? ns : ns.slice(0, 1)).map((n) => ({ id: n.id })), padding: both ? 0.25 : 0.6, maxZoom: 1, duration: 350 })
+    }, 220)
+    return () => clearTimeout(t)
+  }, [locate, fitView, getNode, getNodesBounds])
   // Each page / view keeps its own zoom and position: coming back (from another page, or from the
   // rack elevation) puts you where you were; the first visit frames what's on it.
   const vpKey = viewId ?? page ?? 'all'
@@ -887,7 +894,7 @@ function PickedPanel() {
   )
 }
 
-/** Top-right tools: Tidy Up, wire drawing mode, auto-tidy. */
+/** Diagram bar: page name, wire drawing mode, notes, print. */
 function DiagramTools() {
   const settings = useStore((s) => s.project.diagram)
   const viewId = useStore((s) => s.diagramView)
@@ -912,18 +919,11 @@ function DiagramTools() {
     s.notify('Double-click the note to type · drag to move · drag its corners to resize' + (kind === 'callout' ? ' · drag the arrow’s dot to aim it' : ''), { kind: 'info' })
   }
   const set = (label: string, patch: Partial<NonNullable<typeof settings>>) => apply(label, (d) => { d.diagram = { ...(d.diagram ?? {}), ...patch } })
-  const tidy = (sel: boolean) => {
-    const n = tidyDiagram({ selectionOnly: sel })
-    if (n) { notify(`Tidied ${n} device${n === 1 ? '' : 's'} by signal flow`, { undo: true, kind: 'success' }); setTimeout(() => void fitView({ padding: 0.12, duration: 300 }), 60) }
-  }
   const pageName = useStore((s) => s.diagramView ? viewsOf(s.project).find((v) => v.id === s.diagramView)?.name : s.diagramPage ? (s.project.groups ?? []).find((g) => g.id === s.diagramPage)?.name : 'All Pages')
   return (
     <div className="diagram-tools diagram-bar">
       <span className="db-title" title="The page or view shown – pick another in the sidebar">{pageName}</span>
       <span className="db-sep" />
-      <button className="primary" onClick={() => tidy(selection.length > 1)} title={selection.length > 1 ? 'Arrange the selected devices by signal flow (⌥⌘L)' : 'Arrange the whole diagram by signal flow: sources left, destinations right, groups kept together (⌥⌘L)'}>
-        ✨ Tidy {selection.length > 1 ? 'Selection' : 'Up'}
-      </button>
       <span className="db-label">Wires</span>
       <Segmented<WireMode> value={settings?.wires ?? 'all'} onChange={(v) => set('Wire Style', { wires: v })} options={[
         { value: 'all', label: 'All wires', title: 'Draw every wire in full' },
@@ -937,9 +937,6 @@ function DiagramTools() {
       ])} title="Place a callout, note or revision note anywhere on the diagram">＋ Note ▾</button>
       {viewId && <button className="danger" onClick={() => clearViewWires(viewId)} title="Delete every cable drawn on this view. Cables of other signal types (not on this view) are kept. Undo with ⌘Z.">Remove Connections</button>}
       <span className="db-fill" />
-      <label className="check" title="Re-arrange automatically whenever you add a device or cable">
-        <input type="checkbox" checked={!!settings?.autoTidy} onChange={(e) => { set('Auto-Tidy', { autoTidy: e.target.checked }); if (e.target.checked) tidyDiagram({ amend: true }) }} /> Auto-tidy
-      </label>
       <button onClick={() => setPrinting(true)} title="Print or export a CAD-style wiring drawing">Print…</button>
       {printing && createPortal(<SchematicPrintDialog onClose={() => setPrinting(false)} />, document.body)}
     </div>

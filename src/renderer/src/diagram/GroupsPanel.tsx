@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { create } from 'zustand'
 import { autoGroupBySystem, createGroup, deleteView, duplicateView, layoutView, pageNumbers, GENERAL_PAGE, DOMAINS, groupColor, groupsOf, membersOf, moveToPage, nodeGeom, setInView, ungroup, removeViewConnections, viewMembers, viewsOf, type DeviceGroup, type SignalDomain } from '@core/index'
 import { showContextMenu } from '../components/ContextMenu'
-import { tidyDiagram } from './tidy'
 import type { MenuItem } from '../components/ContextMenu'
 import { useStore } from '../store'
 
@@ -151,7 +150,6 @@ function viewMenu(v: { id: string; name: string }): MenuItem[] {
       openView(copy)
       set({ editingView: copy, copiedView: copy })
     } },
-    { label: 'Tidy This View', onClick: () => { openView(v.id); tidyDiagram() } },
     'sep',
     { label: 'Remove All Connections in This View…', danger: true, onClick: () => clearViewWires(v.id) },
     { label: 'Delete View', danger: true, onClick: () => { useStore.getState().apply('Delete View', (d) => deleteView(d, v.id)); useStore.getState().notify(`Deleted view “${v.name}” – the devices are still on the diagram`, { undo: true }) } },

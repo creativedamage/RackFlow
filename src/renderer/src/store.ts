@@ -5,7 +5,7 @@
 import { create } from 'zustand'
 import { produce } from 'immer'
 import {
-  audit, upgradeBay, addNewCatalogPorts, nodeGeom, spreadCards, BUILT_IN_MANUFACTURERS, ManufacturerDirectory, BUILT_IN_PATCH_TEMPLATES, BUILT_IN_PRODUCTS, CURRENT_SCHEMA, newProject, ProductLibrary,
+  audit, viewsOf, viewMembers, upgradeBay, addNewCatalogPorts, nodeGeom, spreadCards, BUILT_IN_MANUFACTURERS, ManufacturerDirectory, BUILT_IN_PATCH_TEMPLATES, BUILT_IN_PRODUCTS, CURRENT_SCHEMA, newProject, ProductLibrary,
   type CableId, type EquipmentId, type PatchBayId, type PatchBayTemplate, type ProductDefinition, type Project, type RackId,
   type ValidationIssue, type IssueSubject,
 } from '@core/index'
@@ -125,6 +125,8 @@ export interface AppState {
   set: (patch: Partial<AppState>) => void
   select: (ids: EquipmentId[], cable?: CableId | null) => void
   focusIssue: (s: IssueSubject) => void
+  /** Frame these devices on the wiring diagram (issues, Library ▸ locate). */
+  locate: { ids: string[]; seq: number } | null
   reloadLibrary: () => Promise<void>
   notify: (msg: string, opts?: NotifyOptions) => void
   toasts: Toast[]
@@ -162,6 +164,7 @@ export const useStore = create<AppState>((set, get) => ({
   selectedBay: null,
   selectedAccessory: null,
   diagramPage: null,
+  locate: null,
   exportingAll: false,
   selectedLedWall: null,
   selectedBox: null,
@@ -223,13 +226,20 @@ export const useStore = create<AppState>((set, get) => ({
   set: (patch) => set(patch),
   select: (ids, cable = null) => set({ selection: ids, selectedCable: cable, selectedCables: NO_CABLES, selectedAccessory: null }),
   focusIssue: (s) => {
-    switch (s.kind) {
-      case 'equipment': set({ mode: 'diagram', selection: [s.id], selectedCable: null }); break
-      case 'cable': set({ mode: 'diagram', selection: [], selectedCable: s.id }); break
-      case 'rack': set({ mode: 'rack', selectedRack: s.id }); break
-      case 'port': set({ mode: 'diagram', selection: [s.a.equipment], selectedCable: null }); break
-      case 'ports': set({ mode: 'diagram', selection: [s.a.equipment, s.b.equipment], selectedCable: null }); break
-    }
+    if (s.kind === 'project') return
+    if (s.kind === 'rack') { set({ mode: 'rack', selectedRack: s.id }); return }
+    const p = get().project
+    const cable = s.kind === 'cable' ? p.cables.find((c) => c.id === s.id) : undefined
+    const ids = (s.kind === 'equipment' ? [s.id] : s.kind === 'port' ? [s.a.equipment] : s.kind === 'ports' ? [s.a.equipment, s.b.equipment] : cable ? [cable.from.equipment, cable.to.equipment] : [])
+      .filter((id, i, a) => a.indexOf(id) === i && p.equipment.some((e) => e.id === id)) as string[]
+    if (!ids.length) return
+    // Show it where it can be seen: stay on the current page / view if it's there, else go to its page.
+    const st = get(), eqs = p.equipment.filter((e) => ids.includes(e.id))
+    const view = st.diagramView ? viewsOf(p).find((v) => v.id === st.diagramView) : undefined
+    const inView = view && eqs.every((e) => viewMembers(p, view).some((m) => m.id === e.id))
+    const onPage = !st.diagramView && eqs.every((e) => !st.diagramPage || e.groupId === st.diagramPage)
+    const where = inView || onPage ? {} : { diagramView: null, diagramPage: eqs.every((e) => e.groupId && e.groupId === eqs[0].groupId) ? eqs[0].groupId! : null }
+    set({ mode: 'diagram', ...where, selection: s.kind === 'cable' ? [] : ids as EquipmentId[], selectedCable: s.kind === 'cable' ? s.id : null, locate: { ids, seq: (st.locate?.seq ?? 0) + 1 } })
   },
   reloadLibrary: async () => {
     const [userProducts, userTemplates, userMakers] = await Promise.all([api.listUserProducts(), api.listUserTemplates(), api.listUserManufacturers()])

@@ -184,7 +184,6 @@ function buildMenu() {
         sep,
         cmd('Export / Print…', 'quickPrint', 'CmdOrCtrl+P'),
         cmd('Export Everything…', 'exportAll', 'Shift+CmdOrCtrl+E'),
-        cmd('Share…', 'share', 'Shift+CmdOrCtrl+H'),
         sep,
         isMac ? { role: 'close' } : { role: 'quit' },
         ...(isMac ? [] : [sep, settingsItem]),
@@ -225,7 +224,6 @@ function buildMenu() {
     {
       label: 'Diagram',
       submenu: [
-        cmd('Tidy Up', 'tidy', 'Alt+CmdOrCtrl+L'),
         cmd('Zoom to Fit', 'zoomFit', 'CmdOrCtrl+0'),
         sep,
         cmd('New Page', 'page:new'),

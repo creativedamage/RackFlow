@@ -9,7 +9,7 @@ export type MenuCommand =
   | 'new' | 'open' | 'save' | 'saveAs' | 'save-and-close' | 'autosave:toggle' | 'quickPrint'
   | 'undo' | 'redo' | 'delete' | 'selectAll' | 'zoomFit'
   | 'mode:diagram' | 'mode:rack' | 'mode:patch' | 'mode:sheet' | 'mode:led' | 'mode:boxes'
-  | 'newProduct' | 'newTemplate' | 'toggleInspector' | 'toggleSidebar' | 'share' | 'editDevice' | 'findDevice' | 'tidy' | 'exportAll' | 'numbering' | 'units:imperial' | 'units:metric' | 'theme:system' | 'theme:light' | 'theme:dark'
+  | 'newProduct' | 'newTemplate' | 'toggleInspector' | 'toggleSidebar' | 'editDevice' | 'findDevice' | 'exportAll' | 'numbering' | 'units:imperial' | 'units:metric' | 'theme:system' | 'theme:light' | 'theme:dark'
   | 'settings' | 'startScreen' | 'page:new' | 'page:fromSelection' | 'page:bySystem' | 'view:new' | 'sheetNumbers'
   | 'insert:wallBox' | 'insert:wallPlate' | 'insert:floorBox' | 'insert:rackPanel' | 'insert:fiber' | 'insert:rack' | 'insert:led'
 

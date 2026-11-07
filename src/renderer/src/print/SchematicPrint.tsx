@@ -67,7 +67,7 @@ export function SchematicPrintDialog({ onClose }: { onClose: () => void }) {
           ]} />
         </Field>
         <Toggle label="Colour by signal" checked={o.color} onChange={(color) => set({ ...o, color })} />
-        <p className="muted small">Tip: ✨ Tidy Up the diagram first. Wires that leave a sheet end in an arrow naming the device, port and sheet they go to.</p>
+        <p className="muted small">Wires that leave a sheet end in an arrow naming the device, port and sheet they go to.</p>
       </>} />
   )
 }

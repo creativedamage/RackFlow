@@ -42,7 +42,6 @@ export function StartScreen() {
           <div className="ss-rows">
             {row(<svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3.5" y="2.5" width="13" height="15" rx="2" /><path d="M10 7v6M7 10h6" strokeLinecap="round" /></svg>, 'New Project', 'Start a system design from scratch', () => void newDocument())}
             {row(<svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"><path d="M2.5 6V15a1 1 0 001 1h13a1 1 0 001-1V7.5a1 1 0 00-1-1H9.5L8 4.5H3.5a1 1 0 00-1 1z" /></svg>, 'Open Existing Project…', 'Browse for a .rackflow file', () => void openDocument())}
-            {row(<svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="10" cy="10" r="2.6" /><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4" strokeLinecap="round" /></svg>, 'Settings…', 'Folders, units, appearance', () => useStore.getState().set({ showSettings: true }))}
           </div>
         </div>
         <div className="ss-right">
