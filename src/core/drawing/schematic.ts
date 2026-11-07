@@ -10,7 +10,7 @@ import { autoNumber, GENERAL_PAGE, pageNumbers, sheetLabel } from '../sheetnumbe
 import { CATEGORIES, type Annotation, type Cable, type EquipmentInstance, type PortTemplate, type Project, type WireMode, type NetInfo, type VlanPlan } from '../model'
 import { DOMAINS } from '../signals'
 import { portDomain } from '../project'
-import { planChannels, type ChannelWire } from '../autolayout'
+import { findFreeSpot, planChannels, type ChannelWire } from '../autolayout'
 import { cardLayout, cardPortLabel, FACE_H, headerHeight, NODE_WIDTH, nodeGeom, SEC_HEAD, splitPorts, flagName } from '../diagramgeom'
 import { cleanPath, crossings, detourBudget, nudgeWires, route, WIRE_CLEAR, type Pt, type Rect } from '../wireroute'
 import { groupsOf } from '../groups'
@@ -133,11 +133,41 @@ export function sideReach(p: Project, e: EquipmentInstance, o: Pick<SchematicOpt
 const ZONE_PAD = 36 // room zone border distance from what it encloses
 
 /**
- * Print positions: exactly where the devices sit on the wiring diagram (the
- * page or signal view being printed). The sheet is a scaled copy of the screen.
+ * Print positions: where the devices sit on the wiring diagram (the page or
+ * signal view being printed) – the sheet is a scaled copy of the screen. Only
+ * devices that would land on top of another one (cards, tags or the wire
+ * labels beside them) move, each to the nearest open spot, so nothing on a
+ * sheet ever prints overlapped.
  */
-export function printPositions(_p: Project, eqs: EquipmentInstance[], _o: Pick<SchematicOptions, 'wires'> & Partial<Pick<SchematicOptions, 'zones' | 'rooms' | 'split'>> = { wires: 'smart' }, _groupOf?: Map<string, string>): Map<string, { x: number; y: number }> {
-  return new Map(eqs.map((e) => [e.id as string, { x: e.position.x, y: e.position.y }]))
+export function printPositions(p: Project, eqs: EquipmentInstance[], o: Pick<SchematicOptions, 'wires'> & Partial<Pick<SchematicOptions, 'zones' | 'rooms' | 'split'>> = { wires: 'smart' }, groupOf?: Map<string, string>): Map<string, { x: number; y: number }> {
+  const out = new Map(eqs.map((e) => [e.id as string, { x: e.position.x, y: e.position.y }]))
+  // Footprint on paper: tag above, category below, badges, wire labels / flags at the sides.
+  const foot = new Map(eqs.map((e) => {
+    const g = nodeGeom(e), r = sideReach(p, e, o)
+    return [e.id as string, { l: BADGE + Math.min(r.left, 160) + 6, r: BADGE + Math.min(r.right, 160) + 6, t: 34, w: g.width, h: g.height + 22, wl: r.left ? BADGE + 50 : 0, wr: r.right ? BADGE + 50 : 0 }]
+  }))
+  const box = (id: string, at = out.get(id)!) => { const f = foot.get(id)!; return { x0: at.x - f.l, y0: at.y - f.t, x1: at.x + f.w + f.r, y1: at.y + f.h } }
+  const hit = (a: { x0: number; y0: number; x1: number; y1: number }, b: typeof a) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1
+  // Cards only clash when they actually touch (wire labels may tuck in beside each other on screen).
+  const card = (id: string) => { const at = out.get(id)!, f = foot.get(id)!; return { x0: at.x + 2 - f.wl, y0: at.y + 2, x1: at.x + f.w - 2 + f.wr, y1: at.y + f.h - 24 } }
+  const ids = eqs.map((e) => e.id as string)
+  const clash = new Set<string>()
+  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) if (hit(card(ids[i]), card(ids[j]))) { clash.add(ids[i]); clash.add(ids[j]) }
+  if (!clash.size) return out
+  // Keep everything that's clear where it is; place the rest top-left first, the first of each stack staying put.
+  const placed = ids.filter((id) => !clash.has(id)).map((id) => box(id))
+  const order = [...clash].sort((a, b) => out.get(a)!.y - out.get(b)!.y || out.get(a)!.x - out.get(b)!.x)
+  for (const id of order) {
+    const f = foot.get(id)!, b = box(id)
+    // Stay inside one's own group box where possible – a free spot is searched among devices only.
+    if (placed.some((q) => hit(q, b))) {
+      const at = findFreeSpot(placed, { width: b.x1 - b.x0, height: b.y1 - b.y0 }, { x: b.x0, y: b.y0 }, 10, 20)
+      out.set(id, { x: Math.round(at.x + f.l), y: Math.round(at.y + f.t) })
+    }
+    placed.push(box(id))
+  }
+  void groupOf
+  return out
 }
 
 function drawPage(p0: Project, o: SchematicOptions, page: Page, n: number, total: number, sheetOf: Map<string, number>, labels: (string | undefined)[] = []): string {
@@ -157,12 +187,13 @@ function drawPage(p0: Project, o: SchematicOptions, page: Page, n: number, total
     return { ...a, x: a.x + d.x, y: a.y + d.y, leader: a.leader ? { x: a.leader.x + d.x, y: a.leader.y + d.y } : undefined }
   })
   const geo = new Map(eqs.map((e) => [e.id as string, nodeGeom(e)]))
+  const moved = new Set(p0.equipment.filter((e) => pos.has(e.id) && (pos.get(e.id)!.x !== e.position.x || pos.get(e.id)!.y !== e.position.y)).map((e) => e.id as string))
   // Bounds in diagram units (room for tags above, category below, stubs and labels at the sides).
   const reachOf = new Map(eqs.map((e) => [e.id as string, sideReach(p, e, o)]))
   const noteXs = notes.flatMap((a) => [a.x, a.x + a.w, ...(a.leader ? [a.leader.x] : [])]), noteYs = notes.flatMap((a) => [a.y, a.y + a.h, ...(a.leader ? [a.leader.y] : [])])
   // Group boxes exactly as drawn on the diagram (only those with a device of this sheet in them).
   const zmode = zoneMode(p, o)
-  const boxes = zmode !== 'groups' ? [] : clustersOf(p0).filter((c) => clusterShownIn(c, { page: isView ? null : page.pageId ?? null, view: isView ? page.pageId! : null }, viewIds) && eqs.some((e) => groupOf.get(e.id) === c.id)).map((c) => ({ c, r: clusterRect(p0, c) }))
+  const boxes = zmode !== 'groups' ? [] : clustersOf(p0).filter((c) => clusterShownIn(c, { page: isView ? null : page.pageId ?? null, view: isView ? page.pageId! : null }, viewIds) && eqs.some((e) => groupOf.get(e.id) === c.id)).map((c) => ({ c, r: growRect(clusterRect(p0, c), eqs.filter((e) => groupOf.get(e.id) === c.id && moved.has(e.id)), geo) }))
   const bx = boxes.flatMap((b) => [b.r.x, b.r.x + b.r.w]), by = boxes.flatMap((b) => [b.r.y - 12, b.r.y + b.r.h])
   const x0 = Math.min(...eqs.map((e) => e.position.x - BADGE - reachOf.get(e.id)!.left), ...noteXs.map((v) => v - 20), ...bx) - 20
   const y0 = Math.min(...eqs.map((e) => e.position.y - 40), ...noteYs.map((v) => v - 30), ...by) - 10
@@ -187,6 +218,14 @@ function drawPage(p0: Project, o: SchematicOptions, page: Page, n: number, total
     for (const a of notes) drawNote(g, a)
   })
   return svg.toString()
+}
+
+/** A group box grown to hold members that print somewhere else than on screen. */
+function growRect(r: { x: number; y: number; w: number; h: number }, moved: EquipmentInstance[], geo: Map<string, { width: number; height: number }>) {
+  if (!moved.length) return r
+  const x0 = Math.min(r.x, ...moved.map((e) => e.position.x - 40)), y0 = Math.min(r.y, ...moved.map((e) => e.position.y - 50))
+  const x1 = Math.max(r.x + r.w, ...moved.map((e) => e.position.x + geo.get(e.id)!.width + 40)), y1 = Math.max(r.y + r.h, ...moved.map((e) => e.position.y + geo.get(e.id)!.height + 40))
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
 }
 
 /** Dashed, labelled boxes round devices that share a zone (a group, or a room). */
