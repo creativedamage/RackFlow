@@ -5,7 +5,7 @@ import {
   BUILT_IN_KEYS, CATEGORIES, CATEGORY_KEYS, CONNECTOR_TYPES, guessMakerCategories, connectorName, DOMAINS, GENDERS, heatBTU, MOUNT_TYPES, port as mkPort, portDomain,
   productProblems, RACK_UNIT_MM, series, SIGNAL_TYPES, SIGNALS, suggestedSignals, typicalPanelGender,
   type ConnectorType, type Gender, type PortDirection, type PortTemplate, type ProductDefinition, type SignalDomain, type SignalType,
-  refreshBoxPorts, keepInViews, applyCards } from '@core/index'
+  refreshBoxPorts, keepInViews, applyCards, renameSeries } from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
 import { Dot, Field, Modal, NumberInput, Select, TextInput, Toggle, LenInput, WtInput } from '../components/ui'
@@ -92,6 +92,13 @@ export function ProductEditor({ initial }: { initial: ProductDefinition }) {
   const editPort = (id: string, fn: (x: PortTemplate) => void) => edit((d) => { const x = d.ports.find((q) => q.id === id); if (x) fn(x) })
   /** A change on a ticked row applies to every ticked row (connector, gender, direction, signals, group, face). */
   const editPorts = (id: string, fn: (x: PortTemplate) => void) => edit((d) => { const ids = sel.has(id) && sel.size > 1 ? sel : new Set([id]); for (const x of d.ports) if (ids.has(x.id)) fn(x) })
+  /** Renaming a ticked row renames every ticked row, numbered in order (see renameSeries). */
+  const renamePorts = (id: string, text: string) => {
+    if (!(sel.has(id) && sel.size > 1)) { editPort(id, (q) => { q.label = text }); return }
+    const order = p.ports.filter((x) => sel.has(x.id)).map((x) => x.id)
+    const names = renameSeries(text, order.length, order.indexOf(id))
+    edit((d) => { order.forEach((pid, i) => { const q = d.ports.find((x) => x.id === pid); if (q && names[i]) q.label = names[i] }) })
+  }
   const lastTick = useRef<number | null>(null)
   const tick = (i: number, id: string, on: boolean, shift: boolean) => setSel((s0) => {
     const n = new Set(s0)
@@ -186,7 +193,7 @@ export function ProductEditor({ initial }: { initial: ProductDefinition }) {
             <button disabled={!sel.size} onClick={() => edit((d) => { d.ports.push(...d.ports.filter((x) => sel.has(x.id)).map((x) => ({ ...structuredClone(x), id: newPortId(), label: `${x.label} copy` }))) })}>Duplicate</button>
             <button className="danger" disabled={!sel.size} onClick={() => { edit((d) => { d.ports = d.ports.filter((x) => !sel.has(x.id)) }); setSel(new Set()) }}>Delete</button>
           </div>
-          {sel.size > 1 && <p className="muted small ports-bulk">{sel.size} ports selected – a change to Connector, Gender, Direction, Signals, Group or Face on any ticked row applies to all {sel.size}. Shift-click a box to tick a range.</p>}
+          {sel.size > 1 && <p className="muted small ports-bulk">{sel.size} ports selected – a change on any ticked row applies to all {sel.size}. Renaming numbers them in order: type “Mic 1” (or “Ch {'{n}'} In”) and they become Mic 1, Mic 2… Shift-click a box to tick a range.</p>}
           {showSeries && <SeriesForm onAdd={(ps) => { edit((d) => { d.ports.push(...ps) }); setShowSeries(false) }} />}
           <div className="ports-table-wrap">
             <table className="ports-table">
@@ -195,7 +202,7 @@ export function ProductEditor({ initial }: { initial: ProductDefinition }) {
                 {p.ports.map((x, i) => (
                   <tr key={x.id} className={sel.has(x.id) ? 'sel' : ''}>
                     <td><input type="checkbox" checked={sel.has(x.id)} onClick={(e) => tick(i, x.id, (e.target as HTMLInputElement).checked, e.shiftKey)} onChange={() => {}} /></td>
-                    <td><TextInput value={x.label} onCommit={(v) => editPort(x.id, (q) => { q.label = v })} /></td>
+                    <td><TextInput value={x.label} onCommit={(v) => renamePorts(x.id, v)} /></td>
                     <td><Select value={x.connector} width={130} onChange={(v: ConnectorType) => editPorts(x.id, (q) => { q.connector = v; q.gender = typicalPanelGender(v); if (!q.signals.length) q.signals = suggestedSignals(v) })} options={CONNECTOR_TYPES.map((c) => ({ value: c, label: connectorName(c) }))} /></td>
                     <td><Select value={x.gender} onChange={(v: Gender) => editPorts(x.id, (q) => { q.gender = v })} options={GENDERS.map((g) => ({ value: g, label: g }))} /></td>
                     <td><Select value={x.direction} onChange={(v) => editPorts(x.id, (q) => { q.direction = v })} options={DIRS} /></td>

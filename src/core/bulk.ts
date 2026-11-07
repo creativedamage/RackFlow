@@ -51,3 +51,21 @@ export function connectMany(p: Project, sources: PortAddress[], firstTarget: Por
   }
   return result
 }
+
+/**
+ * Names for several ports renamed at once, in their order. "{n}" is replaced by
+ * the number; a name ending in a number counts on from it (the row you typed
+ * on keeps that number); any other name gets 1, 2, 3… added.
+ * renameSeries('Mic 3', 4, 2) → Mic 1, Mic 2, Mic 3, Mic 4.
+ */
+export function renameSeries(text: string, count: number, editedIndex = 0): string[] {
+  const t = text.trim()
+  if (t.includes('{n}')) return Array.from({ length: count }, (_, i) => t.replace(/\{n\}/g, String(i + 1)))
+  const m = /^(.*?)(\d+)$/.exec(t)
+  if (m) {
+    const base = Number(m[2]) - editedIndex, width = m[2].startsWith('0') ? m[2].length : 0
+    return Array.from({ length: count }, (_, i) => { const v = Math.max(0, base + i); return `${m[1]}${width ? String(v).padStart(width, '0') : v}` })
+  }
+  if (!t) return Array.from({ length: count }, () => '')
+  return Array.from({ length: count }, (_, i) => `${t} ${i + 1}`)
+}

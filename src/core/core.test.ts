@@ -641,3 +641,11 @@ describe('half-rack units', () => {
     expect(RackLayout.of(p, r.id)!.usedUnits).toBe(1)
   })
 })
+
+import { renameSeries } from './bulk'
+it('names several ports at once', () => {
+  expect(renameSeries('Mic 3', 4, 2)).toEqual(['Mic 1', 'Mic 2', 'Mic 3', 'Mic 4'])
+  expect(renameSeries('Stage', 3)).toEqual(['Stage 1', 'Stage 2', 'Stage 3'])
+  expect(renameSeries('Ch {n} In', 2)).toEqual(['Ch 1 In', 'Ch 2 In'])
+  expect(renameSeries('IN07', 3)).toEqual(['IN07', 'IN08', 'IN09'])
+})
