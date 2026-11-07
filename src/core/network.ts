@@ -151,6 +151,9 @@ export function switchPortRows(p: Project, rows: NetworkRow[] = networkRows(p)):
   return out
 }
 
+/** "Allen & Heath ME-1" – what a device is, next to its tag. */
+export const deviceName = (e: EquipmentInstance) => [e.product.manufacturer, e.product.model].filter(Boolean).join(' ')
+
 /** A device interface's VLAN: its own, else the access VLAN of the switch port it's wired to. */
 export function rowVlan(r: NetworkRow): { vlan: string; inherited: boolean } {
   if (r.info.vlan) return { vlan: r.info.vlan, inherited: false }

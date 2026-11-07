@@ -10,7 +10,7 @@ import { sheetsToHTML, sheetSize } from './drawing/sheet'
 import { defaultPrintOptions, layoutLabels, pagesToPrintHTML } from './patchbay/layout'
 import { cablesToCSV } from './schedule'
 import { pullScheduleCSV } from './pullschedule'
-import { networkRows, rowSwitch, rowSwitchPort, rowVlan, switchPortRows } from './network'
+import { deviceName, networkRows, rowSwitch, rowSwitchPort, rowVlan, switchPortRows } from './network'
 import { CATEGORIES } from './model'
 import { groupsOf } from './groups'
 import { GENERAL_PAGE } from './sheetnumbers'
@@ -102,8 +102,8 @@ export function buildExport(p: Project, parts: ExportPart[], sheet = 'ansiB', se
   if (parts.includes('switchports')) {
     const sp = switchPortRows(p)
     if (sp.length) out.push({ name: name('switchports'), kind: 'text', count: sp.length, content: csv([
-      ['Switch', 'Port', 'Mode', 'VLAN (untagged)', 'Tagged VLANs', 'Connected Device', 'Device Interface', 'Via', 'Notes'],
-      ...sp.map((r) => [r.sw.tag, r.port.label, r.info.mode === 'trunk' ? 'Trunk' : r.info.vlan ? 'Access' : '', r.info.vlan ?? '', r.info.tagged ?? '', r.device?.eq.tag ?? '', r.device?.interface ?? '', r.device?.link?.via.join(' > ') ?? '', r.info.notes ?? '']),
+      ['Switch', 'Port', 'Mode', 'VLAN (untagged)', 'Tagged VLANs', 'Connected Device', 'Device Name', 'Device Interface', 'Via', 'Notes'],
+      ...sp.map((r) => [r.sw.tag, r.port.label, r.info.mode === 'trunk' ? 'Trunk' : r.info.vlan ? 'Access' : '', r.info.vlan ?? '', r.info.tagged ?? '', r.device?.eq.tag ?? '', r.device ? deviceName(r.device.eq) : '', r.device?.interface ?? '', r.device?.link?.via.join(' > ') ?? '', r.info.notes ?? '']),
     ]) })
   }
   return out

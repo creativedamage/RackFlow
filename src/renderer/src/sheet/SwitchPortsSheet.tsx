@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { setNet, switchPortRows, validVlans, type SwitchPortRow } from '@core/index'
+import { deviceName, setNet, switchPortRows, validVlans, type SwitchPortRow } from '@core/index'
 import { useStore } from '../store'
 import { Select } from '../components/ui'
 import { Sheet, type SheetColumn } from './Sheet'
@@ -25,7 +25,7 @@ export function SwitchPortsSheet() {
   const switches = useMemo(() => [...new Map(all.map((r) => [r.sw.id as string, r.sw.tag])).entries()], [all])
   const rows = useMemo(() => {
     const s = q.toLowerCase()
-    return all.filter((r) => (!sw || r.sw.id === sw) && (!s || [r.sw.tag, r.port.label, r.info.vlan, r.info.tagged, r.device?.eq.tag, r.device?.interface, r.info.notes].join(' ').toLowerCase().includes(s)))
+    return all.filter((r) => (!sw || r.sw.id === sw) && (!s || [r.sw.tag, r.port.label, r.info.vlan, r.info.tagged, r.device?.eq.tag, r.device ? deviceName(r.device.eq) : '', r.device?.interface, r.info.notes].join(' ').toLowerCase().includes(s)))
   }, [all, q, sw])
 
   const columns = useMemo<SheetColumn<SwitchPortRow>[]>(() => [
@@ -38,6 +38,7 @@ export function SwitchPortsSheet() {
     { key: 'tagged', title: 'Tagged VLANs', width: 150, get: (r) => r.info.tagged ?? '', set: () => {},
       render: (r) => <span className={r.info.tagged && !validVlans(r.info.tagged) ? 'net-bad' : ''}>{r.info.tagged ?? ''}</span> },
     { key: 'device', title: 'Connected Device', width: 130, get: (r) => r.device?.eq.tag ?? '' },
+    { key: 'devname', title: 'Device Name', width: 200, get: (r) => (r.device ? deviceName(r.device.eq) : '') },
     { key: 'iface', title: 'Device Interface', width: 140, get: (r) => r.device?.interface ?? '' },
     { key: 'via', title: 'Via', width: 200, get: (r) => r.device?.link?.via.join(' → ') ?? '' },
     { key: 'notes', title: 'Notes', width: 240, get: (r) => r.info.notes ?? '', set: () => {} },
