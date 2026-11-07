@@ -35,7 +35,7 @@ export const PORT_CLASSES: { key: PortClass; name: string; prefix: string; off?:
 export const BOX_CATEGORIES: EquipmentCategory[] = ['wallBox', 'wallPlate', 'floorBox', 'connectorPanel']
 export const isBox = (e: EquipmentInstance) => BOX_CATEGORIES.includes(e.product.category)
 
-const MULTI = new Set(['whirlwindW1', 'whirlwindW2', 'socapex19', 'amphenol57', 'edac56', 'edac90'])
+const MULTI = new Set(['whirlwindW1', 'whirlwindW2', 'socapex19', 'amphenol57', 'edac56', 'edac90', 'elcoE3'])
 const FIBER = new Set(['lcDuplex', 'scDuplex', 'mdc', 'mpo8', 'mpo12', 'mpo24', 'opticalCON'])
 
 /** What kind of jack a box port is (null for rear tie lines and anything we don't number). */

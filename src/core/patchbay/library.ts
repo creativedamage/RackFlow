@@ -80,6 +80,8 @@ export const BUILT_IN_PATCH_TEMPLATES: PatchBayTemplate[] = [
   panel('panduit.cppl48wbly', 'Panduit', 'Mini-Com Keystone CPPL48WBLY (48-port, 2RU)', 'rj45', 2, 24, 'keystonePunchdown', 'cat6a'),
 
   dual('bittree.tt.2x48', 'Bittree', 'TT 2×48 (1RU)', 'ttBantam', 1, 48, 9.5, 24, 2, NOTE),
+  { ...dual('bittree.tt.2x48.e3', 'Bittree', 'TT 2×48 (1RU) – E3 rear', 'ttBantam', 1, 48, 9.5, 24, 2, NOTE), rearConnector: 'elcoE3' },
+  { ...dual('bittree.tt.2x48.e90', 'Bittree', 'TT 2×48 (1RU) – E90 rear', 'ttBantam', 1, 48, 9.5, 24, 2, NOTE), rearConnector: 'edac90' },
   dual('bittree.trs.2x24', 'Bittree', '1/4" TRS 2×24 (1RU)', 'quarterInchTRS', 1, 24, 10, 12, 2, NOTE),
   dual('bittree.12g.2x16', 'Bittree', '12G-SDI Video 2×16 (1RU)', 'bnc12G', 1, 16, 10, null, 3, NOTE),
   dual('neutrik.trs.2x24', 'Neutrik', '1/4" TRS 2×24 (1RU)', 'quarterInchTRS', 1, 24, 10, 12, 2, NOTE),

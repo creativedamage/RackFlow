@@ -162,8 +162,10 @@ export const CONNECTORS = {
   whirlwindW2: c('Whirlwind W2 (61-pin)', ['analogMic', 'analogLine']),
   socapex19: c('Socapex 19-pin', ['analogMic', 'analogLine']),
   amphenol57: c('Amphenol 57 (50-pin)', ['analogLine', 'analogMic']),
-  edac56: c('EDAC 56-pin', ['analogMic', 'analogLine']),
-  edac90: c('EDAC 90-pin', ['analogMic', 'analogLine']),
+  edac56: c('EDAC / ELCO 56-pin', ['analogMic', 'analogLine']),
+  edac90: c('EDAC / ELCO 90-pin (E90)', ['analogMic', 'analogLine']),
+  /** Bittree's E3 rear interface for TT bays (EDAC / ELCO family). */
+  elcoE3: c('E3 (EDAC / ELCO)', ['analogLine', 'analogMic', 'aes3']),
 } satisfies Record<string, ConnectorMeta>
 
 export type ConnectorType = keyof typeof CONNECTORS

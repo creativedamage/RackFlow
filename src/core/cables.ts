@@ -118,6 +118,7 @@ export const CABLE_CATALOG: CableSpec[] = [
   cable('multi.soca', '6-Channel Snake – Socapex 19-pin', e('socapex19', 'male'), e('socapex19', 'female'), ['analogMic', 'analogLine', 'aes3'], 150, 'A'),
   cable('multi.amp57', '24-Channel (25-pair) Cable – Amphenol 57', e('amphenol57', 'male'), e('amphenol57', 'male'), ['analogMic', 'analogLine', 'aes3'], 100, 'A'),
   cable('multi.edac56', '18-Channel Snake – EDAC 56', e('edac56', 'male'), e('edac56', 'female'), ['analogMic', 'analogLine', 'aes3'], 150, 'A'),
+  cable('multi.e3', 'E3 Multicore (EDAC / ELCO)', e('elcoE3', 'male'), e('elcoE3', 'female'), ['analogMic', 'analogLine', 'aes3'], 150, 'A'),
   cable('multi.edac90', '28-Channel Snake – EDAC 90', e('edac90', 'male'), e('edac90', 'female'), ['analogMic', 'analogLine', 'aes3'], 150, 'A'),
   cable('xlr3.mic', 'XLR Cable', e('xlr3', 'female'), e('xlr3', 'male'), ['analogMic', 'analogLine', 'aes3', 'ltc'], 100, 'A'),
   cable('midi.din', 'MIDI Cable (5-pin DIN)', e('din5', 'male'), e('din5', 'male'), ['midi'], 15, 'A'),

@@ -55,7 +55,7 @@ export function connectorBadge(c: PortTemplate['connector']): string {
     speakonNL2: 'NL2', speakonNL4: 'NL4', euroblock: 'PHX', bindingPost: 'BP', rj45: 'RJ45', etherCON: 'ECON', lcDuplex: 'LC', scDuplex: 'SC', mdc: 'MDC', mpo8: 'MTP8', mpo12: 'MTP', mpo24: 'MT24', opticalCON: 'OCON',
     usbA: 'USB', usbB: 'USB', usbC: 'USBC', db9: 'DB9', db25: 'DB25', idcPunchdown: 'IDC', xlr5: 'XLR5', lemo: 'LEMO', smpteFiber: 'SMPT', sma: 'SMA', tnc: 'TNC',
     iecC13C14: 'IEC', iecC19C20: 'C20', powerCON: 'PCON', powerCONTrue1: 'TRU1', dcBarrel: 'DC', xlr4: 'XLR4', camlok: 'CAM', schuko: 'SCH',
-    whirlwindW1: 'W1', whirlwindW2: 'W2', socapex19: 'SOCA', amphenol57: 'AMP', edac56: 'ED56', edac90: 'ED90',
+    whirlwindW1: 'W1', whirlwindW2: 'W2', socapex19: 'SOCA', amphenol57: 'AMP', edac56: 'ED56', edac90: 'E90', elcoE3: 'E3',
   }
   return m[c] ?? (c.startsWith('nema') ? c.replace('nema', '').replace('_', '-').toUpperCase() : c.slice(0, 4).toUpperCase())
 }
