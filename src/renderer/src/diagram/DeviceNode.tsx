@@ -1,5 +1,5 @@
-import { memo, useMemo } from 'react'
-import { Handle, NodeToolbar, Position, type NodeProps, type Node } from '@xyflow/react'
+import { memo, useEffect, useMemo, useRef } from 'react'
+import { Handle, NodeToolbar, Position, useUpdateNodeInternals, type NodeProps, type Node } from '@xyflow/react'
 import {
   cardLayout, cardPortLabel, FACE_H, faceProduct, CATEGORIES, connectorName, DOMAINS, nodeGeom, faceSVG, IO_H, portDomain, previewHeight, SEC_HEAD, SIGNALS, SMALL_HEAD, SMALL_W, viewsOf,
   setPortsInView, vlanTag, type CardSection, type EquipmentInstance, type PortTemplate, type SignalDomain,
@@ -47,6 +47,22 @@ export const DeviceNode = memo(function DeviceNode({ data, selected }: NodeProps
   const geom = small ? nodeGeom(eq) : null
   const L = small ? null : cardLayout(eq)
   const domains = useMemo(() => [...new Set(eq.product.ports.map(portDomain).filter(Boolean) as SignalDomain[])].filter((d) => d !== 'power' || eq.product.ports.every((p) => portDomain(p) === 'power')).slice(0, 3), [eq.product.ports])
+
+  // React Flow only draws a wire once it has measured both port handles. When ports appear, move or
+  // fold (a cable added, a port shown in a view, a section opened, card resized) without the card
+  // changing size, it never re-measures – the wire (or its stub) was missing until the page was
+  // reopened. Re-measure this card whenever its set or layout of handles changes.
+  const updateInternals = useUpdateNodeInternals()
+  const handleSig = [(() => { const g = nodeGeom(eq); return eq.product.ports.map((p) => { const q = g.port(p.id); return `${p.id}@${q ? `${q.side}${Math.round(q.y)}` : '-'}` }).join(',') })(), [...connected].sort().join(','), (eq.collapsed ?? []).join(','), eq.ioHidden ? 1 : 0, size, ph, Object.keys(data.offPage ?? {}).join(',')].join('|')
+  const lastSig = useRef(handleSig)
+  useEffect(() => {
+    if (lastSig.current === handleSig) return
+    lastSig.current = handleSig
+    updateInternals(eq.id)
+    // Once more after the browser has laid the card out (fonts, preview image).
+    const r = requestAnimationFrame(() => updateInternals(eq.id))
+    return () => cancelAnimationFrame(r)
+  }, [handleSig, eq.id, updateInternals])
 
   const state = (p: PortTemplate) => {
     if (!wiring) return ''

@@ -84,7 +84,13 @@ export function NetworkSheet() {
         const v = ch.value.trim()
         switch (ch.col.key) {
           case 'ip': if (v && !validIp(v)) bad++; setNet(eq, ch.row.portId, { ip: v }); break
-          case 'vlan': setNet(eq, ch.row.portId, { vlan: v }); break
+          case 'vlan': {
+            setNet(eq, ch.row.portId, { vlan: v })
+            // …and the switch port it's plugged into gets the same VLAN (trunks are left as they are).
+            const l = ch.row.link, sw = l && !l.direct ? d.equipment.find((e) => e.id === l.eq.id) : undefined
+            if (l && sw && sw.network?.[l.port.id]?.mode !== 'trunk') setNet(sw, l.port.id, { vlan: v, mode: v ? 'access' : undefined })
+            break
+          }
           case 'notes': setNet(eq, ch.row.portId, { notes: ch.value }); break
           // Typing the traced value (or clearing) removes the manual override.
           case 'switch': setNet(eq, ch.row.portId, { switchTag: v && v !== (ch.row.link?.eq.tag ?? '') ? v : undefined }); break

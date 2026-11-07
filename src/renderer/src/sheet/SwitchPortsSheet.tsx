@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { deviceName, setNet, switchPortRows, validVlans, type SwitchPortRow } from '@core/index'
+import { autoAssignByVlan, deviceName, inSubnet, validIp, networkRows, rowVlan, setNet, switchPortRows, validVlans, vlanPlan, vlansOf, type SwitchPortRow, type VlanAssignResult } from '@core/index'
 import { useStore } from '../store'
 import { Select } from '../components/ui'
 import { Sheet, type SheetColumn } from './Sheet'
@@ -28,37 +28,73 @@ export function SwitchPortsSheet() {
     return all.filter((r) => (!sw || r.sw.id === sw) && (!s || [r.sw.tag, r.port.label, r.info.vlan, r.info.tagged, r.device?.eq.tag, r.device ? deviceName(r.device.eq) : '', r.device?.interface, r.info.notes].join(' ').toLowerCase().includes(s)))
   }, [all, q, sw])
 
+  // VLANs to pick from: the planned ones, plus any ID already used on a switch port or interface.
+  const vlanChoices = useMemo(() => {
+    const plans = vlansOf(project)
+    const used = new Set<string>()
+    for (const e of project.equipment) for (const n of Object.values(e.network ?? {})) if (n.vlan?.trim() && validVlans(n.vlan) && !n.vlan.includes(',')) used.add(n.vlan.trim())
+    const extra = [...used].filter((v) => !plans.some((p) => p.vlan.trim() === v)).map((v) => ({ vlan: v, name: '(no subnet set)' }))
+    return [...plans.map((p) => ({ vlan: p.vlan.trim(), name: p.name ?? '' })), ...extra].sort((a, b) => Number(a.vlan) - Number(b.vlan) || a.vlan.localeCompare(b.vlan))
+  }, [project])
+
   const columns = useMemo<SheetColumn<SwitchPortRow>[]>(() => [
     { key: 'sw', title: 'Switch', width: 110, get: (r) => r.sw.tag, render: (r) => <b>{r.sw.tag}</b> },
     { key: 'port', title: 'Port', width: 120, get: (r) => r.port.label },
-    { key: 'mode', title: 'Mode', width: 90, get: (r) => (r.info.mode === 'trunk' ? 'Trunk' : r.info.vlan ? 'Access' : ''), set: () => {},
+    { key: 'mode', title: 'Mode', width: 100, get: (r) => (r.info.mode === 'trunk' ? 'Trunk' : r.info.vlan ? 'Access' : ''), set: () => {},
+      value: (r) => r.info.mode ?? (r.info.vlan ? 'access' : ''), options: () => [{ value: '', label: '—' }, { value: 'access', label: 'Access' }, { value: 'trunk', label: 'Trunk' }],
       render: (r) => r.info.mode === 'trunk' ? <span className="vlan-chip trunk">Trunk</span> : r.info.vlan ? <span className="vlan-chip">Access</span> : <span className="muted">—</span> },
-    { key: 'vlan', title: 'VLAN (untagged)', width: 140, get: (r) => r.info.vlan ?? '', set: () => {},
-      render: (r) => <span className={r.info.vlan && !validVlans(r.info.vlan) ? 'net-bad' : ''}>{r.info.vlan ?? ''}</span> },
+    { key: 'vlan', title: 'VLAN (untagged)', width: 170, get: (r) => r.info.vlan ?? '', value: (r) => r.info.vlan ?? '', set: () => {},
+      options: () => [{ value: '', label: '—' }, ...vlanChoices.map((v) => ({ value: v.vlan, label: v.name ? `${v.vlan} – ${v.name}` : v.vlan }))],
+      render: (r) => { const pl = vlanPlan(project, r.info.vlan); return <span className={`net-vlan-cell ${r.info.vlan && !validVlans(r.info.vlan) ? 'net-bad' : ''}`} title="Click to pick a VLAN – the device on this port gets an address in it">{r.info.vlan ?? ''}{pl?.name ? <span className="muted"> {pl.name}</span> : null}<i>▾</i></span> } },
     { key: 'tagged', title: 'Tagged VLANs', width: 150, get: (r) => r.info.tagged ?? '', set: () => {},
       render: (r) => <span className={r.info.tagged && !validVlans(r.info.tagged) ? 'net-bad' : ''}>{r.info.tagged ?? ''}</span> },
     { key: 'device', title: 'Connected Device', width: 130, get: (r) => r.device?.eq.tag ?? '' },
     { key: 'devname', title: 'Device Name', width: 200, get: (r) => (r.device ? deviceName(r.device.eq) : '') },
     { key: 'iface', title: 'Device Interface', width: 140, get: (r) => r.device?.interface ?? '' },
+    { key: 'ip', title: 'Device IP', width: 130, get: (r) => r.device?.info.ip ?? '', set: () => {},
+      render: (r) => { const ip = r.device?.info.ip ?? '', pl = vlanPlan(project, r.info.vlan); const off = ip && pl && !inSubnet(ip, pl); return <span className={(ip && !validIp(ip)) || off ? 'net-bad' : ''} title={off ? `Not in VLAN ${r.info.vlan}'s subnet` : r.device ? 'Same as the Network schedule – edit on either page' : 'Nothing wired to this port'}>{ip}{off ? ' ⚠︎' : ''}</span> } },
     { key: 'via', title: 'Via', width: 200, get: (r) => r.device?.link?.via.join(' → ') ?? '' },
     { key: 'notes', title: 'Notes', width: 240, get: (r) => r.info.notes ?? '', set: () => {} },
-  ], [])
+  ], [vlanChoices, project])
 
   const commit = useCallback((label: string, changes: { row: SwitchPortRow; col: SheetColumn<SwitchPortRow>; value: string }[]) => {
     let bad = 0
-    apply(label === 'Edit VLAN (untagged)' ? 'Set VLAN' : label, (d) => {
+    let res: VlanAssignResult | null = null
+    let badIp = 0
+    // The device on a port always matches the port's VLAN, and gets an address in it.
+    const devKeys = changes.filter((ch) => ch.col.key === 'vlan' && ch.row.device).map((ch) => ch.row.device!.key)
+    apply(label === 'Edit VLAN (untagged)' ? (changes.length > 1 ? `Set VLAN on ${changes.length} Ports` : 'Set VLAN') : label, (d) => {
       for (const ch of changes) {
         const eq = d.equipment.find((e) => e.id === ch.row.sw.id)
         if (!eq) continue
         const v = ch.value.trim()
         switch (ch.col.key) {
-          case 'vlan': if (!validVlans(v) || v.includes(',') || v.includes('-')) bad++; setNet(eq, ch.row.port.id, { vlan: v, mode: eq.network?.[ch.row.port.id]?.mode ?? (v ? 'access' : undefined) }); break
+          case 'vlan': {
+            if (!validVlans(v) || v.includes(',') || v.includes('-')) bad++
+            setNet(eq, ch.row.port.id, { vlan: v, mode: eq.network?.[ch.row.port.id]?.mode ?? (v ? 'access' : undefined) })
+            const dv = ch.row.device, de = dv && d.equipment.find((e) => e.id === dv.eq.id)
+            if (dv && de) setNet(de, dv.portId, { vlan: v })
+            break
+          }
           case 'tagged': if (!validVlans(v)) bad++; setNet(eq, ch.row.port.id, { tagged: v, ...(v ? { mode: 'trunk' as const } : {}) }); break
-          case 'mode': setNet(eq, ch.row.port.id, { mode: modeOf(v) }); break
+          case 'mode': setNet(eq, ch.row.port.id, { mode: v === 'access' || v === 'trunk' ? v : modeOf(v) }); break
           case 'notes': setNet(eq, ch.row.port.id, { notes: ch.value }); break
+          case 'ip': { const dv = ch.row.device, de = dv && d.equipment.find((e) => e.id === dv.eq.id); if (!dv || !de) break; if (v && !validIp(v)) badIp++; setNet(de, dv.portId, { ip: v }); break }
         }
       }
+      if (devKeys.length) {
+        const byKey = new Map(networkRows(d).map((r) => [r.key, r]))
+        for (const k of devKeys) {
+          const r = byKey.get(k), pl = r && vlanPlan(d, rowVlan(r).vlan)
+          if (r && pl && r.info.ip && !inSubnet(r.info.ip, pl)) { const eq = d.equipment.find((e) => e.id === r.eq.id); if (eq) setNet(eq, r.portId, { ip: '' }) }
+        }
+        res = autoAssignByVlan(d, devKeys, { onlyEmpty: true })
+      }
     })
+    const rr = res as VlanAssignResult | null
+    if (rr?.assigned) notify(`${rr.assigned} device IP address${rr.assigned === 1 ? '' : 'es'} assigned from the VLAN`, { undo: true, kind: 'success' })
+    else if (rr?.noPlan.length) notify(`VLAN ${rr.noPlan.join(', ')} has no subnet yet – set it under Network ▸ VLANs… to give devices addresses`, { kind: 'info' })
+    if (badIp) notify(`${badIp} address${badIp === 1 ? ' isn’t a' : 'es aren’t'} valid IPv4 (e.g. 10.10.20.15)`, { kind: 'warning' })
     if (bad) notify(`${bad} VLAN entr${bad === 1 ? 'y isn’t' : 'ies aren’t'} valid – use IDs 1–4094 (one for untagged; a list like 10,20,100-110 for tagged)`, { kind: 'warning' })
   }, [apply, notify])
 
