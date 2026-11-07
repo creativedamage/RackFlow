@@ -265,6 +265,7 @@ textarea { resize: vertical; width: 100%; }
 .rack-body { flex: 1; display: flex; min-height: 0; }
 .unracked { width: 220px; border-right: 1px solid var(--line-2); padding: 0 10px 10px; overflow: auto; background: var(--bg); }
 .unracked-item { display: grid; grid-template-columns: auto 1fr auto; gap: 6px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 4px; cursor: grab; background: var(--bg); }
+.unracked-item.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
 .racks-scroll { flex: 1; overflow: auto; padding: 24px 32px; display: flex; gap: 48px; align-items: flex-start; background: var(--bg-2); }
 .rack-col { display: flex; flex-direction: column; gap: 8px; }
 .rack-head { display: flex; align-items: center; gap: 8px; }

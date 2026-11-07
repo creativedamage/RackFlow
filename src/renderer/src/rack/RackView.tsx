@@ -1,4 +1,5 @@
 import { deviceMenu } from '../product/productActions'
+import { editPlacedDevice } from '../product/openEditor'
 import { showContextMenu } from '../components/ContextMenu'
 import { useEffect, useMemo, useState } from 'react'
 import { faceSVG, faceProduct, productFace, fmtWt, type EquipmentInstance } from '@core/index'
@@ -22,6 +23,7 @@ export function RackView() {
   const [heat, setHeat] = useState(false)
   const [printing, setPrinting] = useState(false)
 
+  const selection = useStore((s) => s.selection)
   const unracked = project.equipment.filter((e) => e.product.physical.rackUnits != null && !e.rackPlacement)
   // Delete / Backspace takes everything picked out of the racks (devices stay in the project).
   useEffect(() => {
@@ -71,7 +73,8 @@ export function RackView() {
           <h4>Not yet racked</h4>
           {unracked.length === 0 && <p className="muted">All rack-mountable devices are placed.</p>}
           {unracked.map((e) => (
-            <div key={e.id} className="unracked-item" draggable onDragStart={(ev) => ev.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: 'rack-eq', id: e.id } satisfies DragPayload))}>
+            <div key={e.id} className={`unracked-item ${selection.includes(e.id) ? 'selected' : ''}`} draggable onDragStart={(ev) => ev.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: 'rack-eq', id: e.id } satisfies DragPayload))}
+              onClick={() => { useStore.getState().select([e.id]); useStore.getState().set({ showInspector: true, selectedRack: null }) }} onDoubleClick={() => editPlacedDevice(e.id)} title="Drag into a rack · click to edit in the inspector · double-click to edit the device">
               <b>{e.tag}</b><span className="muted ellipsis">{e.product.model}</span><span className="mono">{e.product.physical.rackUnits}U</span>
             </div>
           ))}
@@ -312,11 +315,11 @@ function RackColumn({ rack, face, unitPx, heat }: { rack: Rack; face: RackFace; 
                 if (!id) return
                 // Shift / ⌘-click adds or removes it from the selection.
                 if (e.shiftKey || e.metaKey) { const st = useStore.getState(), cur = st.selection; setState({ selection: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id], selectedCable: null, selectedAccessory: null, rackAccSel: st.selectedAccessory && !st.rackAccSel.includes(st.selectedAccessory.id) ? [...st.rackAccSel, st.selectedAccessory.id] : st.rackAccSel }) }
-                else select([id])
+                else { select([id]); setState({ showInspector: true, selectedRack: null }) }
               }}
               onContextMenu={(e) => { if (!id) return; if (!useStore.getState().selection.includes(id)) select([id]); showContextMenu(e, [...deviceMenu(id), 'sep', ...(o.halfSlot ? [{ label: `Move to ${o.halfSlot === 'left' ? 'Right' : 'Left'} Half`, disabled: !layout.canPlace(o.high - o.low + 1, o.depthMM, o.low, o.face, o.ref, o.halfSlot === 'left' ? 'right' : 'left'), onClick: () => apply('Move Half-Rack Unit', (d) => { const eq = d.equipment.find((x) => x.id === id); if (eq?.rackPlacement) eq.rackPlacement.halfSlot = o.halfSlot === 'left' ? 'right' : 'left' }) }] : []), { label: 'Flip Front/Rear', onClick: () => apply('Flip Mount Face', (d) => { const eq = d.equipment.find((x) => x.id === id); if (eq?.rackPlacement) eq.rackPlacement.face = eq.rackPlacement.face === 'front' ? 'rear' : 'front' }) }]) }}
-              onDoubleClick={() => id && apply('Flip Mount Face', (d) => { const eq = d.equipment.find((x) => x.id === id); if (eq?.rackPlacement) eq.rackPlacement.face = eq.rackPlacement.face === 'front' ? 'rear' : 'front' })}
-              title={id ? 'Drag to move · shift-click or drag a box to pick several · double-click to flip front/rear · right-click to edit · Delete removes from rack' : undefined}
+              onDoubleClick={() => id && editPlacedDevice(id)}
+              title={id ? 'Click to edit in the inspector · double-click to edit the device · drag to move · shift-click or drag a box to pick several · right-click to flip front/rear · Delete removes from rack' : undefined}
               tabIndex={id ? 0 : -1}
             >
               {(() => { const eq = id ? project.equipment.find((e) => e.id === id) : undefined; const f = eq && !o.halfSlot ? productFace(eq.product) : null
