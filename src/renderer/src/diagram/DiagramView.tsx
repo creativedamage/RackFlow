@@ -161,6 +161,8 @@ export function DiagramView() {
   // Devices that were inside each group box when its drag began – only these move with it
   // (a box dragged over other devices doesn't pick them up on the way).
   const boxCrew = useRef(new Map<string, Set<string>>())
+  /** Where a dragged group frame / box and its devices were when the drag began. */
+  const dragStart = useRef(new Map<string, { x: number; y: number; members: Map<string, { x: number; y: number }> }>())
   // Notes / callouts / revision notes: local state for smooth dragging and resizing.
   const [notes, setNotes] = useState<NoteNodeType[]>([])
   useEffect(() => {
@@ -271,28 +273,43 @@ export function DiagramView() {
   }, [vpKey, fitView, setViewport, getViewport])
 
   const onNodesChange = useCallback((all: NodeChange<AnyNode>[]) => {
-    // Dragging a group frame moves its members by the same amount.
-    const moves = new Map<string, { dx: number; dy: number; dragging?: boolean }>()
-    for (const c of all) {
-      if (c.type !== 'position' || !c.id.startsWith('group:') || !c.position) continue
-      const f = framesRef.current.find((x) => x.id === c.id)
-      if (f) moves.set(c.id.slice(6), { dx: c.position.x - f.position.x, dy: c.position.y - f.position.y, dragging: c.dragging })
-    }
-    // …and dragging a group box moves the devices inside it (resizing doesn't).
-    const cmoves: { ids: Set<string>; dx: number; dy: number }[] = []
-    for (const c of all) {
-      if (c.type !== 'position' || !c.id.startsWith('cbox:') || !c.position || c.dragging === undefined) continue
-      const b = boxesRef.current.find((x) => x.id === c.id)
-      if (!b) continue
-      let crew = boxCrew.current.get(c.id)
-      if (!crew) {
-        // Drag just started: who is in the box right now (devices being dragged themselves excluded).
-        const r = { x: b.position.x, y: b.position.y, w: b.width ?? b.measured?.width ?? 0, h: b.height ?? b.measured?.height ?? 0 }
-        const dragged = new Set(all.filter((x) => x.type === 'position' && x.dragging).map((x) => (x as { id: string }).id))
-        crew = new Set(nodesRef.current.filter((n) => !n.hidden && !dragged.has(n.id) && insideRect(r, n.position, devSize(n))).map((n) => n.id))
-        boxCrew.current.set(c.id, crew)
+    // Dragging a group frame or a group box carries the devices in it rigidly: each device sits at
+    // where it was when the drag began plus how far the frame has moved since. (Adding up per-event
+    // steps against the last *rendered* frame made the devices creep away from the box when mouse
+    // events came faster than renders.)
+    const rigid = new Map<string, { x: number; y: number }>()
+    const carry = (key: string, at: { x: number; y: number }, from: { x: number; y: number }, members: () => string[], dragging: boolean | undefined) => {
+      let st = dragStart.current.get(key)
+      if (!st && dragging === false) return
+      if (!st) {
+        const pos = new Map(nodesRef.current.map((n) => [n.id, n.position]))
+        st = { x: from.x, y: from.y, members: new Map(members().map((id) => [id, { ...pos.get(id)! }])) }
+        dragStart.current.set(key, st)
       }
-      cmoves.push({ ids: crew, dx: c.position.x - b.position.x, dy: c.position.y - b.position.y })
+      const dx = at.x - st.x, dy = at.y - st.y
+      for (const [id, p] of st.members) rigid.set(id, { x: p.x + dx, y: p.y + dy })
+      void dragging // kept until the drop (onNodeDragStop) saves where everything ended up
+    }
+    for (const c of all) {
+      if (c.type !== 'position' || !c.position) continue
+      if (c.id.startsWith('group:')) {
+        const f = framesRef.current.find((x) => x.id === c.id)
+        const gid = c.id.slice(6)
+        if (f) carry(c.id, c.position, f.position, () => nodesRef.current.filter((n) => n.data.eq.groupId === gid).map((n) => n.id), c.dragging)
+      } else if (c.id.startsWith('cbox:') && c.dragging !== undefined) {
+        const b = boxesRef.current.find((x) => x.id === c.id)
+        if (!b) continue
+        let crew = boxCrew.current.get(c.id)
+        if (!crew) {
+          // Drag just started: who is in the box right now (devices being dragged themselves excluded).
+          const r = { x: b.position.x, y: b.position.y, w: b.width ?? b.measured?.width ?? 0, h: b.height ?? b.measured?.height ?? 0 }
+          const dragged = new Set(all.filter((x) => x.type === 'position' && x.dragging).map((x) => (x as { id: string }).id))
+          crew = new Set(nodesRef.current.filter((n) => !n.hidden && !dragged.has(n.id) && insideRect(r, n.position, devSize(n))).map((n) => n.id))
+          boxCrew.current.set(c.id, crew)
+        }
+        const ids = crew
+        carry(c.id, c.position, b.position, () => [...ids], c.dragging)
+      }
     }
     const boxChanges = all.filter((c) => 'id' in c && String(c.id).startsWith('cbox:')) as NodeChange<ClusterBoxType>[]
     if (boxChanges.length) setBoxes((bs) => applyNodeChanges(boxChanges.filter((c) => c.type !== 'remove'), bs))
@@ -301,14 +318,7 @@ export function DiagramView() {
     const changes = all.filter((c) => !('id' in c && (String(c.id).startsWith('group:') || String(c.id).startsWith('cbox:') || String(c.id).startsWith('note:')))) as NodeChange<DeviceNodeType>[]
     setNodes((ns) => {
       let next = applyNodeChanges(changes.filter((c) => c.type !== 'remove'), ns)
-      if (moves.size) next = next.map((n) => {
-        const m = n.data.eq.groupId ? moves.get(n.data.eq.groupId) : undefined
-        return m ? { ...n, position: { x: n.position.x + m.dx, y: n.position.y + m.dy } } : n
-      })
-      if (cmoves.length) next = next.map((n) => {
-        const m = !n.dragging ? cmoves.find((mv) => mv.ids.has(n.id)) : undefined
-        return m ? { ...n, position: { x: n.position.x + m.dx, y: n.position.y + m.dy } } : n
-      })
+      if (rigid.size) next = next.map((n) => { const p = rigid.get(n.id); return p && !n.dragging ? { ...n, position: p } : n })
       if (changes.some((c) => c.type === 'select')) {
         const ids = next.filter((n) => n.selected).map((n) => n.id as EquipmentId)
         const cur = useStore.getState().selection
@@ -331,6 +341,15 @@ export function DiagramView() {
     document.querySelectorAll('.pages-nav .drop').forEach((el) => el.classList.remove('drop'))
     const vid = useStore.getState().diagramView
     // A group box that was dragged: save where it is now, and the devices that moved with it.
+    // Where each carried device ends up: its start + how far its frame / box moved (not the last render).
+    const carried = new Map<string, { x: number; y: number }>()
+    for (const n of draggedAll) {
+      const st = dragStart.current.get(n.id)
+      if (st) for (const [id, p] of st.members) carried.set(id, { x: p.x + n.position.x - st.x, y: p.y + n.position.y - st.y })
+    }
+    dragStart.current.clear()
+    if (carried.size) setNodes((ns) => ns.map((n) => { const p = carried.get(n.id); return p ? { ...n, position: p } : n }))
+    const posOf = (n: { id: string; position: { x: number; y: number } }) => carried.get(n.id) ?? n.position
     const movedBoxes = draggedAll.filter((n) => n.id.startsWith('cbox:'))
     const clusterIds = new Set(movedBoxes.map((n) => n.id.slice(5)))
     const crewIds = new Set(movedBoxes.flatMap((b) => [...(boxCrew.current.get(b.id) ?? [])]))
@@ -340,8 +359,9 @@ export function DiagramView() {
       for (const b of movedBoxes) { const x = d.clusters?.find((y) => y.id === b.id.slice(5)); if (x) { x.x = Math.round(b.position.x); x.y = Math.round(b.position.y); if (!x.w) { x.w = Math.round(b.width ?? 400); x.h = Math.round(b.height ?? 300) } } }
       const v = vid ? viewsOf(d).find((y) => y.id === vid) : undefined
       for (const n of clusterMembers) {
-        if (v) v.positions[n.id] = { x: Math.round(n.position.x), y: Math.round(n.position.y) }
-        else { const eq = d.equipment.find((e) => e.id === n.id); if (eq) eq.position = { x: Math.round(n.position.x), y: Math.round(n.position.y) } }
+        const p = posOf(n)
+        if (v) v.positions[n.id] = { x: Math.round(p.x), y: Math.round(p.y) }
+        else { const eq = d.equipment.find((e) => e.id === n.id); if (eq) eq.position = { x: Math.round(p.x), y: Math.round(p.y) } }
       }
     })
     if (vid) {
@@ -381,8 +401,8 @@ export function DiagramView() {
     if (!dragged.length) return
     apply(groupIds.size ? 'Move Group' : dragged.length > 1 ? 'Move Devices' : 'Move Device', (d) => {
       for (const n of dragged) {
-        const eq = d.equipment.find((e) => e.id === n.id)
-        if (eq) eq.position = { x: Math.round(n.position.x), y: Math.round(n.position.y) }
+        const eq = d.equipment.find((e) => e.id === n.id), p = posOf(n)
+        if (eq) eq.position = { x: Math.round(p.x), y: Math.round(p.y) }
       }
       // Never on top of another device: slide the moved block into the nearest open space.
       resolveOverlap(d, dragged.map((n) => n.id), nodeGeom)
