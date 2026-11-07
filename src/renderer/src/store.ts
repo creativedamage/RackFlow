@@ -67,6 +67,8 @@ export interface AppState {
   selectedBay: PatchBayId | null
   /** Rack panel (blank, brush, logo…) selected on the Rack page. */
   selectedAccessory: { rack: string; id: string } | null
+  /** Rack panels picked together (shift-click / drag a box in the rack elevation). */
+  rackAccSel: string[]
   /** Wiring diagram page shown (group id); null = all pages. */
   diagramPage: string | null
   exportingAll: boolean
@@ -163,6 +165,7 @@ export const useStore = create<AppState>((set, get) => ({
   selectedRack: null,
   selectedBay: null,
   selectedAccessory: null,
+  rackAccSel: [],
   diagramPage: null,
   locate: null,
   exportingAll: false,
@@ -224,7 +227,7 @@ export const useStore = create<AppState>((set, get) => ({
   }) },
   markSaved: (path) => { rememberSaved(get().project); set({ path, dirty: false, lastSaved: Date.now() }) },
   set: (patch) => set(patch),
-  select: (ids, cable = null) => set({ selection: ids, selectedCable: cable, selectedCables: NO_CABLES, selectedAccessory: null }),
+  select: (ids, cable = null) => set({ selection: ids, selectedCable: cable, selectedCables: NO_CABLES, selectedAccessory: null, rackAccSel: [] }),
   focusIssue: (s) => {
     if (s.kind === 'project') return
     if (s.kind === 'rack') { set({ mode: 'rack', selectedRack: s.id }); return }

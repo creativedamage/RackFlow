@@ -74,8 +74,8 @@ export class RackLayout {
    * against what stays put – and against each other – ignoring where the moving
    * ones are now. Returns false if any doesn't fit.
    */
-  canPlaceGroup(items: { id: string; height: number; depthMM: number; start: number; halfSlot?: 'left' | 'right' | null }[], face: RackFace): boolean {
-    const moving = new Set(items.map((i) => `equipment:${i.id}`))
+  canPlaceGroup(items: { id: string; kind?: 'equipment' | 'accessory'; height: number; depthMM: number; start: number; halfSlot?: 'left' | 'right' | null }[], face: RackFace): boolean {
+    const moving = new Set(items.map((i) => `${i.kind ?? 'equipment'}:${i.id}`))
     const placed: RackOccupant[] = []
     for (const it of items) {
       const low = it.start, high = it.start + it.height - 1
