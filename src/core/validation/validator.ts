@@ -81,7 +81,7 @@ function passiveView(a: ResolvedPort, b: ResolvedPort): { a: ResolvedPort; b: Re
     const sameFamily = other.port.signals.some((s) => SIGNALS[s].domain === bayDomain)
     // A jack is just copper / glass: whatever plugs into the same connector passes (an RJ45 panel
     // carries A&H ME, dSNAKE, DMX over Cat… as happily as Ethernet).
-    const sameJack = !sameFamily && !isPatchBay(other) && other.port.connector === bay.port.connector && other.port.signals.every((s) => SIGNALS[s].domain !== 'power')
+    const sameJack = !sameFamily && !isPatchBay(other) && connectorsMate(other.port.connector, bay.port.connector) && other.port.signals.every((s) => SIGNALS[s].domain !== 'power')
     const passes = sameFamily ? other.port.signals.filter((s) => SIGNALS[s].domain === bayDomain) : sameJack ? [...other.port.signals] : bay.port.signals
     if (sameFamily && !isPatchBay(other) && !passes.some((s) => bay.port.signals.includes(s))) {
       notes.push({ rule: 'patch-rating', severity: 'warning', subject: { kind: 'ports', a: a.address, b: b.address },

@@ -55,4 +55,11 @@ describe('RJ45 panels', () => {
     expect(v.issues.filter((i) => i.severity === 'error')).toEqual([])
     expect(v.signal).toBe('ahME')
   })
+  it('pass RJ45 signals into etherCON wall plate jacks too', () => {
+    const p = newProject()
+    const plate = addEquipment(p, BUILT_IN_PRODUCTS.find((x) => ['wallPlate', 'wallBox', 'connectorPanel'].includes(x.category) && x.ports.some((q) => q.connector === 'etherCON'))!, { x: 0, y: 0 })
+    const me = addEquipment(p, BUILT_IN_PRODUCTS.find((x) => x.ports.some((q) => q.signals.includes('ahME') && q.connector === 'rj45'))!, { x: 0, y: 0 })
+    const v = connect(p, { equipment: me.id, port: me.product.ports.find((q) => q.signals.includes('ahME') && q.connector === 'rj45')!.id }, { equipment: plate.id, port: plate.product.ports.find((q) => q.connector === 'etherCON')!.id }, 'cat6')
+    expect(v.issues.filter((i) => i.severity === 'error')).toEqual([])
+  })
 })
