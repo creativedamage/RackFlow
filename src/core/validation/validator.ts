@@ -79,7 +79,10 @@ function passiveView(a: ResolvedPort, b: ResolvedPort): { a: ResolvedPort; b: Re
   const adapt = (bay: ResolvedPort, other: ResolvedPort): ResolvedPort => {
     const bayDomain = SIGNALS[bay.port.signals[0]]?.domain
     const sameFamily = other.port.signals.some((s) => SIGNALS[s].domain === bayDomain)
-    const passes = sameFamily ? other.port.signals.filter((s) => SIGNALS[s].domain === bayDomain) : bay.port.signals
+    // A jack is just copper / glass: whatever plugs into the same connector passes (an RJ45 panel
+    // carries A&H ME, dSNAKE, DMX over Cat… as happily as Ethernet).
+    const sameJack = !sameFamily && !isPatchBay(other) && other.port.connector === bay.port.connector && other.port.signals.every((s) => SIGNALS[s].domain !== 'power')
+    const passes = sameFamily ? other.port.signals.filter((s) => SIGNALS[s].domain === bayDomain) : sameJack ? [...other.port.signals] : bay.port.signals
     if (sameFamily && !isPatchBay(other) && !passes.some((s) => bay.port.signals.includes(s))) {
       notes.push({ rule: 'patch-rating', severity: 'warning', subject: { kind: 'ports', a: a.address, b: b.address },
         message: `${bay.equipment.tag} is rated for ${bay.port.signals.map((s) => SIGNALS[s].name).join(' / ')}; ${SIGNALS[passes[0]].name} may not pass cleanly.`,
@@ -92,8 +95,6 @@ function passiveView(a: ResolvedPort, b: ResolvedPort): { a: ResolvedPort; b: Re
   if (isPatchBay(b)) return { a, b: adapt(b, a), notes }
   return { a, b, notes }
 }
-
-const CAT_NAME: Record<string, string> = { cat5e: 'Cat5e', cat6: 'Cat6', cat6a: 'Cat6A', cat8: 'Cat8' }
 
 /** The port-validation engine: full rule set. */
 export function validate(project: Project, a: PortAddress, b: PortAddress, opts: ValidateOptions = {}): ConnectionVerdict {
@@ -121,18 +122,6 @@ export function validate(project: Project, a: PortAddress, b: PortAddress, opts:
     if (rule.gate && r.some((i) => i.severity === 'error')) break
   }
   found.push(...passive.notes)
-  // Category: a lower-category cable on a higher-rated panel (or the other way round) is worth flagging.
-  if (spec && /^cat(5e|6a?|8)/.test(spec.key)) {
-    const order = ['cat5e', 'cat6', 'cat6a', 'cat8']
-    const cableCat = order.find((c) => spec.key === c || spec.key.startsWith(`${c}.`)) ?? (spec.key.startsWith('cat6a') ? 'cat6a' : null)
-    const panelCats = [ra, rb].flatMap((r) => r.equipment.product.tags.filter((t) => order.includes(t)))
-    const top = panelCats.sort((x, y) => order.indexOf(y) - order.indexOf(x))[0]
-    if (cableCat && top && order.indexOf(cableCat) < order.indexOf(top)) {
-      found.push({ rule: 'cable-category', severity: 'warning', subject: { kind: 'ports', a, b },
-        message: `${spec.name} is a lower category than the ${CAT_NAME[top]} panel it connects to.`,
-        suggestion: `Use ${CAT_NAME[top]} cable so the link keeps its rating.` })
-    }
-  }
   const issues = sortIssues(found)
   const signal = match && isUsable(match.match) ? match.source : null
   return {

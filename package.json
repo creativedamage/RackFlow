@@ -1,7 +1,7 @@
 {
   "name": "rackflow",
   "productName": "RackFlow",
-  "version": "1.22.16",
+  "version": "1.22.17",
   "description": "AVL system design: wiring diagrams, rack elevations, validated connections and patch bay labels.",
   "main": "./out/main/index.js",
   "author": "Wayne Goodman",
