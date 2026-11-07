@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   clearFormatting, clearRange, resetToWiring, boundText, copyRange, defaultPrintOptions, fillSeries, findCell, FORMAT_PRESETS, layoutLabels, mergeTitle,
-  NORMAL_SYMBOLS, pagesToPrintHTML, pageToSVG, pasteAt, refreshLabels, removeTitles, setNormals, staleCells, STOCKS, styleRange,
+  NORMAL_SYMBOLS, normalsShown, pagesToPrintHTML, pageToSVG, pasteAt, refreshLabels, removeTitles, setNormals, staleCells, STOCKS, styleRange,
   toggleStyle, arrowGlyph, rowLetter, type CellStyle, type NormalMode, type PatchBay, type PrintOptions, type RowArrow, autoGroupTitles} from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
@@ -141,13 +141,14 @@ function FormatBar() {
         )}
       </div>
       <div className="fb-group" title="Normalling for the selected channels">
-        {(['full', 'half', 'parallel', 'none'] as NormalMode[]).map((m) => (
+        <label className="fb-check" title="Show normalling on this bay (symbols and NORMAL / HALF / ISOLATED at the strip ends). Network, fiber and other pass-through panels don't normal, so it's off for them."><input type="checkbox" disabled={!bay} checked={!!bay && normalsShown(bay)} onChange={(e) => bay && editBay(bay.id, e.target.checked ? 'Show Normalling' : 'Hide Normalling', (b) => { b.showNormals = e.target.checked })} /> Normalling</label>
+        {(!bay || normalsShown(bay)) && (['full', 'half', 'parallel', 'none'] as NormalMode[]).map((m) => (
           <button key={m} className="fb" disabled={!has || !bay || bandForRow(bay, sel!.row) == null} title={NORMAL_SYMBOLS[m].name} onClick={() => normals(m)}>
             {NORMAL_SYMBOLS[m].glyph || '∅'}
           </button>
         ))}
       </div>
-      <div className="fb-group" title="Strip ends: a letter for the row, with ▼ and its normalling word (NORMAL, HALF, ISOLATED…) under it">
+      <div className="fb-group" title="Strip ends: a letter for each row (with ▼ and its normalling word under it when normalling is shown)">
         <label className="fb-check"><input type="checkbox" disabled={!bay} checked={!!bay?.rowTabs?.on} onChange={(e) => bay && editBay(bay.id, 'Row Letters', (b) => { b.rowTabs = { ...b.rowTabs, on: e.target.checked } })} /> Row letters</label>
         <input className="fb-letter" disabled={!has || !bay?.rowTabs?.on} maxLength={3} value={bay && sel ? rowLetter(bay, sel.row) : ''} title="Letter for the selected row"
           onChange={(e) => editSelection('Row Letter', (b, s) => { b.rowTabs = { on: true, ...b.rowTabs, letters: { ...b.rowTabs?.letters, [String(s.row)]: e.target.value.toUpperCase() } } })} />

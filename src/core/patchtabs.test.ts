@@ -45,3 +45,17 @@ it('arrows sit on the jack side: under the text on top rows, above it on bottom 
   expect(near('▼', tTop).r.y).toBeGreaterThan(tTop.r.y)
   expect(near('▲', tBot).r.y).toBeLessThan(tBot.r.y)
 })
+
+it('network panels keep row letters but print no normalling (unless turned on)', () => {
+  const p = newProject()
+  const t = BUILT_IN_PATCH_TEMPLATES.find((x) => x.termination && x.rows.length >= 1 && x.normalling !== 'open')
+    ?? BUILT_IN_PATCH_TEMPLATES.find((x) => x.termination)!
+  const bay = addPatchBay(p, t, { x: 0, y: 0 })
+  const b = p.patchBays.find((x) => x.id === bay.id)!
+  b.rowTabs = { on: true }
+  const top = t.rows[0].id
+  expect(rowMode(b, top)).toBe(null)
+  const svg = layoutLabels([b], defaultPrintOptions()).map(pageToSVG).join('')
+  expect(svg).toContain(`>${rowLetter(b, top)}<`)
+  for (const w of ['NORMAL', 'HALF', 'ISOLATED', 'ISO']) expect(svg.includes(`>${w}<`)).toBe(false)
+})

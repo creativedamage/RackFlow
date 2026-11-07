@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { CellRange, PatchBay } from '@core/index'
+import { normalsShown, type CellRange, type PatchBay } from '@core/index'
 import { useStore } from '../store'
 
 /** Selection & editing state for the patch label editor (UI only, not saved). */
@@ -44,6 +44,7 @@ export function editSelection(label: string, fn: (b: PatchBay, sel: PatchSel) =>
 
 /** The normalling band a selection row belongs to (row above or below the band). */
 export function bandForRow(bay: PatchBay, row: number): number | null {
+  if (!normalsShown(bay)) return null
   if (bay.normals.some((n) => n.afterRow === row)) return row
   const idx = bay.template.rows.findIndex((r) => r.id === row)
   const above = idx > 0 ? bay.template.rows[idx - 1].id : null

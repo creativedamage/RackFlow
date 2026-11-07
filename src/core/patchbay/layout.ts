@@ -3,7 +3,7 @@
 // printToPDF with a CSS @page size, so screen, SVG and PDF are identical.
 
 import type { CellStyle, LabelStripGeometry, LabelStyle, PatchBay } from '../model'
-import { arrowGlyph, rowOnBottom, findCell, NORMAL_SYMBOLS, NORMAL_WORDS, rowLetter, rowMode } from './patchbay'
+import { arrowGlyph, rowOnBottom, findCell, normalsShown, NORMAL_SYMBOLS, NORMAL_WORDS, rowLetter, rowMode } from './patchbay'
 import { cellSpanMM } from './template'
 
 export interface LabelStock { key: string; name: string; widthMM: number; heightMM: number; marginMM: number }
@@ -199,7 +199,7 @@ export function layoutLabels(bays: PatchBay[], o: PrintOptions): LabelPage[] {
 /** Heights of the title band (top) and normalling band (bottom) within a strip. */
 export function stripBands(bay: PatchBay, rowId: number, h: number, normals = true) {
   const hasTitles = (bay.spans ?? []).some((s) => s.row === rowId)
-  const band = normals ? bay.normals?.find((n) => n.afterRow === rowId) : undefined
+  const band = normals && normalsShown(bay) ? bay.normals?.find((n) => n.afterRow === rowId) : undefined
   const own = bay.rowTabs?.on ? rowMode(bay, rowId) : null
   // With strip-end words only the channels that differ from the row's mode need a symbol.
   const hasNormals = !!band && band.modes.some((m) => (own ? m !== own : m !== 'none') && NORMAL_SYMBOLS[m].glyph)

@@ -561,6 +561,8 @@ export interface PatchBay {
   rowFill: Record<string, string>
   /** Strip ends: a letter per row (row id → "S") with the row's normalling word under it (▼ NORMAL). */
   rowTabs?: { on: boolean; letters?: Record<string, string> }
+  /** Show normalling (symbols, NORMAL / HALF / ISO words). Default: on for audio / video bays, off for network, fiber and other pass-through panels. */
+  showNormals?: boolean
   /** ▲ / ▼ printed on every port label of a row, pointing at the jacks it names (row id → direction). */
   arrows?: Record<string, RowArrow>
   /** Titles grouping channels that come from the same wall box / plate / floor box (default on). */

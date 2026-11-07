@@ -1,7 +1,7 @@
 import { editBayLayout } from '../product/openEditor'
 import { memo, useLayoutEffect, useRef, useState } from 'react'
 import {
-  FORMATS, gapBefore, NORMAL_SYMBOLS, NORMAL_WORDS, arrowGlyph, rowOnBottom, rowLetter, rowMode, cycleNormal, findCell, titlesIn, totalChannels,
+  FORMATS, gapBefore, normalsShown, NORMAL_SYMBOLS, NORMAL_WORDS, arrowGlyph, rowOnBottom, rowLetter, rowMode, cycleNormal, findCell, titlesIn, totalChannels,
   type CellStyle, type LabelStripGeometry, type LabelSpan, type PatchBay, type PatchRowTemplate, isTwoSided, panelDescription,
 } from '@core/index'
 import { useStore } from '../store'
@@ -90,7 +90,7 @@ export const BayGrid = memo(function BayGrid({ bay, index, count }: { bay: Patch
         {t.rows.map((row) => (
           <div key={row.id}>
             <Strip bay={bay} row={row} bank={bank} sel={sel} title={title} onSel={setSel} onEdit={(e) => setUI({ editing: e })} />
-            {bay.normals.find((n) => n.afterRow === row.id) && <NormalRow bay={bay} afterRow={row.id} bank={bank} />}
+            {normalsShown(bay) && bay.normals.find((n) => n.afterRow === row.id) && <NormalRow bay={bay} afterRow={row.id} bank={bank} />}
           </div>
         ))}
       </div>

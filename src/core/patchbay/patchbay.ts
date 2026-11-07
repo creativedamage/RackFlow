@@ -126,7 +126,11 @@ export function rowLetter(bay: PatchBay, rowId: number): string {
 }
 
 /** The normalling band a row belongs to (the one below it, or – for the bottom row of a pair – above it). */
+/** Whether this bay shows normalling – network / fiber / XLR panels are straight pass-throughs, so not by default. */
+export const normalsShown = (bay: PatchBay) => bay.showNormals ?? !bay.template.termination
+
 export function rowBand(bay: PatchBay, rowId: number): NormalBand | undefined {
+  if (!normalsShown(bay)) return undefined
   const rows = bay.template.rows
   const i = rows.findIndex((r) => r.id === rowId)
   return bay.normals?.find((n) => n.afterRow === rowId) ?? (i > 0 ? bay.normals?.find((n) => n.afterRow === rows[i - 1].id) : undefined)
