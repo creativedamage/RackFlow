@@ -5,8 +5,9 @@ import {
   toggleStyle, arrowGlyph, rowLetter, type CellStyle, type NormalMode, type PatchBay, type PrintOptions, type RowArrow, autoGroupTitles} from '@core/index'
 import { api } from '../platform'
 import { useStore } from '../store'
-import { Empty, Modal, Select, TextInput, Toggle } from '../components/ui'
+import { Empty, Modal, Segmented, Select, TextInput, Toggle } from '../components/ui'
 import { BayGrid, CellEditorPopover } from './BayGrid'
+import { ButtonCapsView } from './ButtonCaps'
 import { bandForRow, editBay, editSelection, fontLabel, FONTS, PALETTE, usePatchUI } from './patchState'
 
 /**
@@ -18,6 +19,14 @@ import { bandForRow, editBay, editSelection, fontLabel, FONTS, PALETTE, usePatch
 export function PatchEditor() {
   const project = useStore((s) => s.project)
   const preview = usePatchUI((s) => s.preview)
+  const tab = usePatchUI((s) => s.tab)
+
+  if (tab === 'caps') return (
+    <div className="patch-editor">
+      <InfoBar />
+      <ButtonCapsView />
+    </div>
+  )
 
   if (project.patchBays.length === 0) {
     return (
@@ -45,6 +54,8 @@ export function PatchEditor() {
 function InfoBar() {
   const info = useStore((s) => s.project.info)
   const count = useStore((s) => s.project.patchBays.length)
+  const caps = useStore((s) => s.project.buttonCaps?.length ?? 0)
+  const tab = usePatchUI((s) => s.tab)
   const apply = useStore((s) => s.apply)
   const upd = (label: string, fn: (i: typeof info) => void) => apply(label, (d) => fn(d.info))
   return (
@@ -53,8 +64,11 @@ function InfoBar() {
       <label>Location<TextInput value={info.location ?? ''} onCommit={(v) => upd('Project Location', (i) => { i.location = v })} /></label>
       <label>Client Name<TextInput value={info.client} onCommit={(v) => upd('Client', (i) => { i.client = v })} /></label>
       <label>Revision<TextInput value={info.revision} onCommit={(v) => upd('Revision', (i) => { i.revision = v })} /></label>
-      <span className="count">Patchbays: {count}</span>
-      <AddBayButton />
+      <Segmented value={tab} onChange={(v) => usePatchUI.getState().set({ tab: v })} options={[
+        { value: 'bays', label: `Patch Bays${count ? ` (${count})` : ''}` },
+        { value: 'caps', label: `Button Caps${caps ? ` (${caps})` : ''}`, title: 'Custom labels for switcher button caps (Ross…) – printed as their own sheets' },
+      ]} />
+      {tab === 'bays' && <AddBayButton />}
     </div>
   )
 }

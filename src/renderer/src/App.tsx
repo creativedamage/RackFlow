@@ -178,7 +178,8 @@ export function App() {
 
   // The right panel shows only when there's something to inspect (design checks live in the ⚠︎ notifications).
   const hasSubject = useStore((s) => s.selection.length > 0 || !!s.selectedCable || s.selectedCables.length > 0 || (s.mode === 'rack' && (!!s.selectedRack || !!s.selectedAccessory)))
-  const rightAvail = mode !== 'sheet' && mode !== 'led' && mode !== 'boxes' && (mode === 'patch' || hasSubject)
+  const capsTab = usePatchUI((s) => s.tab === 'caps')
+  const rightAvail = mode !== 'sheet' && mode !== 'led' && mode !== 'boxes' && (mode === 'patch' ? !capsTab : hasSubject)
   const rightPanel = showInspector && rightAvail
   const peek = useStore((s) => s.peek)
   const hasWalls = useStore((s) => (s.project.ledWalls?.length ?? 0) > 0)

@@ -410,6 +410,8 @@ export interface Project {
   cables: Cable[]
   racks: Rack[]
   patchBays: PatchBay[]
+  /** Button-cap label sheets (Patch Labels ▸ Button Caps). */
+  buttonCaps?: import('./buttoncaps').CapSheet[]
   /** Diagram groups / systems. */
   groups?: DeviceGroup[]
   /** Wiring diagram view settings. */

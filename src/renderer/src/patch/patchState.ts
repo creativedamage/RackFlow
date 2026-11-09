@@ -11,6 +11,8 @@ interface PatchUIState {
   title: string | null
   editing: { bay: string; row: number; channel: number; seed?: string } | { bay: string; title: string } | null
   preview: boolean
+  /** Patch Labels page: patch bay strips, or button-cap sheets. */
+  tab: 'bays' | 'caps'
   /** Minimum column width in px (0 = fit to window). */
   colw: number
   setSel: (s: PatchSel | null, title?: string | null) => void
@@ -22,6 +24,7 @@ export const usePatchUI = create<PatchUIState>((set) => ({
   title: null,
   editing: null,
   preview: false,
+  tab: 'bays',
   colw: 0,
   setSel: (sel, title = null) => set({ sel, title }),
   set: (p) => set(p),
