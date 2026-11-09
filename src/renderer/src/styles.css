@@ -452,6 +452,10 @@ textarea { resize: vertical; width: 100%; }
 .preview-pages { flex: 1; overflow: auto; background: #8e8e93; padding: 24px; display: flex; flex-direction: column; gap: 24px; align-items: center; }
 .sheet { width: 100%; max-width: 1000px; background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,.35); line-height: 0; }
 .sheet svg { width: 100%; height: auto; display: block; }
+.preview-pages.zoomable { align-items: flex-start; }
+.preview-pages.zoomable > .sheet { margin: 0 auto; flex: none; }
+.preview-pages.pannable { cursor: grab; }
+.preview-pages.panning { cursor: grabbing; user-select: none; }
 .warn-text { color: var(--warn); }
 
 /* ───────── Manufacturers ───────── */

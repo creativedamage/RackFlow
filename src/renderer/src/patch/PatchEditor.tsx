@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   clearFormatting, clearRange, resetToWiring, boundText, copyRange, defaultPrintOptions, fillSeries, findCell, FORMAT_PRESETS, layoutLabels, mergeTitle,
   NORMAL_SYMBOLS, normalsShown, pagesToPrintHTML, pageToSVG, pasteAt, refreshLabels, removeTitles, setNormals, staleCells, STOCKS, styleRange,
@@ -332,6 +332,32 @@ function PrintPreview({ onClose }: { onClose: () => void }) {
   const pages = useMemo(() => layoutLabels(bays, opts), [bays, opts])
   const name = all ? `${project.info.name} labels` : `${bay?.name} labels`
   const unverified = bays.filter((b) => !b.template.dimensionsVerified)
+  // Zoom: −/+ / slider, ⌘-scroll or pinch (zooms round the pointer); drag to move around when zoomed in.
+  const [zoom, setZoom] = useState(1)
+  const zoomRef = useRef(zoom); zoomRef.current = zoom
+  const pagesRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = pagesRef.current
+    if (!el) return
+    const wheel = (e: WheelEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return
+      e.preventDefault()
+      const r = el.getBoundingClientRect()
+      const fx = (el.scrollLeft + e.clientX - r.left) / el.scrollWidth, fy = (el.scrollTop + e.clientY - r.top) / el.scrollHeight
+      const next = Math.min(8, Math.max(0.5, zoomRef.current * Math.exp(-e.deltaY * (e.ctrlKey && !e.metaKey ? 0.01 : 0.002))))
+      setZoom(next)
+      requestAnimationFrame(() => { el.scrollLeft = fx * el.scrollWidth - (e.clientX - r.left); el.scrollTop = fy * el.scrollHeight - (e.clientY - r.top) })
+    }
+    const key = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return
+      if (e.key === '=' || e.key === '+') { e.preventDefault(); setZoom((z) => Math.min(8, z * 1.25)) }
+      else if (e.key === '-') { e.preventDefault(); setZoom((z) => Math.max(0.5, z / 1.25)) }
+      else if (e.key === '0') { e.preventDefault(); setZoom(1) }
+    }
+    el.addEventListener('wheel', wheel, { passive: false })
+    window.addEventListener('keydown', key, true)
+    return () => { el.removeEventListener('wheel', wheel); window.removeEventListener('keydown', key, true) }
+  }, [])
 
   return (
     <Modal title="Print / Export Labels" onClose={onClose} wide footer={<>
@@ -351,11 +377,28 @@ function PrintPreview({ onClose }: { onClose: () => void }) {
           <Toggle label="Cut marks" checked={opts.cutMarks} onChange={(v) => setOpts({ ...opts, cutMarks: v })} />
           <Toggle label="Strip captions" checked={opts.captions} onChange={(v) => setOpts({ ...opts, captions: v })} />
           <Toggle label="Normalling symbols" checked={opts.normals !== false} onChange={(v) => setOpts({ ...opts, normals: v })} />
+          <div className="zoom-row">
+            <button className="mini" onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))} title="Zoom out (⌘−)">−</button>
+            <input type="range" min={0.5} max={8} step={0.05} value={zoom} onChange={(e) => setZoom(+e.target.value)} />
+            <button className="mini" onClick={() => setZoom((z) => Math.min(8, z * 1.25))} title="Zoom in (⌘+)">+</button>
+            <button className="mini" onClick={() => setZoom(1)} title="Fit the page to the window (⌘0)">Fit</button>
+            <span className="muted small">{Math.round(zoom * 100)}%</span>
+          </div>
+          <p className="muted small">Zoom with ⌘-scroll, pinch or ⌘+ / ⌘−; drag the page to move around.</p>
           <p className="muted small">Printed at 100 %. Strips wider than the paper are split at channel boundaries and marked “cont.”.</p>
           {unverified.length > 0 && <p className="warn-text small">⚠ {unverified.map((b) => b.name).join(', ')} use nominal template dimensions. Check one strip against the panel before printing a full run.</p>}
         </div>
-        <div className="preview-pages">
-          {pages.map((p, i) => <div key={i} className="sheet" dangerouslySetInnerHTML={{ __html: pageToSVG(p).replace(/width="[\d.]+mm" height="[\d.]+mm"/, 'width="100%"') }} />)}
+        <div className={`preview-pages zoomable ${zoom > 1 ? 'pannable' : ''}`} ref={pagesRef}
+          onPointerDown={(e) => {
+            const el = pagesRef.current
+            if (!el || e.button !== 0 || zoom <= 1) return
+            const start = { x: e.clientX, y: e.clientY, l: el.scrollLeft, t: el.scrollTop }
+            el.setPointerCapture(e.pointerId); el.classList.add('panning')
+            const move = (ev: PointerEvent) => { el.scrollLeft = start.l - (ev.clientX - start.x); el.scrollTop = start.t - (ev.clientY - start.y) }
+            const up = () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.classList.remove('panning') }
+            el.addEventListener('pointermove', move); el.addEventListener('pointerup', up)
+          }}>
+          {pages.map((p, i) => <div key={i} className="sheet" style={{ width: `${zoom * 100}%`, maxWidth: 1000 * zoom }} dangerouslySetInnerHTML={{ __html: pageToSVG(p).replace(/width="[\d.]+mm" height="[\d.]+mm"/, 'width="100%"') }} />)}
         </div>
       </div>
     </Modal>
