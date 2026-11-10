@@ -3,7 +3,7 @@
 
 import { applyCards } from './cards'
 import { boxNumberingOf, isBox, numberBoxPorts } from './boxports'
-import { cableRule, nextNumber, tagRule, type CableSystem } from './numbering'
+import { cableRule, endpointLabel, nextNumber, numberingOf, tagRule, type CableSystem } from './numbering'
 import { cableSpec, fittingCables } from './cables'
 import { isPanelBayProduct, syncPanelBay } from './patchbay/panelbay'
 import {
@@ -112,7 +112,7 @@ export function connect(p: Project, a: PortAddress, b: PortAddress, specKey: str
   const spec = cableSpec(specKey) ?? (fiberPick || (tp && preferred ? preferred : verdict.suggestedCables[0])) ?? (ra && rb ? fittingCables(ra.port, rb.port)[0] : undefined)
   const prefix = spec?.labelPrefix ?? (verdict.signal ? CABLE_PREFIX[SIGNALS[verdict.signal].domain] : 'X')
   const c: Cable = {
-    id: newId(), label: nextCableLabel(p, prefix, verdict.signal ? SIGNALS[verdict.signal].domain : 'other'), from: { ...from }, to: { ...to },
+    id: newId(), label: numberingOf(p).cableStyle === 'endpoints' ? endpointLabel(p, from, to) : nextCableLabel(p, prefix, verdict.signal ? SIGNALS[verdict.signal].domain : 'other'), from: { ...from }, to: { ...to },
     specKey: spec?.key ?? null, lengthMeters: null, notes: '',
   }
   p.cables.push(c)

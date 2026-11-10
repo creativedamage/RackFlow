@@ -3,7 +3,7 @@
 // project follows a company standard. A standard can be saved by name and
 // loaded into other projects.
 
-import { CATEGORIES, type EquipmentCategory, type Project } from './model'
+import { CATEGORIES, type EquipmentCategory, type PortAddress, type Project } from './model'
 import type { SignalDomain } from './signals'
 
 export interface NumberRule { prefix: string; separator: string; digits: number; start: number }
@@ -18,7 +18,14 @@ export interface NumberingStandard {
   cables: Partial<Record<CableSystem, Partial<NumberRule>>>
   /** Unique port numbers on wall boxes, plates, floor boxes and connector panels. */
   boxPorts?: import('./boxports').BoxPortNumbering
+  /** Cable labels: numbered per system (V-0001), or named by their two ends (SW-01_SDI-OUT-04 > PB-A_IN-12). */
+  cableStyle?: 'number' | 'endpoints'
+  endpoints?: EndpointStyle
 }
+
+/** "SW-01_SDI-OUT-04 > PB-A_IN-12": tag, `tagSep`, port code; the two ends joined by `join`. */
+export interface EndpointStyle { join: string; tagSep: string; digits: number }
+export const DEFAULT_ENDPOINTS: EndpointStyle = { join: ' > ', tagSep: '_', digits: 2 }
 
 export const CABLE_PREFIXES: Record<CableSystem, string> = { video: 'V', audio: 'A', network: 'N', control: 'C', lighting: 'L', rf: 'RF', usb: 'U', power: 'P', other: 'X' }
 
@@ -85,4 +92,67 @@ export function renumberDevices(p: Project, opts: { ids?: Set<string>; categorie
     }
   }
   return n
+}
+
+// MARK: Endpoint cable labels
+
+/** "SDI Out 4" → "SDI-OUT-04": capitals, words joined by '-', numbers padded to `digits`. */
+export function portCode(label: string, digits = 2): string {
+  const words = label.toUpperCase().replace(/[()[\]{}·•,:;'"]/g, ' ').split(/[\s/_\\.\-–—]+/).filter(Boolean)
+  return words.map((w) => (/^\d+$/.test(w) ? w.padStart(digits, '0') : w.replace(/[^A-Z0-9+#&]/g, ''))).filter(Boolean).join('-')
+}
+
+const endName = (p: Project, a: PortAddress, st: EndpointStyle) => {
+  const e = p.equipment.find((x) => x.id === a.equipment)
+  const port = e?.product.ports.find((x) => x.id === a.port)
+  return `${e?.tag ?? '?'}${st.tagSep}${port ? portCode(port.label, st.digits) : a.port.toUpperCase()}`
+}
+
+/** The label for a cable from `from` to `to` in endpoint style (unique: "…-2" if the same pair is cabled twice). */
+export function endpointLabel(p: Project, from: PortAddress, to: PortAddress, used = new Set(p.cables.map((c) => c.label))): string {
+  const st = { ...DEFAULT_ENDPOINTS, ...numberingOf(p).endpoints }
+  const base = `${endName(p, from, st)}${st.join}${endName(p, to, st)}`
+  let label = base, k = 2
+  while (used.has(label)) label = `${base}-${k++}`
+  return label
+}
+
+/** Relabels cables (all, or `ids`) by their two ends. Returns how many changed. */
+export function relabelByEndpoints(p: Project, ids?: Set<string>): number {
+  const targets = p.cables.filter((c) => !ids || ids.has(c.id))
+  const changing = new Set(targets.map((c) => c.id as string))
+  const used = new Set(p.cables.filter((c) => !changing.has(c.id)).map((c) => c.label))
+  let n = 0
+  for (const c of targets) {
+    const label = endpointLabel(p, c.from, c.to, used)
+    used.add(label)
+    if (c.label !== label) { c.label = label; n++ }
+  }
+  return n
+}
+
+/**
+ * Endpoint labels follow their ends: after an edit, a cable whose label was the
+ * automatic "A_PORT > B_PORT" of the old state gets the new one (a device or
+ * port renamed, an end moved). Labels typed by hand are left alone.
+ */
+export function syncEndpointLabels(before: Project, p: Project) {
+  if (numberingOf(p).cableStyle !== 'endpoints' || before === p) return
+  const st = { ...DEFAULT_ENDPOINTS, ...numberingOf(p).endpoints }
+  const idx = (q: Project) => new Map(q.equipment.map((e) => [e.id as string, e]))
+  const eb = idx(before), en = idx(p)
+  const name = (m: Map<string, Project['equipment'][number]>, a: PortAddress) => {
+    const e = m.get(a.equipment), port = e?.product.ports.find((x) => x.id === a.port)
+    return `${e?.tag ?? '?'}${st.tagSep}${port ? portCode(port.label, st.digits) : a.port.toUpperCase()}`
+  }
+  const old = new Map(before.cables.map((c) => [c.id as string, c]))
+  for (const c of p.cables) {
+    const o = old.get(c.id)
+    if (!o) continue
+    const was = `${name(eb, o.from)}${st.join}${name(eb, o.to)}`
+    if (o.label !== was && !(o.label.startsWith(`${was}-`) && /^\d+$/.test(o.label.slice(was.length + 1)))) continue
+    if (c.label !== o.label) continue // relabelled in this edit
+    const now = `${name(en, c.from)}${st.join}${name(en, c.to)}`
+    if (now !== was) c.label = now + o.label.slice(was.length)
+  }
 }

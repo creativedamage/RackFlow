@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   clearBoxPortNumbers, formatPortNumber, isBox, numberBoxPorts, PORT_CLASSES, portClass, portRule, type PortClass, type PortRule,
-  CABLE_PREFIXES, CATEGORIES, CATEGORY_KEYS, DOMAINS, cableRule, defaultNumberingStandard, formatNumber, numberingOf, renumberCables, renumberDevices, tagRule,
+  CABLE_PREFIXES, DEFAULT_ENDPOINTS, endpointLabel, relabelByEndpoints, type EndpointStyle, CATEGORIES, CATEGORY_KEYS, DOMAINS, cableRule, defaultNumberingStandard, formatNumber, numberingOf, renumberCables, renumberDevices, tagRule,
   type CableSystem, type EquipmentCategory, type NumberingStandard, type NumberRule, type Project, type SignalDomain,
 } from '@core/index'
 import { api } from '../platform'
@@ -79,6 +79,8 @@ export function NumberingDialog({ onClose }: { onClose: () => void }) {
         ? <button disabled={!std.boxPorts?.on} onClick={() => save((d) => numberBoxPorts(d, { all: true }), 'Box Ports')} title="Save, then number every box port again from the start, box by box in tag order">Save &amp; Renumber Box Ports</button>
         : tab === 'tags'
         ? <button onClick={() => save((d) => renumberDevices(d), 'Devices')} title="Save, then re-tag every device with this standard">Save &amp; Renumber Devices</button>
+        : std.cableStyle === 'endpoints'
+        ? <button onClick={() => save((d) => relabelByEndpoints(d), 'Cables')} title="Save, then relabel every cable by its two ends">Save &amp; Relabel Cables</button>
         : <button onClick={() => save((d) => renumberCables(d, { schemes: Object.fromEntries((Object.keys(DOMAINS) as SignalDomain[]).map((s) => { const r = cableRule(d, s); return [s, r] })), other: cableRule(d, 'other'), separator: std.cableDefaults.separator }), 'Cables')} title="Save, then relabel every cable with this standard">Save &amp; Renumber Cables</button>}
       <button className="primary" onClick={() => save()}>Save</button>
     </>}>
@@ -105,6 +107,27 @@ export function NumberingDialog({ onClose }: { onClose: () => void }) {
           </div>
           <p className="muted small">Empty boxes use the default (grey). New devices get the next free tag; <b>Save &amp; Renumber Devices</b> re-tags everything top-to-bottom, left-to-right per category.</p>
         </>) : (<>
+          <div className="nb-style">
+            <label><input type="radio" name="cstyle" checked={std.cableStyle !== 'endpoints'} onChange={() => setStd({ ...std, cableStyle: 'number' })} /> Numbered per system <span className="mono muted">V-0001, A-0001…</span></label>
+            <label><input type="radio" name="cstyle" checked={std.cableStyle === 'endpoints'} onChange={() => setStd({ ...std, cableStyle: 'endpoints' })} /> From › To <span className="mono muted">SW-01_SDI-OUT-04 &gt; PB-A_IN-12</span></label>
+          </div>
+          {std.cableStyle === 'endpoints' ? (() => {
+            const ep = { ...DEFAULT_ENDPOINTS, ...std.endpoints }
+            const setEp = (patch: Partial<EndpointStyle>) => setStd({ ...std, endpoints: { ...ep, ...patch } })
+            const sample = project.cables.slice(0, 3).map((c) => endpointLabel(draft, c.from, c.to, new Set()))
+            return (<>
+              <div className="row-gap nb-defaults">
+                <label>Between tag and port <input className="mono" value={ep.tagSep} onChange={(e) => setEp({ tagSep: e.target.value })} style={{ width: 44 }} maxLength={3} /></label>
+                <label>Between the two ends <input className="mono" value={ep.join} onChange={(e) => setEp({ join: e.target.value })} style={{ width: 60 }} maxLength={5} /></label>
+                <label>Port number digits <input className="mono" type="number" min={1} max={4} value={ep.digits} onChange={(e) => setEp({ digits: num(e.target.value, ep.digits) })} style={{ width: 56 }} /></label>
+              </div>
+              <div className="nb-examples">
+                <span className="small muted">From your cables:</span>
+                {(sample.length ? sample : ['SW-01_SDI-OUT-04 > PB-A_IN-12']).map((x) => <code key={x}>{x}</code>)}
+              </div>
+              <p className="muted small">Each label is the device tag and port at the source end, then the destination end; port names are written in capitals with dashes and their numbers padded (SDI Out 4 → SDI-OUT-04). Renaming a device or port updates its cables’ labels; labels you type yourself stay as they are. <b>Save &amp; Relabel Cables</b> relabels every existing cable.</p>
+            </>)
+          })() : (<>
           {defaults(std.cableDefaults, (d) => setStd({ ...std, cableDefaults: d }))}
           <div className="nb-table-wrap">
             <table className="nb-table">
@@ -113,6 +136,7 @@ export function NumberingDialog({ onClose }: { onClose: () => void }) {
             </table>
           </div>
           <p className="muted small">New cables get the next free label for their system. <b>Save &amp; Renumber Cables</b> relabels all of them (Schedule → Renumber… does selections and other orders).</p>
+          </>)}
         </>)}
       </div>
     </Modal>

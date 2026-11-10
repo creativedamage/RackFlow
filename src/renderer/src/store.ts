@@ -5,7 +5,7 @@
 import { create } from 'zustand'
 import { produce } from 'immer'
 import {
-  audit, viewsOf, viewMembers, upgradeBay, addNewCatalogPorts, nodeGeom, spreadCards, BUILT_IN_MANUFACTURERS, ManufacturerDirectory, BUILT_IN_PATCH_TEMPLATES, BUILT_IN_PRODUCTS, CURRENT_SCHEMA, newProject, ProductLibrary,
+  audit, syncEndpointLabels, viewsOf, viewMembers, upgradeBay, addNewCatalogPorts, nodeGeom, spreadCards, BUILT_IN_MANUFACTURERS, ManufacturerDirectory, BUILT_IN_PATCH_TEMPLATES, BUILT_IN_PRODUCTS, CURRENT_SCHEMA, newProject, ProductLibrary,
   type CableId, type EquipmentId, type PatchBayId, type PatchBayTemplate, type ProductDefinition, type Project, type RackId,
   type ValidationIssue, type IssueSubject,
 } from '@core/index'
@@ -200,7 +200,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   apply: (label, fn) => {
     const prev = get().project
-    const next = produce(prev, fn)
+    const next = produce(prev, (d) => { fn(d); syncEndpointLabels(prev, d as Project) })
     if (next === prev) return
     set({ project: next, dirty: changedSinceSave(next), past: [...get().past.slice(-MAX_HISTORY + 1), { project: prev, label }], future: [] })
   },
