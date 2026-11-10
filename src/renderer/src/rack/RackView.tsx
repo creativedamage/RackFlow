@@ -31,6 +31,8 @@ export function RackView() {
       if (e.key !== 'Delete' && e.key !== 'Backspace') return
       const t = e.target as HTMLElement | null
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
+      // Not while a dialog (e.g. the device / plate designer) is open, or focus is in the inspector.
+      if (document.querySelector('.modal-backdrop, [role=dialog]') || t?.closest?.('.inspector, .sidebar')) return
       const st = useStore.getState()
       const eqs = new Set(st.selection.filter((id) => st.project.equipment.find((x) => x.id === id)?.rackPlacement))
       const accs = new Set([...st.rackAccSel, ...(st.selectedAccessory ? [st.selectedAccessory.id] : [])])

@@ -100,6 +100,8 @@ export interface AppState {
   issues: ValidationIssue[]
   /** Bumped to ask the diagram to fit view. */
   fitRequest: number
+  /** Bumped when the project is replaced wholesale (open, undo, redo) – not a user edit. */
+  histSeq: number
 
   library: ProductLibrary
   makers: ManufacturerDirectory
@@ -185,6 +187,7 @@ export const useStore = create<AppState>((set, get) => ({
   showSidebar: (() => { try { return localStorage.getItem('rackflow.sidebar') !== 'off' } catch { return true } })(),
   issues: [],
   fitRequest: 0,
+  histSeq: 0,
 
   library: new ProductLibrary(BUILT_IN_PRODUCTS, []),
   makers: new ManufacturerDirectory(BUILT_IN_MANUFACTURERS),
@@ -213,17 +216,19 @@ export const useStore = create<AppState>((set, get) => ({
     const { past, project, future } = get()
     const last = past[past.length - 1]
     if (!last) return
-    set({ project: last.project, past: past.slice(0, -1), future: [{ project, label: last.label }, ...future], dirty: changedSinceSave(last.project) })
+    set({ project: last.project, past: past.slice(0, -1), future: [{ project, label: last.label }, ...future], dirty: changedSinceSave(last.project), histSeq: get().histSeq + 1 })
   },
   redo: () => {
     const { past, project, future } = get()
     const next = future[0]
     if (!next) return
-    set({ project: next.project, future: future.slice(1), past: [...past, { project, label: next.label }], dirty: changedSinceSave(next.project) })
+    set({ project: next.project, future: future.slice(1), past: [...past, { project, label: next.label }], dirty: changedSinceSave(next.project), histSeq: get().histSeq + 1 })
   },
   load: (project, path) => { rememberSaved(project); set({
     project, path, dirty: false, past: [], future: [], selection: [], selectedCable: null, showStart: false,
-    selectedRack: project.racks[0]?.id ?? null, selectedBay: project.patchBays[0]?.id ?? null, fitRequest: get().fitRequest + 1,
+    selectedRack: project.racks[0]?.id ?? null, selectedBay: project.patchBays[0]?.id ?? null, fitRequest: get().fitRequest + 1, histSeq: get().histSeq + 1,
+    // A page / view of the previous file doesn't exist in this one.
+    diagramPage: null, diagramView: null, selectedAccessory: null, rackAccSel: [], selectedCables: [],
   }) },
   markSaved: (path) => { rememberSaved(get().project); set({ path, dirty: false, lastSaved: Date.now() }) },
   set: (patch) => set(patch),

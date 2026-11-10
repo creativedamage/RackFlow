@@ -128,6 +128,7 @@ export function App() {
         } else s.select(s.project.equipment.map((e) => e.id))
         break
       case 'delete':
+        if (document.querySelector('.modal-backdrop, [role=dialog]')) break
         if (s.mode === 'sheet') { window.dispatchEvent(new Event('sheet:delete')); break }
         if (!inTextField() && s.selection.length && s.diagramView && s.mode === 'diagram') { const vid = s.diagramView; s.apply('Remove from View', (d) => setInView(d, vid, s.selection, false)); break }
         if (!inTextField() && s.selection.length) s.apply('Delete', (d) => {

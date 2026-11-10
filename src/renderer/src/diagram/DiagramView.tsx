@@ -36,6 +36,13 @@ const pointOf = (e: MouseEvent | TouchEvent | React.MouseEvent) => ('touches' in
 
 /** Zoom / position per page or view, kept while the app is open (survives switching tabs). */
 const viewports = new Map<string, Viewport>()
+/** A dialog is open, or focus is outside the diagram canvas (inspector, sidebar…). */
+function deleteBlocked(target: EventTarget | Element | null): boolean {
+  if (document.querySelector('.modal-backdrop, [role=dialog], [aria-modal=true]')) return true
+  const el = target instanceof Element ? target : null
+  if (!el || el === document.body) return false
+  return !!el.closest('.inspector, .sidebar, .toolbar, .modal, .context-menu') || !el.closest('.react-flow, .diagram')
+}
 let seenLocate = 0
 let seenFit = 0
 
@@ -188,9 +195,15 @@ export function DiagramView() {
 
   const wireMode = project.diagram?.wires ?? 'all'
   // On a page, newly added devices join that page.
+  // Only devices the user just added count – not a whole file being opened, or devices
+  // coming back with undo / redo (those used to be pulled into whatever page or view was open).
   const knownIds = useRef(new Set(project.equipment.map((e) => e.id as string)))
+  const histSeq = useStore((s) => s.histSeq)
+  const seenHist = useRef(histSeq)
   useEffect(() => {
-    const fresh = project.equipment.filter((e) => !knownIds.current.has(e.id) && !e.groupId).map((e) => e.id)
+    const replaced = seenHist.current !== histSeq
+    seenHist.current = histSeq
+    const fresh = replaced ? [] : project.equipment.filter((e) => !knownIds.current.has(e.id) && !e.groupId).map((e) => e.id)
     knownIds.current = new Set(project.equipment.map((e) => e.id as string))
     if (!fresh.length) return
     if (view) useStore.getState().amend((d) => {
@@ -199,7 +212,7 @@ export function DiagramView() {
       if (v) for (const e of d.equipment) if (fresh.includes(e.id)) v.positions[e.id] = { ...e.position }
     })
     else if (page) useStore.getState().amend((d) => addToGroup(d, fresh, page))
-  }, [project.equipment, page, view])
+  }, [project.equipment, page, view, histSeq])
   // Devices that joined an auto view (e.g. added on the main diagram) get a spot in the view's layout.
   useEffect(() => {
     if (view && shown.equipment.some((e) => !view.positions[e.id])) useStore.getState().amend((d) => { layoutView(d, view.id, nodeGeom, { onlyNew: true }) })
@@ -415,6 +428,7 @@ export function DiagramView() {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || (e.key !== 'Backspace' && e.key !== 'Delete')) return
       if ((e.target as HTMLElement)?.closest?.('input, textarea, select, [contenteditable]')) return
+      if (deleteBlocked(e.target)) return
       const st = useStore.getState()
       if (st.mode !== 'diagram' || (!st.selection.length && !st.selectedCable && !st.selectedCables.length)) return
       hardDelete.current = true
@@ -443,6 +457,9 @@ export function DiagramView() {
     select([], null)
   }, [apply, select])
 
+  // Never delete diagram devices from a key press meant for something else (a dialog such as the
+  // plate designer, the inspector, the sidebar): the selected wall box used to vanish that way.
+  const onBeforeDelete = useCallback(async () => { if (deleteBlocked(document.activeElement)) { hardDelete.current = false; return false } return true }, [])
   const onDelete = useCallback(({ nodes: ns, edges: es }: { nodes: { id: string }[]; edges: { id: string }[] }) => {
     if (!ns.length && !es.length) return
     const ids = new Set(ns.map((n) => n.id))
@@ -756,6 +773,7 @@ export function DiagramView() {
           document.querySelectorAll('.pages-nav [data-page]').forEach((el) => el.classList.toggle('drop', el === over))
         }}
         onDelete={onDelete}
+        onBeforeDelete={onBeforeDelete}
         onNodeDoubleClick={(ev, n) => {
           if (n.type === 'groupFrame') { select(project.equipment.filter((e) => e.groupId === (n as GroupFrameType).data.id).map((e) => e.id)); return }
           if ((ev.target as HTMLElement).closest('.react-flow__handle')) return
