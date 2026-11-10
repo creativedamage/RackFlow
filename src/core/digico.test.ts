@@ -13,7 +13,7 @@ it('DiGiCo consoles take DMI cards and an Optocore option; SD-Rack takes I/O car
   setCard(p, q.id, 3, 'opt.loop2.hma')
   setCard(p, q.id, 1, 'opt.loop1.hma') // wrong family for a DMI slot – ignored
   expect(q.cards).toEqual({ 1: 'dmi.dante', 2: 'dmi.madib', 3: 'opt.loop2.hma' })
-  expect(q.product.ports.filter((x) => x.group.startsWith('DMI Slot 1')).map((x) => x.label)).toEqual(['Dante Primary', 'Dante Secondary'])
+  expect(q.product.ports.filter((x) => x.group?.startsWith('DMI Slot 1')).map((x) => x.label)).toEqual(['Dante Primary', 'Dante Secondary'])
   expect(q.product.ports.filter((x) => x.label.startsWith('Optocore')).length).toBe(4)
 
   const rack = addEquipment(p, dg('SD-Rack'), { x: 600, y: 0 })
@@ -26,7 +26,7 @@ it('DiGiCo consoles take DMI cards and an Optocore option; SD-Rack takes I/O car
   const ob = addEquipment(p, dg('Orange Box'), { x: 0, y: 600 })
   expect(slotGroups(ob).map((g) => `${g.name}×${g.count}`)).toEqual(['DMI Slot×2'])
   setCard(p, ob.id, 1, 'dmi.madib'); setCard(p, ob.id, 2, 'dmi.dante')
-  const madiOut = q.product.ports.find((x) => x.group.startsWith('DMI Slot 2') && x.label === 'MADI Out')!
+  const madiOut = q.product.ports.find((x) => x.group?.startsWith('DMI Slot 2') && x.label === 'MADI Out')!
   const obIn = ob.product.ports.find((x) => x.label === 'MADI In')!
   expect(connect(p, { equipment: q.id, port: madiOut.id }, { equipment: ob.id, port: obIn.id }).allowed).toBe(true)
 })
