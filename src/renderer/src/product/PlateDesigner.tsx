@@ -327,7 +327,8 @@ export function PlateDesigner({ initial, instanceId }: { initial: ProductDefinit
   const one = sel.size === 1 ? [...sel][0] : null
   const oneJack = one && !isText(one) ? spec.inserts.find((x) => x.pid === one) : undefined
   const oneText = one && isText(one) ? L.texts.find((t) => t.id === one) : undefined
-  const photo = spec.kind === 'rackPanel' || spec.kind === 'wallBox'
+  // The designer draws plates exactly as they print (the photo-style face was retired in 1.22.33).
+  const photo = false
   const pad = spec.kind === 'rackPanel' ? 6 : 12
   // Photo view: room under the panel for its width dimension.
   const padB = photo ? pad + 12 : pad
