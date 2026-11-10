@@ -69,7 +69,7 @@ const CONSOLES: ProductDefinition[] = [
   dg(P(DG, 'Quantum 852', 'mixer', 'Quantum dual-engine flagship', '12 xlrIn, 12 xlrOut, 6 aesIn, 6 aesOut, 8 madiIn, 8 madiOut, 2 lan, 2 iec2', { mount: 'desk', w: 700, kg: 120, tags: 'quantum' }), 'loop1.hma'),
   dg(P(DG, 'SD12', 'mixer', 'SD Series console, 72 channels', '8 xlrIn, 8 xlrOut, 4 aesIn, 4 aesOut, 2 madiIn, 2 madiOut, lan, iec2', { mount: 'desk', w: 300, kg: 40 })),
   P(DG, 'SD10', 'mixer', 'SD Series console', '8 xlrIn, 8 xlrOut, 4 aesIn, 4 aesOut, 2 madiIn, 2 madiOut, lan, iec2', { mount: 'desk', w: 400, kg: 57 }),
-  P(DG, 'SD9', 'mixer', 'SD Series compact console', '8 xlrIn, 8 xlrOut, aesIn, aesOut, madiIn, madiOut, lan, iec', { mount: 'desk', w: 200, kg: 26 }),
+  dg(P(DG, 'SD9', 'mixer', 'SD Series compact console (MADI; optional single optics loop, ST or HMA)', '8 xlrIn, 8 xlrOut, aesIn, aesOut, 2 madiIn, 2 madiOut, lan, iec', { mount: 'desk', w: 200, kg: 26 })),
   P(DG, 'SD7', 'mixer', 'SD Series flagship console', '8 xlrIn, 8 xlrOut, 4 aesIn, 4 aesOut, 4 madiIn, 4 madiOut, 4 madiOptIn, 4 madiOptOut, 2 lan, 2 iec2', { mount: 'desk', w: 700, kg: 160 }),
   P(DG, 'SD5', 'mixer', 'SD Series console', '8 xlrIn, 8 xlrOut, 4 aesIn, 4 aesOut, 2 madiIn, 2 madiOut, 2 madiOptIn, 2 madiOptOut, lan, iec2', { mount: 'desk', w: 500, kg: 80 }),
   // SD-Rack: 14 I/O card slots (8 ch each – 7 mic in + 7 line out = 56 / 56 as shipped) and HMA optics.

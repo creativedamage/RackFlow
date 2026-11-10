@@ -30,3 +30,14 @@ it('DiGiCo consoles take DMI cards and an Optocore option; SD-Rack takes I/O car
   const obIn = ob.product.ports.find((x) => x.label === 'MADI In')!
   expect(connect(p, { equipment: q.id, port: madiOut.id }, { equipment: ob.id, port: obIn.id }).allowed).toBe(true)
 })
+
+it('SD9: MADI, with an optional single optics loop (ST or HMA) – also on SD9s placed before slots existed', () => {
+  const p = newProject()
+  const sd9 = addEquipment(p, dg('SD9'), { x: 0, y: 0 })
+  expect(slotGroups(sd9).map((g) => `${g.name}×${g.count}`)).toEqual(['Optics×1'])
+  delete sd9.product.slots // an older SD9 in a saved project
+  expect(slotGroups(sd9).length).toBe(1)
+  setCard(p, sd9.id, 1, 'opt.loop1.st')
+  expect(sd9.product.ports.filter((x) => x.connector === 'stFiber').map((x) => x.label)).toEqual(['Optocore Loop 1 In', 'Optocore Loop 1 Out'])
+  expect(sd9.product.ports.filter((x) => x.signals.includes('madi')).length).toBeGreaterThan(0)
+})

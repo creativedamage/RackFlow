@@ -100,6 +100,7 @@ CARD_CATALOG.push(
   // Console / rack optics (Optocore loops) – the factory option, not a DMI card.
   D('loop1.hma', 'Optocore – single loop (HMA)', 'Optics option', 'One Optocore loop, HMA multi-mode (in / out)', [{ id: 'l1in', label: 'Optocore Loop 1 In', connector: 'hma', signals: ['optocore'] }, { id: 'l1out', label: 'Optocore Loop 1 Out', connector: 'hma', signals: ['optocore'] }], OPT),
   D('loop2.hma', 'Optocore – dual loop (HMA)', 'Optics option', 'Two Optocore loops, HMA multi-mode (redundant)', [1, 2].flatMap((n) => [{ id: `l${n}in`, label: `Optocore Loop ${n} In`, connector: 'hma' as ConnectorType, signals: ['optocore'] as SignalType[] }, { id: `l${n}out`, label: `Optocore Loop ${n} Out`, connector: 'hma' as ConnectorType, signals: ['optocore'] as SignalType[] }]), OPT),
+  D('loop1.st', 'Optocore – single loop (ST multi-mode)', 'Optics option', 'One Optocore loop, ST multi-mode (in / out)', [{ id: 'l1in', label: 'Optocore Loop 1 In', connector: 'stFiber', signals: ['optocore'] }, { id: 'l1out', label: 'Optocore Loop 1 Out', connector: 'stFiber', signals: ['optocore'] }], OPT),
   D('loop1.ocon', 'Optocore – single loop (opticalCON)', 'Optics option', 'One Optocore loop, opticalCON (in / out)', [{ id: 'l1in', label: 'Optocore Loop 1 In', connector: 'opticalCON', signals: ['optocore'] }, { id: 'l1out', label: 'Optocore Loop 1 Out', connector: 'opticalCON', signals: ['optocore'] }], OPT),
   D('loop2.ocon', 'Optocore – dual loop (opticalCON)', 'Optics option', 'Two Optocore loops, opticalCON (redundant)', [1, 2].flatMap((n) => [{ id: `l${n}in`, label: `Optocore Loop ${n} In`, connector: 'opticalCON' as ConnectorType, signals: ['optocore'] as SignalType[] }, { id: `l${n}out`, label: `Optocore Loop ${n} Out`, connector: 'opticalCON' as ConnectorType, signals: ['optocore'] as SignalType[] }]), OPT),
 )
@@ -113,6 +114,8 @@ export const DIGICO_SLOTS: Record<string, { family: string; count: number; name:
   'Quantum 225': [G(DMI, 2, 'DMI Slot'), G(OPT, 1, 'Optics')],
   'Quantum 852': [G(DMI, 4, 'DMI Slot'), G(OPT, 1, 'Optics')],
   'SD12': [G(DMI, 2, 'DMI Slot'), G(OPT, 1, 'Optics')],
+  // SD9: MADI only, or MADI + one multi-mode optics loop (ST or HMA). No DMI slots.
+  'SD9': [G(OPT, 1, 'Optics')],
   'Orange Box': [G(DMI, 2, 'DMI Slot')],
   'SD-Rack': [G(SDR, 14, 'I/O Card'), G(OPT, 1, 'Optics')],
 }
