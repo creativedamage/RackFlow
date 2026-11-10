@@ -41,7 +41,7 @@ const sameRects = (a: Rect[], b: Rect[]) => a.length === b.length && a.every((r,
 
 interface EndInfo { x: number; y: number; dir: number; device: string; far: string }
 /** A bundle of stubs from one device side to the same far device. */
-export interface StubGroup { key: string; ids: string[]; ys: number[]; x: number; dir: number; leader: string; /** Bracket x. */ bx: number }
+export interface StubGroup { key: string; ids: string[]; ys: number[]; x: number; dir: number; leader: string; /** Bracket x. */ bx: number; /** Where the device-name tag sits (its leader runs out from the bracket at `ty`). */ tx: number; ty: number }
 interface Plan { channel: Map<string, number>; stub: Map<string, boolean>; groups: Map<string, StubGroup>; labels: Map<string, Pt>; paths: Map<string, Pt[]> }
 
 /**
@@ -132,8 +132,33 @@ function planFor(s: ReactFlowState, rects: Rect[]): Plan {
     if (ms.length < 2) continue
     ms.sort((a, b) => a.end.y - b.end.y)
     const width = Math.max(70, ...ms.map((m) => tagW(m.text)))
-    const g: StubGroup = { key, ids: ms.map((m) => m.id), ys: ms.map((m) => m.end.y), x: ms[0].end.x, dir: ms[0].end.dir, leader: ms[0].id, bx: ms[0].end.x + ms[0].end.dir * (STUB + width + 14) }
+    const bx = ms[0].end.x + ms[0].end.dir * (STUB + width + 14)
+    const g: StubGroup = { key, ids: ms.map((m) => m.id), ys: ms.map((m) => m.end.y), x: ms[0].end.x, dir: ms[0].end.dir, leader: ms[0].id, bx, tx: bx + ms[0].end.dir * 22, ty: (ms[0].end.y + ms[ms.length - 1].end.y) / 2 }
     for (const m of ms) groups.set(`${m.id}|${m.end.device}|${m.end.dir}`, g)
+  }
+  // Bundles on the same side of a device never sit on top of each other: brackets whose
+  // spans overlap get their own column, and the device-name tags stack without touching.
+  const sides = new Map<string, StubGroup[]>()
+  for (const g of new Set(groups.values())) { const k = `${g.key.split('|')[0]}|${g.dir}`; sides.set(k, [...(sides.get(k) ?? []), g]) }
+  for (const gs of sides.values()) {
+    if (gs.length < 2) continue
+    const dir = gs[0].dir, x = gs[0].x
+    const reach = Math.max(...gs.map((g) => (g.bx - g.x) * dir))
+    gs.sort((a, b) => Math.min(...a.ys) - Math.min(...b.ys))
+    const colEnd: number[] = []
+    for (const g of gs) {
+      const y0 = Math.min(...g.ys), y1 = Math.max(...g.ys)
+      let col = colEnd.findIndex((e) => e + 10 < y0)
+      if (col < 0) { col = colEnd.length; colEnd.push(y1) } else colEnd[col] = y1
+      g.bx = x + dir * (reach + col * 14)
+    }
+    const tx = x + dir * (reach + (colEnd.length - 1) * 14 + 22)
+    const TAG = 34
+    let last = -Infinity
+    for (const g of [...gs].sort((a, b) => (Math.min(...a.ys) + Math.max(...a.ys)) - (Math.min(...b.ys) + Math.max(...b.ys)))) {
+      const ty = Math.max((Math.min(...g.ys) + Math.max(...g.ys)) / 2, last + TAG)
+      g.ty = ty; g.tx = tx; last = ty
+    }
   }
   // Full wires: route each, then pull apart any that share a run so none sit on top of each other.
   const raw = new Map<string, Pt[]>()
@@ -226,11 +251,11 @@ export const CableEdge = memo(function CableEdge(props: EdgeProps<CableEdgeType>
       // Bundled: short stub + "label · port" tag, all reaching one bracket, then one tag naming the device.
       const bx = g.bx
       const p = { x: x + dir * STUB, y }
-      const y0 = Math.min(...g.ys), y1 = Math.max(...g.ys), ym = (y0 + y1) / 2
+      const ty = g.ty, y0 = Math.min(...g.ys, ty), y1 = Math.max(...g.ys, ty)
       return (
         <g key={key}>
           <BaseEdge id={`${id}:${key}`} path={`M ${x} ${y} L ${bx} ${y}`} interactionWidth={10} style={stroke} />
-          {g.leader === id && <path d={`M ${bx} ${y0} L ${bx} ${y1} M ${bx} ${ym} L ${bx + dir * 22} ${ym}`} fill="none" stroke="var(--text-2)" strokeWidth={1.6} />}
+          {g.leader === id && <path d={`M ${bx} ${y0} L ${bx} ${y1} M ${bx} ${ty} L ${g.tx} ${ty}`} fill="none" stroke="var(--text-2)" strokeWidth={1.6} />}
           <EdgeLabelRenderer>
             <div className={`cable-stub nodrag nopan grouped ${dir < 0 ? 'left' : 'right'}`}
               style={{ transform: `translate(${dir < 0 ? '-100%' : '0'}, -50%) translate(${p.x}px, ${p.y}px)`, borderColor: color }}
@@ -239,7 +264,7 @@ export const CableEdge = memo(function CableEdge(props: EdgeProps<CableEdgeType>
             </div>
             {g.leader === id && (
               <div className={`cable-stub-group nodrag nopan ${dir < 0 ? 'left' : 'right'}`}
-                style={{ transform: `translate(${dir < 0 ? '-100%' : '0'}, -50%) translate(${bx + dir * 22}px, ${ym}px)` }}
+                style={{ transform: `translate(${dir < 0 ? '-100%' : '0'}, -50%) translate(${g.tx}px, ${ty}px)` }}
                 title={`${g.ids.length} wires to ${name ?? ''}`}>
                 {dir < 0 ? '◂ ' : ''}{name}{dir < 0 ? '' : ' ▸'} <span>×{g.ids.length}</span>
               </div>
