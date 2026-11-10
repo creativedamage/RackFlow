@@ -1,10 +1,19 @@
 import type { ProductDefinition } from '../model'
 import { P } from './dsl'
-import { DLIVE_SLOTS } from '../cards'
+import { DIGICO_SLOTS, DLIVE_SLOTS } from '../cards'
 
 const AH = 'Allen & Heath', DG = 'DiGiCo', YA = 'Yamaha', AV = 'Avid', MI = 'Midas', BE = 'Behringer'
 /** dLive option I/O ports (Dante, Waves, fibreACE, gigaACE… cards). */
 const ioPorts = (d: ProductDefinition, count: number): ProductDefinition => ({ ...d, slots: { family: 'dlive', count, name: 'I/O Port' } })
+
+/** DiGiCo slots (DMI + optics, or SD-Rack I/O cards) and the cards fitted as shipped. */
+const dg = (d: ProductDefinition, optics?: string, cards: Record<number, string> = {}): ProductDefinition => {
+  const groups = DIGICO_SLOTS[d.model]
+  const def: Record<string, string> = Object.fromEntries(Object.entries(cards).map(([k, v]) => [k, v]))
+  const opt = groups.reduce((n, g) => (g.family === 'digico.optics' ? n : n + g.count), 0) + 1
+  if (optics && groups.some((g) => g.family === 'digico.optics')) def[String(opt)] = `opt.${optics}`
+  return { ...d, slots: { family: groups[0].family, count: groups.reduce((t, g) => t + g.count, 0), name: groups[0].name, groups }, ...(Object.keys(def).length ? { defaultCards: def } : {}) }
+}
 
 const SC = 'Soundcraft', SSL = 'Solid State Logic', LW = 'Lawo', CR = 'Calrec', PS = 'PreSonus'
 
@@ -52,21 +61,25 @@ const CONSOLES: ProductDefinition[] = [
   P(AH, 'Xone:96', 'mixer', 'Analog DJ mixer', '4 rcaIn, 2 xlrIn, 2 xlrOut, usbB, iec', { mount: 'desk', w: 30 }),
 
   // ── DiGiCo ──
-  P(DG, 'Quantum 7', 'mixer', 'Quantum flagship console', '8 xlrIn, 8 xlrOut, 4 aesIn, 4 aesOut, 4 madiIn, 4 madiOut, 4 madiOptIn, 4 madiOptOut, 2 lan, 2 iec2', { mount: 'desk', w: 600, kg: 105, tags: 'quantum' }),
-  P(DG, 'Quantum 5', 'mixer', 'Quantum console, compact flagship', '8 xlrIn, 8 xlrOut, 4 aesIn, 4 aesOut, 2 madiIn, 2 madiOut, 2 madiOptIn, 2 madiOptOut, 2 lan, iec2', { mount: 'desk', w: 500, kg: 70, tags: 'quantum' }),
-  P(DG, 'Quantum 338', 'mixer', 'Quantum console, 338 channels', '8 xlrIn, 8 xlrOut, 4 aesIn, 4 aesOut, 2 madiIn, 2 madiOut, 2 madiOptIn, 2 madiOptOut, 2 lan, iec2', { mount: 'desk', w: 450, kg: 60, tags: 'quantum' }),
-  P(DG, 'Quantum 225', 'mixer', 'Quantum compact console', '8 xlrIn, 8 xlrOut, 2 aesIn, 2 aesOut, 2 madiIn, 2 madiOut, 2 lan, iec2', { mount: 'desk', w: 300, kg: 40, tags: 'quantum' }),
-  P(DG, 'Quantum 852', 'mixer', 'Quantum dual-engine flagship', '8 xlrIn, 8 xlrOut, 4 aesIn, 4 aesOut, 4 madiIn, 4 madiOut, 4 madiOptIn, 4 madiOptOut, 2 lan, 2 iec2', { mount: 'desk', w: 700, kg: 120, tags: 'quantum' }),
-  P(DG, 'SD12', 'mixer', 'SD Series console, 72 channels', '12 xlrIn, 12 xlrOut, 2 aesIn, 2 aesOut, 2 madiIn, 2 madiOut, lan, iec2', { mount: 'desk', w: 300, kg: 40 }),
+  // Consoles: 2 DMI slots (Quantum 852: 4) and the Optocore optics option – pick cards in the inspector.
+  dg(P(DG, 'Quantum 7', 'mixer', 'Quantum flagship console', '12 xlrIn, 12 xlrOut, 6 aesIn, 6 aesOut, 8 madiIn, 8 madiOut, 2 lan, 2 iec2', { mount: 'desk', w: 600, kg: 105, tags: 'quantum' }), 'loop1.hma'),
+  dg(P(DG, 'Quantum 5', 'mixer', 'Quantum console, compact flagship', '8 xlrIn, 8 xlrOut, 4 aesIn, 4 aesOut, 8 madiIn, 8 madiOut, 2 lan, iec2', { mount: 'desk', w: 500, kg: 70, tags: 'quantum' }), 'loop1.hma'),
+  dg(P(DG, 'Quantum 338', 'mixer', 'Quantum console, 338 channels', '8 xlrIn, 8 xlrOut, 4 aesIn, 4 aesOut, 6 madiIn, 6 madiOut, 2 lan, iec2', { mount: 'desk', w: 450, kg: 60, tags: 'quantum' })),
+  dg(P(DG, 'Quantum 225', 'mixer', 'Quantum compact console', '8 xlrIn, 8 xlrOut, 2 aesIn, 2 aesOut, 4 madiIn, 4 madiOut, 2 lan, iec2', { mount: 'desk', w: 300, kg: 40, tags: 'quantum' })),
+  dg(P(DG, 'Quantum 852', 'mixer', 'Quantum dual-engine flagship', '12 xlrIn, 12 xlrOut, 6 aesIn, 6 aesOut, 8 madiIn, 8 madiOut, 2 lan, 2 iec2', { mount: 'desk', w: 700, kg: 120, tags: 'quantum' }), 'loop1.hma'),
+  dg(P(DG, 'SD12', 'mixer', 'SD Series console, 72 channels', '8 xlrIn, 8 xlrOut, 4 aesIn, 4 aesOut, 2 madiIn, 2 madiOut, lan, iec2', { mount: 'desk', w: 300, kg: 40 })),
   P(DG, 'SD10', 'mixer', 'SD Series console', '8 xlrIn, 8 xlrOut, 4 aesIn, 4 aesOut, 2 madiIn, 2 madiOut, lan, iec2', { mount: 'desk', w: 400, kg: 57 }),
   P(DG, 'SD9', 'mixer', 'SD Series compact console', '8 xlrIn, 8 xlrOut, aesIn, aesOut, madiIn, madiOut, lan, iec', { mount: 'desk', w: 200, kg: 26 }),
   P(DG, 'SD7', 'mixer', 'SD Series flagship console', '8 xlrIn, 8 xlrOut, 4 aesIn, 4 aesOut, 4 madiIn, 4 madiOut, 4 madiOptIn, 4 madiOptOut, 2 lan, 2 iec2', { mount: 'desk', w: 700, kg: 160 }),
   P(DG, 'SD5', 'mixer', 'SD Series console', '8 xlrIn, 8 xlrOut, 4 aesIn, 4 aesOut, 2 madiIn, 2 madiOut, 2 madiOptIn, 2 madiOptOut, lan, iec2', { mount: 'desk', w: 500, kg: 80 }),
-  P(DG, 'SD-Rack', 'audioInterface', 'Stage rack, 56 in / 56 out (32-bit)', '56 xlrIn, 56 xlrOut, 2 madiIn, 2 madiOut, 2 madiOptIn, 2 madiOptOut, iec2', { ru: 10, w: 350, kg: 38 }),
+  // SD-Rack: 14 I/O card slots (8 ch each – 7 mic in + 7 line out = 56 / 56 as shipped) and HMA optics.
+  dg(P(DG, 'SD-Rack', 'audioInterface', 'Stage rack, 14 I/O card slots (56 in / 56 out as standard)', '2 madiIn, 2 madiOut, iec2', { ru: 10, w: 350, kg: 38 }), 'loop2.hma',
+    { 1: 'sdr.mic8', 2: 'sdr.mic8', 3: 'sdr.mic8', 4: 'sdr.mic8', 5: 'sdr.mic8', 6: 'sdr.mic8', 7: 'sdr.mic8', 8: 'sdr.out8', 9: 'sdr.out8', 10: 'sdr.out8', 11: 'sdr.out8', 12: 'sdr.out8', 13: 'sdr.out8', 14: 'sdr.out8' }),
   P(DG, 'SD-MiNi Rack', 'audioInterface', 'Stage rack, 32 in / 16 out', '32 xlrIn, 16 xlrOut, 2 madiIn, 2 madiOut, iec2', { ru: 5, w: 200, kg: 18 }),
   P(DG, 'SD-Nano Rack', 'audioInterface', 'Stage rack, 16 in / 8 out', '16 xlrIn, 8 xlrOut, 2 madiIn, 2 madiOut, iec', { ru: 3, w: 100, kg: 10 }),
   P(DG, 'D2-Rack', 'audioInterface', 'Stage rack, 48 in / 16 out', '48 xlrIn, 16 xlrOut, 2 madiIn, 2 madiOut, 2 madiOptIn, 2 madiOptOut, iec2', { ru: 4, w: 200, kg: 15 }),
-  P(DG, 'Orange Box', 'converter', 'Multi-format MADI interface / converter', '2 madiIn, 2 madiOut, madiOptIn, madiOptOut, dante, danteSec, iec', { ru: 1, w: 30 }),
+  // Orange Box: a 2RU carrier for two DMI cards (any format to any format), dual PSUs.
+  dg(P(DG, 'Orange Box', 'converter', 'Format converter – 2 DMI slots (MADI, Dante, Optics, Waves, KLANG…)', 'lan:Control, iec2', { ru: 2, w: 40 })),
   P(DG, '4REA4', 'dsp', 'Install/live audio processor', '8 xlrIn, 8 xlrOut, 2 madiIn, 2 madiOut, 2 dante, lan, iec2', { ru: 4, w: 150 }),
 
   // ── Yamaha ──

@@ -1,6 +1,7 @@
 // Project helpers. Mutating functions are designed to run on Immer drafts
 // (store) or on plain objects (tests); read helpers are pure.
 
+import { applyCards } from './cards'
 import { boxNumberingOf, isBox, numberBoxPorts } from './boxports'
 import { cableRule, nextNumber, tagRule, type CableSystem } from './numbering'
 import { cableSpec, fittingCables } from './cables'
@@ -71,6 +72,7 @@ export function addEquipment(p: Project, product: ProductDefinition, at: CanvasP
     id: newId<EquipmentId>(), tag: nextTag(p, product.category),
     product: structuredClone(product), position: { ...at }, rackPlacement: null, room: '', notes: '',
   }
+  if (product.defaultCards && Object.keys(product.defaultCards).length) { inst.cards = { ...product.defaultCards }; applyCards(inst) }
   p.equipment.push(inst)
   if (isBox(inst) && boxNumberingOf(p).on) numberBoxPorts(p, { ids: [inst.id] })
   if (isPanelBayProduct(inst.product)) syncPanelBay(p, inst)

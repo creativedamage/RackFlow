@@ -16,7 +16,7 @@ export const DOMAINS: Record<SignalDomain, { name: string; color: string }> = {
 
 export type SignalFamily =
   | 'hdmi' | 'displayPort' | 'dvi' | 'sdi' | 'hdbaseT' | 'analogVideo'
-  | 'analogAudio' | 'speakerLowZ' | 'speakerCV' | 'aes3' | 'madi' | 'ahME'
+  | 'analogAudio' | 'speakerLowZ' | 'speakerCV' | 'aes3' | 'madi' | 'ahME' | 'optocore' | 'hydra2' | 'aNet'
   | 'ethernet' | 'ipProtocol'
   | 'rs232' | 'rs485' | 'ir' | 'gpio'
   | 'dmx' | 'rfUHF' | 'rfWiFi' | 'usb'
@@ -52,6 +52,12 @@ export const SIGNALS = {
   madi: s('MADI', 'audio', 'madi'),
   /** Allen & Heath ME personal-mixing link (40 channels over Cat5e, proprietary – not Ethernet). */
   ahME: s('A&H ME', 'audio', 'ahME'),
+  /** Optocore fibre loop (DiGiCo SD / Quantum consoles and racks). */
+  optocore: s('Optocore', 'audio', 'optocore'),
+  /** Calrec Hydra2 audio network. */
+  hydra2: s('Calrec Hydra2', 'audio', 'hydra2'),
+  /** Aviom A-Net personal mixing. */
+  aNet: s('Aviom A-Net', 'audio', 'aNet'),
 
   ethernet100M: s('Ethernet 100M', 'network', 'ethernet', 1),
   ethernet1G: s('Ethernet 1G', 'network', 'ethernet', 2),
@@ -129,6 +135,8 @@ export const CONNECTORS = {
   mpo12: c('MTP/MPO-12', ['ethernet10G']),
   mpo24: c('MTP/MPO-24', ['ethernet10G']),
   opticalCON: c('opticalCON', ['ethernet10G']),
+  hma: c('HMA (expanded-beam fibre)', ['optocore']),
+  stFiber: c('ST fibre', ['optocore']),
   usbA: c('USB-A', ['usb3']),
   usbB: c('USB-B', ['usb3']),
   usbC: c('USB-C', ['usb3']),
@@ -183,6 +191,6 @@ export const suggestedSignals = (t: ConnectorType): SignalType[] => [...meta(t).
 /** Gender a panel-mounted jack of this type usually has (for new ports). */
 export function typicalPanelGender(t: ConnectorType): Gender {
   const female: ConnectorType[] = ['hdmi', 'displayPort', 'dvi', 'bnc', 'hd15', 'trs6_35', 'trs3_5', 'bantamTT', 'rca', 'rj45', 'etherCON',
-    'lcDuplex', 'scDuplex', 'mdc', 'mpo8', 'mpo12', 'mpo24', 'opticalCON', 'usbA', 'usbB', 'usbC', 'db9', 'db25', 'sma', 'tnc', 'speakonNL2', 'speakonNL4', 'nema5_15', 'nema5_20', 'nemaL5_20', 'nemaL5_30', 'nemaL6_20', 'nemaL6_30', 'nemaL14_30', 'nemaL21_30', 'schuko']
+    'lcDuplex', 'scDuplex', 'mdc', 'mpo8', 'mpo12', 'mpo24', 'opticalCON', 'hma', 'stFiber', 'usbA', 'usbB', 'usbC', 'db9', 'db25', 'sma', 'tnc', 'speakonNL2', 'speakonNL4', 'nema5_15', 'nema5_20', 'nemaL5_20', 'nemaL5_30', 'nemaL6_20', 'nemaL6_30', 'nemaL14_30', 'nemaL21_30', 'schuko']
   return female.includes(t) ? 'female' : 'male'
 }

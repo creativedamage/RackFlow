@@ -1,6 +1,6 @@
 import { editPlacedDevice } from '../product/openEditor'
 import { useState } from 'react'
-import { CABLE_CATALOG, CABLE_COLORS, cableSpec, CATEGORIES, CONNECTOR_TYPES, connectorIsPower, exactFitCable, fittingCables, cablesAt, connectorName, DOMAINS, heatBTU, orientation, portDomain, resolve, SIGNALS, validateCable, findRack, addToGroup, groupsOf, removeFromGroup, groupColor, slotsOf, cardsFor, cardByKey, setCard, circuitLoads, circuitName, isPowerSource, sourceRating, sourcesFor, type Cable, type EquipmentId, type EquipmentInstance, fmtLen, fmtLenPair, fmtWt } from '@core/index'
+import { CABLE_CATALOG, CABLE_COLORS, cableSpec, CATEGORIES, CONNECTOR_TYPES, connectorIsPower, exactFitCable, fittingCables, cablesAt, connectorName, DOMAINS, heatBTU, orientation, portDomain, resolve, SIGNALS, validateCable, findRack, addToGroup, groupsOf, removeFromGroup, groupColor, slotsOf, slotGroups, cardsFor, cardByKey, setCard, circuitLoads, circuitName, isPowerSource, sourceRating, sourcesFor, type Cable, type EquipmentId, type EquipmentInstance, fmtLen, fmtLenPair, fmtWt } from '@core/index'
 import { useStore } from '../store'
 import { RackSettings } from '../rack/RackView'
 import { AccessoryInspector } from '../rack/AccessoryInspector'
@@ -292,23 +292,24 @@ function MultiCableInspector({ ids }: { ids: string[] }) {
 /** Option-card slots (dLive I/O Ports…): pick a card per slot; its connectors appear on the device. */
 function OptionCards({ eq }: { eq: EquipmentInstance }) {
   const apply = useStore((s) => s.apply)
-  const sl = slotsOf(eq)!
-  const choices = cardsFor(sl.family)
+  const groups = slotGroups(eq)
+  const digico = eq.product.manufacturer === 'DiGiCo'
   return (<>
-    <h4>Option cards</h4>
-    {Array.from({ length: sl.count }, (_, i) => i + 1).map((n) => {
+    <h4>{digico ? 'Cards & options' : 'Option cards'}</h4>
+    {groups.flatMap((g) => Array.from({ length: g.count }, (_, i) => g.first + i).map((n) => {
       const cur = eq.cards?.[String(n)] ?? ''
       const card = cardByKey(cur)
+      const choices = cardsFor(g.family)
       const wired = card ? useStore.getState().project.cables.filter((c) => (c.from.equipment === eq.id && c.from.port.startsWith(`slot${n}.`)) || (c.to.equipment === eq.id && c.to.port.startsWith(`slot${n}.`))).length : 0
       return (
-        <Field key={n} label={`${sl.name ?? 'Slot'} ${n}`} hint={card ? `${card.model} – ${card.summary}` : undefined}>
+        <Field key={n} label={g.count > 1 ? `${g.name} ${n - g.first + 1}` : g.name} hint={card ? `${card.model} – ${card.summary}` : undefined}>
           <Select value={cur} onChange={(v: string) => {
             if (wired && !confirm(`Swap the ${card!.name} card? Its ${wired} cable${wired === 1 ? '' : 's'} will be removed.`)) return
             apply(v ? `Fit ${cardByKey(v)?.name}` : 'Remove Card', (d) => setCard(d, eq.id, n, v || null))
-          }} options={[{ value: '', label: 'Empty' }, ...choices.map((c) => ({ value: c.key, label: c.name }))]} />
+          }} options={[{ value: '', label: g.family === 'digico.optics' ? 'None (MADI only)' : 'Empty' }, ...choices.map((c) => ({ value: c.key, label: c.name }))]} />
         </Field>
       )
-    })}
+    }))}
     <p className="muted small">A fitted card’s connectors appear on this device on the diagram, grouped under its slot, ready to wire.</p>
   </>)
 }
