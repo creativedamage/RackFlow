@@ -105,6 +105,69 @@ CARD_CATALOG.push(
   D('loop2.ocon', 'Optocore – dual loop (opticalCON)', 'Optics option', 'Two Optocore loops, opticalCON (redundant)', [1, 2].flatMap((n) => [{ id: `l${n}in`, label: `Optocore Loop ${n} In`, connector: 'opticalCON' as ConnectorType, signals: ['optocore'] as SignalType[] }, { id: `l${n}out`, label: `Optocore Loop ${n} Out`, connector: 'opticalCON' as ConnectorType, signals: ['optocore'] as SignalType[] }]), OPT),
 )
 
+// ── openGear (AJA cards in an AJA OG-X-FR or Ross OG3-FR frame) ──
+// A card and its rear module take two of the frame's 20 slots, so a frame holds 10 cards
+// (positions "Slots 1–2" … "Slots 19–20"). Connectors from AJA's spec sheets.
+const OG = 'opengear'
+type CP = OptionCard['ports'][number]
+const io = (id: string, label: string, connector: ConnectorType, signals: SignalType[], direction: 'input' | 'output') => ({ id, label, connector, signals, direction }) as CP
+const many = (n: number, id: string, label: string, connector: ConnectorType, signals: SignalType[], direction: 'input' | 'output'): CP[] =>
+  n === 1 ? [io(id, label, connector, signals, direction)] : Array.from({ length: n }, (_, i) => io(`${id}${i + 1}`, `${label} ${i + 1}`, connector, signals, direction))
+const S12: SignalType[] = ['sdi12G'], S3: SignalType[] = ['sdi3G'], HD: SignalType[] = ['hdmi20'], AN: SignalType[] = ['analogLine'], AES: SignalType[] = ['aes3']
+const OGC = (k: string, name: string, summary: string, ports: CP[], note?: string): OptionCard => ({ key: `og.${k}`, family: OG, name, model: name, summary, ports, ...(note ? { note } : {}) })
+/** FiDO fibre: T = SDI in → fibre out, R = fibre in → SDI out, TR = one of each. */
+const fido = (k: string, name: string, t: number, r: number, sdi: SignalType[], fib: ConnectorType, loop: boolean, mode: string, note?: string) => OGC(k, name,
+  `${t ? `${t}× SDI → fibre` : ''}${t && r ? ' + ' : ''}${r ? `${r}× fibre → SDI` : ''} (${sdi[0] === 'sdi12G' ? '12G' : '3G'}, ${mode})`,
+  [...many(t, 'tin', 'SDI In', 'bnc', sdi, 'input'), ...(loop ? [io('loop', 'SDI Loop Out', 'bnc', sdi, 'output')] : []), ...many(t, 'fout', 'Fibre Out', fib, sdi, 'output'),
+    ...many(r, 'fin', 'Fibre In', fib, sdi, 'input'), ...many(r, 'rout', 'SDI Out', 'bnc', sdi, 'output')], note)
+const VERIFY4 = '4-channel FiDO connectors follow AJA’s 1- and 2-channel pattern – check the spec sheet'
+CARD_CATALOG.push(
+  OGC('gen10', 'OG-GEN10', 'Sync generator: 9 analog SD/HD sync + AES-11 out', [...many(9, 'ref', 'Ref Out', 'bnc', ['refSync'], 'output'), io('aes11', 'AES-11 Out', 'bnc', AES, 'output')]),
+  OGC('c10da', 'OG-C10DA', 'Analog reference / video DA, 1×8 + loop', [io('in', 'Ref In', 'bnc', ['refSync', 'analogComposite'], 'input'), io('loop', 'Ref Loop', 'bnc', ['refSync', 'analogComposite'], 'output'), ...many(8, 'out', 'Ref Out', 'bnc', ['refSync', 'analogComposite'], 'output')]),
+  OGC('12gm', 'OG-12GM', '4-channel 12G-SDI muxer / converter', [...many(4, 'in', 'SDI In', 'bnc', S12, 'input'), ...many(4, 'out', 'SDI Out', 'bnc', S12, 'output')]),
+  OGC('12gda-2x4', 'OG-12GDA-2x4', '12G-SDI DA, dual 1×4', [...many(2, 'in', 'SDI In', 'bnc', S12, 'input'), ...many(8, 'out', 'SDI Out', 'bnc', S12, 'output')]),
+  OGC('3gda-2x4', 'OG-3GDA-2x4', '3G-SDI DA, 1×8 or dual 1×4', [...many(2, 'in', 'SDI In', 'bnc', S3, 'input'), ...many(8, 'out', 'SDI Out', 'bnc', S3, 'output')]),
+  OGC('3gda-1x9', 'OG-3GDA-1x9', '3G-SDI DA, 1×9', [io('in', 'SDI In', 'bnc', S3, 'input'), ...many(9, 'out', 'SDI Out', 'bnc', S3, 'output')]),
+  OGC('12g-am', 'OG-12G-AM', '12G-SDI 8-ch AES embedder / disembedder', [io('in', 'SDI In', 'bnc', S12, 'input'), io('out', 'SDI Out', 'bnc', S12, 'output'), ...many(4, 'ai', 'AES In', 'bnc', AES, 'input'), ...many(4, 'ao', 'AES Out', 'bnc', AES, 'output')], 'Each AES pair can be set to input or output – shown here as 4 in / 4 out'),
+  OGC('12g-ama', 'OG-12G-AMA', '12G-SDI 8-ch analog audio embedder / disembedder', [io('in', 'SDI In', 'bnc', S12, 'input'), io('out', 'SDI Out', 'bnc', S12, 'output'), ...many(4, 'ai', 'Analog In', 'euroblock', AN, 'input'), ...many(4, 'ao', 'Analog Out', 'euroblock', AN, 'output')], 'Each analog pair can be set to input or output – shown here as 4 in / 4 out'),
+  OGC('3g-ama', 'OG-3G-AMA', '3G-SDI 8-ch analog audio embedder / disembedder', [io('in', 'SDI In', 'bnc', S3, 'input'), io('out', 'SDI Out', 'bnc', S3, 'output'), ...many(4, 'ai', 'Analog In', 'euroblock', AN, 'input'), ...many(4, 'ao', 'Analog Out', 'euroblock', AN, 'output')], 'Each analog pair can be set to input or output – shown here as 4 in / 4 out'),
+  OGC('3g-amd', 'OG-3G-AMD', '3G-SDI 8-ch AES embedder / disembedder', [io('in', 'SDI In', 'bnc', S3, 'input'), io('out', 'SDI Out', 'bnc', S3, 'output'), ...many(4, 'ai', 'AES In', 'bnc', AES, 'input'), ...many(4, 'ao', 'AES Out', 'bnc', AES, 'output')]),
+  OGC('dante-12gam', 'OG-DANTE-12GAM', '12G-SDI ↔ Dante 64-ch embedder / disembedder', [...many(2, 'in', 'SDI In', 'bnc', S12, 'input'), ...many(2, 'out', 'SDI Out', 'bnc', S12, 'output'), { id: 'dpri', label: 'Dante Primary', connector: 'rj45', signals: ['dante', 'aes67', 'ethernet1G'] }, { id: 'dsec', label: 'Dante Secondary', connector: 'rj45', signals: ['dante', 'aes67', 'ethernet1G'] }]),
+  OGC('fs-mini', 'OG-FS-Mini', '3G-SDI frame synchronizer', [io('in', 'SDI In', 'bnc', S3, 'input'), io('out', 'SDI Out', 'bnc', S3, 'output'), io('hdmi', 'HDMI Out', 'hdmi', HD, 'output'), ...many(2, 'ao', 'Analog Out', 'euroblock', AN, 'output')]),
+  OGC('hi5-12g', 'OG-Hi5-12G', '12G-SDI → HDMI 2.0 converter', [io('in', 'SDI In', 'bnc', S12, 'input'), io('hdmi', 'HDMI Out', 'hdmi', HD, 'output'), ...many(2, 'ao', 'Analog Out', 'euroblock', AN, 'output')]),
+  OGC('ha5-12g', 'OG-HA5-12G', 'HDMI 2.0 → 12G-SDI converter', [io('hdmi', 'HDMI In', 'hdmi', HD, 'input'), io('out', 'SDI Out', 'bnc', S12, 'output'), ...many(2, 'ai', 'Analog In', 'euroblock', AN, 'input')]),
+  OGC('hi5-4k-plus', 'OG-Hi5-4K-Plus', '4× 3G-SDI (quad-link 4K) → HDMI', [...many(4, 'in', 'SDI In', 'bnc', S3, 'input'), io('hdmi', 'HDMI Out', 'hdmi', HD, 'output')]),
+  OGC('ha5-4k', 'OG-HA5-4K', 'HDMI → 4× 3G-SDI (quad-link 4K)', [io('hdmi', 'HDMI In', 'hdmi', HD, 'input'), ...many(4, 'out', 'SDI Out', 'bnc', S3, 'output')]),
+  OGC('roi-hdmi', 'OG-ROI-HDMI', 'HDMI → 3G-SDI scan converter (region of interest)', [io('hdmi', 'HDMI In', 'hdmi', HD, 'input'), io('loop', 'HDMI Loop Out', 'hdmi', HD, 'output'), io('out', 'SDI Out', 'bnc', S3, 'output'), ...many(2, 'ai', 'Analog In', 'euroblock', AN, 'input')]),
+  OGC('roi-sdi', 'OG-ROI-SDI', '3G-SDI scan converter (region of interest)', [io('in', 'SDI In', 'bnc', S3, 'input'), io('loop', 'SDI Loop Out', 'bnc', S3, 'output'), io('out', 'SDI Out', 'bnc', S3, 'output'), io('hdmi', 'HDMI Out', 'hdmi', HD, 'output'), ...many(2, 'ao', 'Analog Out', 'euroblock', AN, 'output')]),
+  OGC('roi-dvi', 'OG-ROI-DVI', 'DVI → 3G-SDI scan converter (region of interest)', [io('dvi', 'DVI In', 'dvi', ['dviD'], 'input'), io('loop', 'HDMI Loop Out', 'hdmi', HD, 'output'), io('out', 'SDI Out', 'bnc', S3, 'output'), ...many(2, 'ai', 'Analog In', 'euroblock', AN, 'input')]),
+  OGC('udc', 'OG-UDC', '3G-SDI up / down / cross converter', [io('in', 'SDI In', 'bnc', S3, 'input'), io('out', 'SDI Out', 'bnc', S3, 'output'), io('hdmi', 'HDMI Out', 'hdmi', HD, 'output'), ...many(2, 'ao', 'Analog Out', 'euroblock', AN, 'output')]),
+  OGC('colorbox', 'OG-ColorBox', '12G-SDI colour / HDR pipeline', [io('in', 'SDI In', 'bnc', S12, 'input'), ...many(2, 'out', 'SDI Out', 'bnc', S12, 'output'), io('hdmi', 'HDMI Out', 'hdmi', HD, 'output'), { id: 'lan', label: 'LAN', connector: 'rj45', signals: ['ethernet1G', 'ipControl'] }]),
+  fido('fido-t-12g-st', 'OG-FiDO-T-12G-ST', 1, 0, S12, 'stFiber', true, 'ST single-mode'),
+  fido('fido-r-12g-st', 'OG-FiDO-R-12G-ST', 0, 1, S12, 'stFiber', false, 'ST single-mode'),
+  fido('fido-tr-12g', 'OG-FiDO-TR-12G', 1, 1, S12, 'lcDuplex', false, 'LC single-mode'),
+  fido('fido-2t-12g', 'OG-FiDO-2T-12G', 2, 0, S12, 'lcDuplex', false, 'LC single-mode'),
+  fido('fido-2r-12g', 'OG-FiDO-2R-12G', 0, 2, S12, 'lcDuplex', false, 'LC single-mode'),
+  fido('fido-4t-12g', 'OG-FiDO-4T-12G', 4, 0, S12, 'lcDuplex', false, 'LC single-mode', VERIFY4),
+  fido('fido-4r-12g', 'OG-FiDO-4R-12G', 0, 4, S12, 'lcDuplex', false, 'LC single-mode', VERIFY4),
+  fido('fido-4x-12g', 'OG-FiDO-4X-12G', 2, 2, S12, 'lcDuplex', false, 'LC single-mode', VERIFY4),
+  fido('fido-t', 'OG-FiDO-T', 1, 0, S3, 'lcDuplex', true, 'LC single-mode'),
+  fido('fido-r', 'OG-FiDO-R', 0, 1, S3, 'lcDuplex', false, 'LC single-mode'),
+  fido('fido-tr', 'OG-FiDO-TR', 1, 1, S3, 'lcDuplex', false, 'LC single-mode'),
+  fido('fido-2t', 'OG-FiDO-2T', 2, 0, S3, 'lcDuplex', false, 'LC single-mode'),
+  fido('fido-2r', 'OG-FiDO-2R', 0, 2, S3, 'lcDuplex', false, 'LC single-mode'),
+  fido('fido-4t', 'OG-FiDO-4T', 4, 0, S3, 'lcDuplex', false, 'LC single-mode', VERIFY4),
+  fido('fido-4r', 'OG-FiDO-4R', 0, 4, S3, 'lcDuplex', false, 'LC single-mode', VERIFY4),
+  fido('fido-4x', 'OG-FiDO-4X', 2, 2, S3, 'lcDuplex', false, 'LC single-mode', VERIFY4),
+  fido('fido-t-mm', 'OG-FiDO-T-MM', 1, 0, S3, 'lcDuplex', true, 'LC multi-mode'),
+  fido('fido-r-mm', 'OG-FiDO-R-MM', 0, 1, S3, 'lcDuplex', false, 'LC multi-mode'),
+  fido('fido-tr-mm', 'OG-FiDO-TR-MM', 1, 1, S3, 'lcDuplex', false, 'LC multi-mode'),
+  fido('fido-2t-mm', 'OG-FiDO-2T-MM', 2, 0, S3, 'lcDuplex', false, 'LC multi-mode'),
+  fido('fido-2r-mm', 'OG-FiDO-2R-MM', 0, 2, S3, 'lcDuplex', false, 'LC multi-mode'),
+)
+/** openGear frames: 10 card positions, each a card + rear module across two slots. */
+export const OPENGEAR_FRAMES: Record<string, number> = { 'openGear OG3-FR': 10, 'OG-X-FR': 10 }
+
 const G = (family: string, count: number, name: string) => ({ family, count, name })
 /** DiGiCo slots: DMI cards plus the console's optics (Optocore) option; the SD-Rack's 14 I/O card slots. */
 export const DIGICO_SLOTS: Record<string, { family: string; count: number; name: string }[]> = {
@@ -123,14 +186,19 @@ export const DIGICO_SLOTS: Record<string, { family: string; count: number; name:
 /** dLive option I/O ports per model (S Class 2, C Class 1, MixRacks 2–3). */
 export const DLIVE_SLOTS: Record<string, number> = { 'dLive S7000': 2, 'dLive S5000': 2, 'dLive S3000': 2, 'dLive C3500': 1, 'dLive C2500': 1, 'dLive C1500': 1, 'dLive DM64': 3, 'dLive DM48': 3, 'dLive DM32': 2, 'dLive DM0': 3 }
 
-export interface SlotGroup { family: string; count: number; name: string; first: number }
+export interface SlotGroup { family: string; count: number; name: string; first: number; /** Frame slots each position covers (openGear: 2 → "Slots 1–2"). */ span?: number }
+
+/** "Slots 3–4" for a 2-slot position, "DMI Slot 2", or just "Optics" for a single one. */
+export const positionName = (g: Omit<SlotGroup, 'first'>, i: number) => g.span ? `${g.name} ${i * g.span + 1}–${(i + 1) * g.span}` : g.count > 1 ? `${g.name} ${i + 1}` : g.name
 
 /** A device's option slots – from its product, or (for one placed before slots existed) its model. */
-export function slotsOf(eq: EquipmentInstance): { family: string; count: number; name?: string; groups?: { family: string; count: number; name: string }[] } | undefined {
+export function slotsOf(eq: EquipmentInstance): { family: string; count: number; name?: string; groups?: { family: string; count: number; name: string; span?: number }[] } | undefined {
   if (eq.product.slots) return eq.product.slots
   const model = eq.product.model.replace(/\s*\(.*\)$/, '')
   const n = eq.product.manufacturer === 'Allen & Heath' ? DLIVE_SLOTS[model] : undefined
   if (n) return { family: 'dlive', count: n, name: 'I/O Port' }
+  const og = OPENGEAR_FRAMES[model]
+  if (og) return { family: 'opengear', count: og, name: 'Slots', groups: [{ family: 'opengear', count: og, name: 'Slots', span: 2 }] }
   const dg = eq.product.manufacturer === 'DiGiCo' ? DIGICO_SLOTS[model] : undefined
   return dg ? { family: dg[0].family, count: dg.reduce((t, g) => t + g.count, 0), name: dg[0].name, groups: dg } : undefined
 }
@@ -151,7 +219,7 @@ export const cardByKey = (key: string | undefined) => CARD_CATALOG.find((c) => c
 /** Option-slot ports are named "slotN.…", so they can be told apart from the device's own. */
 export const SLOT_PREFIX = 'slot'
 export const isSlotPort = (portId: string) => /^slot\d+\./.test(portId)
-export const cardSlotName = (eq: EquipmentInstance, n: number) => { const g = groupOfSlot(eq, n); return g ? (g.count > 1 ? `${g.name} ${n - g.first + 1}` : g.name) : `Slot ${n}` }
+export const cardSlotName = (eq: EquipmentInstance, n: number) => { const g = groupOfSlot(eq, n); return g ? positionName(g, n - g.first) : `Slot ${n}` }
 
 /** The ports a fitted card adds to a device. */
 export function cardPorts(eq: EquipmentInstance, slot: number, card: OptionCard): PortTemplate[] {

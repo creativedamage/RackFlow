@@ -1,5 +1,9 @@
 import type { ProductDefinition } from '../model'
 import { P } from './dsl'
+import { OPENGEAR_FRAMES } from '../cards'
+
+/** openGear frame: card positions (Slots 1–2 … 19–20) for AJA openGear cards. */
+const og = (d: ProductDefinition): ProductDefinition => ({ ...d, slots: { family: 'opengear', count: OPENGEAR_FRAMES[d.model], name: 'Slots', groups: [{ family: 'opengear', count: OPENGEAR_FRAMES[d.model], name: 'Slots', span: 2 }] } })
 
 const BMD = 'Blackmagic Design', ROSS = 'Ross Video', GV = 'Grass Valley', PAN = 'Panasonic Connect', SONY = 'Sony Electronics'
 const AJA = 'AJA Video Systems', ROL = 'Roland Professional A/V'
@@ -76,7 +80,7 @@ export const VIDEO: ProductDefinition[] = [
   P(ROSS, 'NK-3G72', 'matrixSwitcher', '72×72 3G-SDI router', '72 sdi3In, 72 sdi3Out, refIn, lan, iec2', { ru: 4, w: 200 }),
   P(ROSS, 'NK-3G34', 'matrixSwitcher', '34×34 3G-SDI router', '34 sdi3In, 34 sdi3Out, refIn, lan, iec', { ru: 2, w: 100 }),
   P(ROSS, 'NK-3G16', 'matrixSwitcher', '16×16 3G-SDI router', '16 sdi3In, 16 sdi3Out, refIn, lan, iec', { ru: 1, w: 60 }),
-  P(ROSS, 'openGear OG3-FR', 'other', 'openGear 2RU frame for 20 cards', '2 lan, iec2', { ru: 2, w: 100, tags: 'opengear' }),
+  og(P(ROSS, 'openGear OG3-FR', 'other', 'openGear 2RU frame – 20 slots (10 cards with rear modules)', '2 refIn, lan:DashBoard, iec2', { ru: 2, w: 100, tags: 'opengear' })),
   P(ROSS, 'XPression Studio', 'mediaPlayer', 'Real-time motion graphics server', '4 sdi3Out, 2 sdi3In, refIn, 2 lan, iec2', { ru: 2, w: 600 }),
   P(ROSS, 'Graphite', 'videoSwitcher', 'All-in-one production server (switcher, graphics, clips)', '18 sdi3In, 8 sdi3Out, refIn, 2 lan, iec2', { ru: 4, w: 700 }),
   P(ROSS, 'TouchDrive TD2', 'other', 'Switcher control panel (2 ME)', 'lan, iec', { mount: 'desk', w: 60, kg: 15 }),
@@ -171,6 +175,7 @@ export const VIDEO: ProductDefinition[] = [
   P('AVer Information', 'CAM570', 'conferencing', '4K dual-lens conference camera', 'usbc, hdmiOut, lan, dc12', { mount: 'wall', w: 15 }),
 
   // ── AJA ──
+  og(P(AJA, 'OG-X-FR', 'other', 'openGear 2RU frame – 20 slots (10 cards with rear modules), dual PSU', '2 refIn, 2 refLoop, lan:DashBoard, iec2', { ru: 2, w: 500, tags: 'opengear' })),
   P(AJA, 'KUMO 3232-12G', 'matrixSwitcher', '32×32 12G-SDI router', '32 sdiIn, 32 sdiOut, refIn, lan, iec2', { ru: 2, w: 120 }),
   P(AJA, 'KUMO 1616-12G', 'matrixSwitcher', '16×16 12G-SDI router', '16 sdiIn, 16 sdiOut, refIn, lan, iec2', { ru: 1, w: 70 }),
   P(AJA, 'KUMO 6464-12G', 'matrixSwitcher', '64×64 12G-SDI router', '64 sdiIn, 64 sdiOut, refIn, lan, iec2', { ru: 4, w: 250 }),

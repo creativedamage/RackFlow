@@ -1,6 +1,6 @@
 import { editPlacedDevice } from '../product/openEditor'
 import { useState } from 'react'
-import { CABLE_CATALOG, CABLE_COLORS, cableSpec, CATEGORIES, CONNECTOR_TYPES, connectorIsPower, exactFitCable, fittingCables, cablesAt, connectorName, DOMAINS, heatBTU, orientation, portDomain, resolve, SIGNALS, validateCable, findRack, addToGroup, groupsOf, removeFromGroup, groupColor, slotsOf, slotGroups, cardsFor, cardByKey, setCard, circuitLoads, circuitName, isPowerSource, sourceRating, sourcesFor, type Cable, type EquipmentId, type EquipmentInstance, fmtLen, fmtLenPair, fmtWt } from '@core/index'
+import { CABLE_CATALOG, CABLE_COLORS, cableSpec, CATEGORIES, CONNECTOR_TYPES, connectorIsPower, exactFitCable, fittingCables, cablesAt, connectorName, DOMAINS, heatBTU, orientation, portDomain, resolve, SIGNALS, validateCable, findRack, addToGroup, groupsOf, removeFromGroup, groupColor, slotsOf, slotGroups, positionName, cardsFor, cardByKey, setCard, circuitLoads, circuitName, isPowerSource, sourceRating, sourcesFor, type Cable, type EquipmentId, type EquipmentInstance, fmtLen, fmtLenPair, fmtWt } from '@core/index'
 import { useStore } from '../store'
 import { RackSettings } from '../rack/RackView'
 import { AccessoryInspector } from '../rack/AccessoryInspector'
@@ -295,14 +295,14 @@ function OptionCards({ eq }: { eq: EquipmentInstance }) {
   const groups = slotGroups(eq)
   const digico = eq.product.manufacturer === 'DiGiCo'
   return (<>
-    <h4>{digico ? 'Cards & options' : 'Option cards'}</h4>
+    <h4>{digico ? 'Cards & options' : groups[0]?.family === 'opengear' ? 'openGear cards' : 'Option cards'}</h4>
     {groups.flatMap((g) => Array.from({ length: g.count }, (_, i) => g.first + i).map((n) => {
       const cur = eq.cards?.[String(n)] ?? ''
       const card = cardByKey(cur)
       const choices = cardsFor(g.family)
       const wired = card ? useStore.getState().project.cables.filter((c) => (c.from.equipment === eq.id && c.from.port.startsWith(`slot${n}.`)) || (c.to.equipment === eq.id && c.to.port.startsWith(`slot${n}.`))).length : 0
       return (
-        <Field key={n} label={g.count > 1 ? `${g.name} ${n - g.first + 1}` : g.name} hint={card ? `${card.model} – ${card.summary}` : undefined}>
+        <Field key={n} label={positionName(g, n - g.first)} hint={card ? `${card.model} – ${card.summary}${card.note ? ` · ${card.note}` : ''}` : undefined}>
           <Select value={cur} onChange={(v: string) => {
             if (wired && !confirm(`Swap the ${card!.name} card? Its ${wired} cable${wired === 1 ? '' : 's'} will be removed.`)) return
             apply(v ? `Fit ${cardByKey(v)?.name}` : 'Remove Card', (d) => setCard(d, eq.id, n, v || null))
